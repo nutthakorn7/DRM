@@ -31,6 +31,16 @@ public sealed class ProtectedFilePackageTests
     }
 
     [Fact]
+    public void Reader_rejects_non_drm_file()
+    {
+        using var stream = new MemoryStream("not drm"u8.ToArray());
+
+        var action = () => ProtectedFileReader.Read(stream);
+
+        action.Should().Throw<InvalidDataException>().WithMessage("Protected file magic header is invalid.");
+    }
+
+    [Fact]
     public void Read_rejects_oversized_header_length()
     {
         using var stream = new MemoryStream();
