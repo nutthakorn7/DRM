@@ -32,6 +32,10 @@ public sealed record OpenDecision(
 
 public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
 {
+    private const Permission DefinedPermissions =
+        Permission.View | Permission.Print | Permission.Copy |
+        Permission.ExportOriginal | Permission.Edit | Permission.DeleteProtectedCopy;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task RegisterFileAsync(
@@ -98,7 +102,8 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
             return Permission.None;
         }
 
-        if (Enum.TryParse<Permission>(permissions, ignoreCase: true, out var parsed))
+        if (Enum.TryParse<Permission>(permissions, ignoreCase: true, out var parsed) &&
+            (parsed & ~DefinedPermissions) == Permission.None)
         {
             return parsed;
         }

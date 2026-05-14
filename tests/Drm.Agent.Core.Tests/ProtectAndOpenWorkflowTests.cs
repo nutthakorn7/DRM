@@ -125,6 +125,34 @@ public sealed class ProtectAndOpenWorkflowTests
         decision.AllowedPermissions.Should().Be(Permission.None);
     }
 
+    [Fact]
+    public async Task DrmServerClient_rejects_undefined_allowed_permission_bits()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """{"allowed":true,"allowedPermissions":"64","reasonCode":"allowed","watermarkTemplate":null}""",
+                Encoding.UTF8,
+                "application/json")
+        });
+
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        });
+
+        var act = () => client.DecideAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Permission.View,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Policy decision returned invalid permissions '64'.");
+    }
+
     private sealed class FakeDrmServerClient : IDrmServerClient
     {
         private Guid _tenantId;
