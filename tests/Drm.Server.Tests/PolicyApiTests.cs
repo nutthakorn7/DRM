@@ -65,6 +65,8 @@ public sealed class PolicyApiTests : IDisposable
             ReasonCode = "allowed",
             WatermarkTemplate = "user:{userId}"
         });
+        decision!.OfflineLeaseExpiresAtUtc.Should().BeAfter(DateTimeOffset.UtcNow);
+        decision.OfflineLeaseExpiresAtUtc.Should().BeBefore(DateTimeOffset.UtcNow.AddMinutes(16));
     }
 
     [Fact]
@@ -247,6 +249,7 @@ public sealed class PolicyApiTests : IDisposable
             ReasonCode = "no_grant",
             WatermarkTemplate = (string?)null
         });
+        decision!.OfflineLeaseExpiresAtUtc.Should().BeNull();
     }
 
     [Fact]
@@ -539,5 +542,6 @@ public sealed class PolicyApiTests : IDisposable
         bool Allowed,
         string AllowedPermissions,
         string ReasonCode,
-        string? WatermarkTemplate);
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 }

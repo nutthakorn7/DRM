@@ -6,6 +6,8 @@ namespace Drm.Server.Endpoints;
 
 public static class PolicyEndpoints
 {
+    private static readonly TimeSpan DefaultOfflineLeaseDuration = TimeSpan.FromMinutes(15);
+
     public static IEndpointRouteBuilder MapPolicyEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/policy/decide", DecideAsync);
@@ -24,9 +26,11 @@ public static class PolicyEndpoints
                 false,
                 Permission.None.ToString(),
                 "invalid_permissions",
+                null,
                 null));
         }
 
+        var decisionTime = DateTimeOffset.UtcNow;
         var file = await dbContext.ProtectedFiles
             .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == request.FileId, cancellationToken);
 
@@ -39,7 +43,7 @@ public static class PolicyEndpoints
                 UserId = request.UserId,
                 EventType = "access_denied",
                 ReasonCode = "file_not_found",
-                CreatedAtUtc = DateTimeOffset.UtcNow
+                CreatedAtUtc = decisionTime
             });
             await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -47,6 +51,7 @@ public static class PolicyEndpoints
                 false,
                 Permission.None.ToString(),
                 "file_not_found",
+                null,
                 null));
         }
 
@@ -100,7 +105,7 @@ public static class PolicyEndpoints
             new UserId(request.UserId),
             new DeviceId(request.DeviceId),
             requestedPermission,
-            DateTimeOffset.UtcNow));
+            decisionTime));
 
         dbContext.AuditEvents.Add(new AuditEventEntity
         {
@@ -109,7 +114,7 @@ public static class PolicyEndpoints
             UserId = request.UserId,
             EventType = decision.Allowed ? "access_allowed" : "access_denied",
             ReasonCode = decision.ReasonCode,
-            CreatedAtUtc = DateTimeOffset.UtcNow
+            CreatedAtUtc = decisionTime
         });
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -117,7 +122,8 @@ public static class PolicyEndpoints
             decision.Allowed,
             decision.AllowedPermissions.ToString(),
             decision.ReasonCode,
-            decision.WatermarkTemplate));
+            decision.WatermarkTemplate,
+            decision.Allowed ? decisionTime.Add(DefaultOfflineLeaseDuration) : null));
     }
 
     private sealed record DecidePolicyRequest(
@@ -132,5 +138,6 @@ public static class PolicyEndpoints
         bool Allowed,
         string AllowedPermissions,
         string ReasonCode,
-        string? WatermarkTemplate);
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 }
