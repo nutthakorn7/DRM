@@ -20,6 +20,7 @@ public static class FilesEndpoints
     private static async Task<Results<Created<RegisterFileResponse>, Conflict, BadRequest<ErrorResponse>>> RegisterFileAsync(
         RegisterFileRequest request,
         AppDbContext dbContext,
+        ISiemDispatcher siemDispatcher,
         CancellationToken cancellationToken)
     {
         if (!PermissionParser.TryParse(request.Permissions, out var permissions))
@@ -56,7 +57,7 @@ public static class FilesEndpoints
             Permissions = file.Permissions.ToString(),
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
-        dbContext.AuditEvents.Add(new AuditEventEntity
+        var auditEvent = new AuditEventEntity
         {
             TenantId = file.TenantId,
             FileId = file.Id,
@@ -64,7 +65,8 @@ public static class FilesEndpoints
             EventType = "file_registered",
             ReasonCode = "registered",
             CreatedAtUtc = DateTimeOffset.UtcNow
-        });
+        };
+        dbContext.AuditEvents.Add(auditEvent);
 
         try
         {
@@ -80,6 +82,8 @@ public static class FilesEndpoints
             throw;
         }
 
+        await siemDispatcher.DispatchAsync(auditEvent, cancellationToken);
+
         return TypedResults.Created($"/api/files/{file.Id}", new RegisterFileResponse(
             file.Id,
             file.TenantId,
@@ -94,6 +98,7 @@ public static class FilesEndpoints
         Guid fileId,
         Guid tenantId,
         AppDbContext dbContext,
+        ISiemDispatcher siemDispatcher,
         CancellationToken cancellationToken)
     {
         var file = await dbContext.ProtectedFiles
@@ -105,7 +110,7 @@ public static class FilesEndpoints
         }
 
         file.Revoked = true;
-        dbContext.AuditEvents.Add(new AuditEventEntity
+        var auditEvent = new AuditEventEntity
         {
             TenantId = file.TenantId,
             FileId = file.Id,
@@ -113,9 +118,11 @@ public static class FilesEndpoints
             EventType = "file_revoked",
             ReasonCode = "revoked",
             CreatedAtUtc = DateTimeOffset.UtcNow
-        });
+        };
+        dbContext.AuditEvents.Add(auditEvent);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await siemDispatcher.DispatchAsync(auditEvent, cancellationToken);
 
         return TypedResults.Ok(new RevokeFileResponse(file.Id, file.Revoked));
     }

@@ -20,6 +20,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite(connectionString);
     }
 });
+builder.Services
+    .AddHttpClient<ISiemEventSink, HttpSiemEventSink>()
+    .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 
 var app = builder.Build();
 
@@ -38,6 +42,7 @@ app.MapAdminGroupsEndpoints();
 app.MapAdminFilesEndpoints();
 app.MapAdminPolicyTemplatesEndpoints();
 app.MapAdminAuditEndpoints();
+app.MapAdminSiemEndpoints();
 
 app.Run();
 
