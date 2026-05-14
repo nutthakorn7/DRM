@@ -176,6 +176,30 @@ public sealed class ProtectAndOpenWorkflowTests
 
             return Task.FromResult(new OpenDecision(false, "denied", null, Permission.None));
         }
+
+        public Task<AgentDeviceRegistration> RegisterDeviceAsync(AgentIdentity identity, string hostname, string operatingSystem, string agentVersion, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new AgentDeviceRegistration(
+                identity.TenantId,
+                identity.UserId,
+                identity.DeviceId,
+                hostname,
+                operatingSystem,
+                agentVersion,
+                "registered",
+                DateTimeOffset.UtcNow,
+                null));
+        }
+
+        public Task<AgentHeartbeat> RecordHeartbeatAsync(AgentIdentity identity, string status, string agentVersion, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new AgentHeartbeat(identity.DeviceId, status, DateTimeOffset.UtcNow));
+        }
+
+        public Task UploadAuditAsync(AgentAuditRecord record, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handle) : HttpMessageHandler
