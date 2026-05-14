@@ -27,4 +27,20 @@ public sealed class EnvelopeCryptoTests
 
         action.Should().Throw<System.Security.Cryptography.AuthenticationTagMismatchException>();
     }
+
+    [Fact]
+    public void Payload_properties_return_defensive_copies()
+    {
+        var key = EnvelopeCrypto.GenerateKey();
+        var plaintext = "payload"u8.ToArray();
+        var encrypted = EnvelopeCrypto.Encrypt(plaintext, key, "file:123"u8.ToArray());
+
+        encrypted.Nonce[0] ^= 0xff;
+        encrypted.Ciphertext[0] ^= 0xff;
+        encrypted.Tag[0] ^= 0xff;
+
+        var decrypted = EnvelopeCrypto.Decrypt(encrypted, key, "file:123"u8.ToArray());
+
+        decrypted.Should().Equal(plaintext);
+    }
 }

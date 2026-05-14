@@ -20,7 +20,8 @@ internal static class ProtectedFileAssociatedData
             header.Version.ToString(System.Globalization.CultureInfo.InvariantCulture),
             header.TenantId.ToString("D"),
             header.FileId.ToString("D"),
-            header.ContentType);
+            header.ContentType,
+            header.CreatedAtUtc.ToUniversalTime().Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         return Encoding.UTF8.GetBytes(value);
     }

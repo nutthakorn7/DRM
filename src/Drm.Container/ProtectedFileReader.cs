@@ -6,6 +6,8 @@ namespace Drm.Container;
 
 public static class ProtectedFileReader
 {
+    private const int MaxHeaderLengthBytes = 64 * 1024;
+    private const int MaxCiphertextLengthBytes = 512 * 1024 * 1024;
     private static readonly byte[] Magic = "DRM1"u8.ToArray();
 
     public static ProtectedFilePackage Read(Stream stream)
@@ -20,18 +22,23 @@ public static class ProtectedFileReader
             throw new InvalidDataException("Protected file magic header is invalid.");
         }
 
-        var headerBytes = ReadLengthPrefixed(stream);
+        var headerBytes = ReadLengthPrefixed(stream, "header", MaxHeaderLengthBytes);
         var header = JsonSerializer.Deserialize<ProtectedFileHeader>(headerBytes)
             ?? throw new InvalidDataException("Protected file header is invalid.");
 
-        var nonce = ReadLengthPrefixed(stream);
-        var tag = ReadLengthPrefixed(stream);
-        var ciphertext = ReadLengthPrefixed(stream);
+        var nonce = ReadLengthPrefixed(stream, "nonce", EnvelopeCrypto.NonceSizeBytes, EnvelopeCrypto.NonceSizeBytes);
+        var tag = ReadLengthPrefixed(stream, "tag", EnvelopeCrypto.TagSizeBytes, EnvelopeCrypto.TagSizeBytes);
+        var ciphertext = ReadLengthPrefixed(stream, "ciphertext", MaxCiphertextLengthBytes);
 
         return new ProtectedFilePackage(header, new AesGcmPayload(nonce, ciphertext, tag));
     }
 
-    private static byte[] ReadLengthPrefixed(Stream stream)
+    private static byte[] ReadLengthPrefixed(Stream stream, string fieldName, int maxLength)
+    {
+        return ReadLengthPrefixed(stream, fieldName, minLength: 0, maxLength);
+    }
+
+    private static byte[] ReadLengthPrefixed(Stream stream, string fieldName, int minLength, int maxLength)
     {
         Span<byte> lengthBytes = stackalloc byte[sizeof(int)];
         ReadExactly(stream, lengthBytes);
@@ -39,7 +46,16 @@ public static class ProtectedFileReader
         var length = BinaryPrimitives.ReadInt32BigEndian(lengthBytes);
         if (length < 0)
         {
-            throw new InvalidDataException("Protected file contains a negative length.");
+            throw new InvalidDataException($"Protected file {fieldName} length cannot be negative.");
+        }
+
+        if (length < minLength || length > maxLength)
+        {
+            var requirement = minLength == maxLength
+                ? $"must be {minLength} bytes"
+                : $"must be between {minLength} and {maxLength} bytes";
+
+            throw new InvalidDataException($"Protected file {fieldName} length {requirement}.");
         }
 
         var value = new byte[length];
