@@ -143,6 +143,44 @@ public sealed class PolicyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Deciding_expired_file_uses_server_time_not_client_supplied_time()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new RegisterFileRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            "application/pdf",
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            "View",
+            "user:{userId}"));
+
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var decideResponse = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            Guid.NewGuid(),
+            "View",
+            DateTimeOffset.UtcNow.AddDays(-30)));
+
+        decideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var decision = await decideResponse.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = false,
+            AllowedPermissions = "None",
+            ReasonCode = "expired",
+            WatermarkTemplate = (string?)null
+        });
+    }
+
+    [Fact]
     public async Task Revoking_file_denies_future_owner_view_decisions()
     {
         using var client = factory.CreateClient();

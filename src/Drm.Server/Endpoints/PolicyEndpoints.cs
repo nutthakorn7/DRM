@@ -64,7 +64,7 @@ public static class PolicyEndpoints
             new UserId(request.UserId),
             new DeviceId(request.DeviceId),
             requestedPermission,
-            request.AtUtc ?? DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow));
 
         dbContext.AuditEvents.Add(new AuditEventEntity
         {
