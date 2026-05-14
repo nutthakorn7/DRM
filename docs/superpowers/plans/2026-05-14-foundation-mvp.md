@@ -73,6 +73,8 @@ tests/Drm.Server.Tests/Drm.Server.Tests.csproj
 tests/Drm.Server.Tests/PolicyApiTests.cs
 tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj
 tests/Drm.Agent.Core.Tests/ProtectAndOpenWorkflowTests.cs
+tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj
+tests/Drm.Integration.Tests/ServerIntegratedWorkflowTests.cs
 ```
 
 Boundaries:
@@ -89,7 +91,7 @@ Boundaries:
 **Files:**
 - Create: `Directory.Build.props`
 - Create: `README.md`
-- Create: all `.csproj` files listed above
+- Create: all `.csproj` files listed above except `tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj`, which is created in Task 7
 
 - [ ] **Step 1: Create the solution and projects**
 
@@ -193,14 +195,12 @@ dotnet add tests/Drm.Crypto.Tests/Drm.Crypto.Tests.csproj reference src/Drm.Cryp
 dotnet add tests/Drm.Container.Tests/Drm.Container.Tests.csproj reference src/Drm.Container/Drm.Container.csproj
 dotnet add tests/Drm.Server.Tests/Drm.Server.Tests.csproj reference src/Drm.Server/Drm.Server.csproj
 dotnet add tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj reference src/Drm.Agent.Core/Drm.Agent.Core.csproj
-dotnet add tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj reference src/Drm.Server/Drm.Server.csproj
 dotnet add tests/Drm.Domain.Tests/Drm.Domain.Tests.csproj package FluentAssertions
 dotnet add tests/Drm.Crypto.Tests/Drm.Crypto.Tests.csproj package FluentAssertions
 dotnet add tests/Drm.Container.Tests/Drm.Container.Tests.csproj package FluentAssertions
 dotnet add tests/Drm.Server.Tests/Drm.Server.Tests.csproj package FluentAssertions
 dotnet add tests/Drm.Server.Tests/Drm.Server.Tests.csproj package Microsoft.AspNetCore.Mvc.Testing
 dotnet add tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj package FluentAssertions
-dotnet add tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj package Microsoft.AspNetCore.Mvc.Testing
 ```
 
 - [ ] **Step 5: Verify scaffold**
@@ -1590,11 +1590,26 @@ git commit -m "feat: add Windows agent and viewer shells"
 
 **Files:**
 - Create: `README.md`
-- Create: `tests/Drm.Agent.Core.Tests/ServerIntegratedWorkflowTests.cs`
+- Create: `tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj`
+- Create: `tests/Drm.Integration.Tests/ServerIntegratedWorkflowTests.cs`
 
-- [ ] **Step 1: Add integrated test using test server**
+- [ ] **Step 1: Create dedicated integration test project**
 
-Create `tests/Drm.Agent.Core.Tests/ServerIntegratedWorkflowTests.cs`:
+Run:
+
+```bash
+dotnet new xunit -n Drm.Integration.Tests -o tests/Drm.Integration.Tests
+dotnet sln add tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj
+dotnet add tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj reference src/Drm.Agent.Core/Drm.Agent.Core.csproj src/Drm.Server/Drm.Server.csproj
+dotnet add tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj package FluentAssertions
+dotnet add tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj package Microsoft.AspNetCore.Mvc.Testing
+```
+
+Expected: server-integrated tests live in a dedicated integration test project and do not introduce an upward dependency from `Drm.Agent.Core.Tests` to `Drm.Server`.
+
+- [ ] **Step 2: Add integrated test using test server**
+
+Create `tests/Drm.Integration.Tests/ServerIntegratedWorkflowTests.cs`:
 
 ```csharp
 using Drm.Agent.Core;
@@ -1604,7 +1619,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
-namespace Drm.Agent.Core.Tests;
+namespace Drm.Integration.Tests;
 
 public sealed class ServerIntegratedWorkflowTests
 {
@@ -1638,17 +1653,17 @@ public sealed class ServerIntegratedWorkflowTests
 }
 ```
 
-- [ ] **Step 2: Run integrated tests**
+- [ ] **Step 3: Run integrated tests**
 
 Run:
 
 ```bash
-dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj
+dotnet test tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj
 ```
 
 Expected: integrated agent/server flow passes.
 
-- [ ] **Step 3: Add README instructions**
+- [ ] **Step 4: Add README instructions**
 
 Create or replace `README.md`:
 
@@ -1688,6 +1703,7 @@ dotnet test tests/Drm.Crypto.Tests/Drm.Crypto.Tests.csproj
 dotnet test tests/Drm.Container.Tests/Drm.Container.Tests.csproj
 dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj
 dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj
+dotnet test tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj
 ```
 
 Windows UI projects require a Windows host:
@@ -1698,10 +1714,10 @@ dotnet build src/Drm.Viewer.Windows/Drm.Viewer.Windows.csproj
 ```
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add README.md tests/Drm.Agent.Core.Tests
+git add README.md tests/Drm.Integration.Tests
 git commit -m "test: add foundation smoke workflow"
 ```
 
