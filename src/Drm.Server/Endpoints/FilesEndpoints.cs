@@ -47,6 +47,15 @@ public static class FilesEndpoints
         };
 
         dbContext.ProtectedFiles.Add(file);
+        dbContext.FileGrants.Add(new FileGrantEntity
+        {
+            TenantId = file.TenantId,
+            FileId = file.Id,
+            SubjectType = "User",
+            SubjectId = file.OwnerUserId,
+            Permissions = file.Permissions.ToString(),
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
         dbContext.AuditEvents.Add(new AuditEventEntity
         {
             TenantId = file.TenantId,

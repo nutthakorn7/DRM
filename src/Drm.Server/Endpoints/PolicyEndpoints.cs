@@ -50,12 +50,48 @@ public static class PolicyEndpoints
                 null));
         }
 
+        var groupIds = await dbContext.GroupMembers
+            .AsNoTracking()
+            .Where(member => member.TenantId == request.TenantId && member.UserId == request.UserId)
+            .Select(member => member.GroupId)
+            .ToListAsync(cancellationToken);
+
+        var grantRows = await dbContext.FileGrants
+            .AsNoTracking()
+            .Where(grant =>
+                grant.TenantId == request.TenantId &&
+                grant.FileId == request.FileId &&
+                ((grant.SubjectType == GrantSubjectType.User.ToString() && grant.SubjectId == request.UserId) ||
+                    (grant.SubjectType == GrantSubjectType.Group.ToString() && groupIds.Contains(grant.SubjectId))))
+            .ToListAsync(cancellationToken);
+
+        var effectivePermissions = Permission.None;
+        foreach (var grant in grantRows)
+        {
+            if (PermissionParser.TryParse(grant.Permissions, out var grantPermissions))
+            {
+                effectivePermissions |= grantPermissions;
+            }
+        }
+
+        var hasUserGrant = grantRows.Any(grant => grant.SubjectType == GrantSubjectType.User.ToString());
+        if (!hasUserGrant && file.OwnerUserId == request.UserId)
+        {
+            effectivePermissions |= file.Permissions;
+        }
+
+        var grants = new List<FileGrant>();
+        if (effectivePermissions != Permission.None)
+        {
+            grants.Add(new FileGrant(new UserId(request.UserId), effectivePermissions));
+        }
+
         var policy = new FilePolicy(
             new TenantId(file.TenantId),
             new ProtectedFileId(file.Id),
             file.ExpiresAtUtc,
             file.Revoked,
-            [new FileGrant(new UserId(file.OwnerUserId), file.Permissions)],
+            grants,
             file.WatermarkTemplate);
 
         var decision = PolicyEvaluator.Evaluate(policy, new PolicyRequest(

@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using Drm.Domain;
+using Drm.Server;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Drm.Server.Tests;
 
@@ -60,6 +64,188 @@ public sealed class PolicyApiTests : IDisposable
             AllowedPermissions = "View",
             ReasonCode = "allowed",
             WatermarkTemplate = "user:{userId}"
+        });
+    }
+
+    [Fact]
+    public async Task Registering_file_creates_owner_file_grant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new RegisterFileRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            "application/pdf",
+            DateTimeOffset.UtcNow.AddHours(1),
+            "View, Print",
+            "user:{userId}"));
+
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var grant = await dbContext.FileGrants.AsNoTracking().SingleAsync();
+
+        grant.Should().BeEquivalentTo(new
+        {
+            TenantId = tenantId,
+            FileId = fileId,
+            SubjectType = "User",
+            SubjectId = ownerUserId,
+            Permissions = "View, Print"
+        });
+        grant.CreatedAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Existing_file_without_file_grant_still_allows_owner_from_legacy_file_policy()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.ProtectedFiles.Add(new ProtectedFileEntity
+            {
+                Id = fileId,
+                TenantId = tenantId,
+                OwnerUserId = ownerUserId,
+                ContentType = "application/pdf",
+                ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+                Revoked = false,
+                Permissions = Permission.View,
+                WatermarkTemplate = "user:{userId}"
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var decideResponse = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            Guid.NewGuid(),
+            "View",
+            DateTimeOffset.UtcNow));
+
+        decideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var decision = await decideResponse.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "user:{userId}"
+        });
+    }
+
+    [Fact]
+    public async Task Legacy_owner_permissions_still_apply_when_owner_also_matches_group_grant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.ProtectedFiles.Add(new ProtectedFileEntity
+            {
+                Id = fileId,
+                TenantId = tenantId,
+                OwnerUserId = ownerUserId,
+                ContentType = "application/pdf",
+                ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+                Revoked = false,
+                Permissions = Permission.View,
+                WatermarkTemplate = "user:{userId}"
+            });
+            dbContext.TenantGroups.Add(new TenantGroupEntity
+            {
+                TenantId = tenantId,
+                GroupId = groupId,
+                Name = "Legal",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            dbContext.GroupMembers.Add(new GroupMemberEntity
+            {
+                TenantId = tenantId,
+                GroupId = groupId,
+                UserId = ownerUserId,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            dbContext.FileGrants.Add(new FileGrantEntity
+            {
+                TenantId = tenantId,
+                FileId = fileId,
+                SubjectType = "Group",
+                SubjectId = groupId,
+                Permissions = "Print",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var decideResponse = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            Guid.NewGuid(),
+            "View",
+            DateTimeOffset.UtcNow));
+
+        decideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var decision = await decideResponse.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View, Print",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "user:{userId}"
+        });
+    }
+
+    [Fact]
+    public async Task User_without_effective_grant_cannot_get_allowed_decision_for_none_permission()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new RegisterFileRequest(
+            tenantId,
+            fileId,
+            Guid.NewGuid(),
+            "application/pdf",
+            DateTimeOffset.UtcNow.AddHours(1),
+            "View",
+            "user:{userId}"));
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var decideResponse = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "None",
+            DateTimeOffset.UtcNow));
+
+        decideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var decision = await decideResponse.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = false,
+            AllowedPermissions = "None",
+            ReasonCode = "no_grant",
+            WatermarkTemplate = (string?)null
         });
     }
 
