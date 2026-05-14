@@ -53,3 +53,25 @@ Windows UI projects:
 dotnet build src/Drm.Agent.Service.Windows/Drm.Agent.Service.Windows.csproj
 dotnet build src/Drm.Viewer.Windows/Drm.Viewer.Windows.csproj
 ```
+
+## Phase 2A Admin and Audit APIs
+
+The server includes admin APIs for local enterprise administration:
+
+- `POST /api/admin/users`
+- `GET /api/admin/users?tenantId=...`
+- `POST /api/admin/groups`
+- `POST /api/admin/groups/{groupId}/members`
+- `GET /api/admin/groups/{groupId}/members?tenantId=...`
+- `POST /api/admin/policy-templates`
+- `GET /api/admin/policy-templates?tenantId=...`
+- `GET /api/admin/policy-templates/{templateId}?tenantId=...`
+- `GET /api/admin/files?tenantId=...&q=...`
+- `POST /api/admin/files/{fileId}/grants`
+- `PUT /api/admin/files/{fileId}/grants`
+- `GET /api/admin/audit?tenantId=...&eventType=...`
+- `GET /api/admin/audit.csv?tenantId=...&eventType=...`
+- `POST /api/admin/siem-webhooks`
+- `GET /api/admin/siem-webhooks?tenantId=...`
+
+Identity-provider integrations such as AD, Entra ID, SAML/OIDC, and SCIM are intentionally deferred to a later phase. SIEM webhooks are also conservative in this MVP: outbound URLs must be HTTPS with public IP-literal hosts until a production allowlist or pinned resolver is added.
