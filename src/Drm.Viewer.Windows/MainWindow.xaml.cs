@@ -1,23 +1,28 @@
-﻿using System.Text;
+﻿using System.IO;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace Drm.Viewer.Windows;
 
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
 public partial class MainWindow : Window
 {
     public MainWindow()
     {
         InitializeComponent();
+        PermissionText.Text = "Permissions: not loaded";
+        WatermarkText.Text = "DRM Protected";
+        StatusText.Text = "No document loaded.";
+    }
+
+    public void LoadPdfFromTemporaryFile(string path, string watermark, string permissions)
+    {
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Temporary PDF file was not found.", path);
+        }
+
+        PermissionText.Text = permissions;
+        WatermarkText.Text = watermark;
+        StatusText.Text = $"Loaded protected PDF: {Path.GetFileName(path)}";
+        PdfHost.Navigate(path);
     }
 }
