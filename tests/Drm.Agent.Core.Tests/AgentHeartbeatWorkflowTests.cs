@@ -40,7 +40,7 @@ public sealed class AgentHeartbeatWorkflowTests
 
         public Task<OpenDecision> DecideAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, Permission permission, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new OpenDecision(true, "allowed", null, Permission.View));
+            return Task.FromResult(new OpenDecision(true, "allowed", null, Permission.View, DateTimeOffset.UtcNow.AddMinutes(5)));
         }
 
         public Task<AgentDeviceRegistration> RegisterDeviceAsync(AgentIdentity identity, string hostname, string operatingSystem, string agentVersion, CancellationToken cancellationToken)

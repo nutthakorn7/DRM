@@ -50,6 +50,83 @@ public sealed class ProtectAndOpenWorkflowTests
     }
 
     [Fact]
+    public async Task Open_stores_allowed_online_decision_in_policy_cache()
+    {
+        var server = new FakeDrmServerClient();
+        var cache = new RecordingPolicyDecisionCache();
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+        var protectedBytes = await new ProtectPdfWorkflow(server)
+            .ProtectAsync(tenantId, userId, "%PDF-1.7"u8.ToArray(), fileKey, CancellationToken.None);
+
+        await new OpenProtectedPdfWorkflow(server, cache)
+            .OpenAsync(protectedBytes, userId, deviceId, fileKey, CancellationToken.None);
+
+        cache.StoredEntries.Should().ContainSingle(entry =>
+            entry.Key.TenantId == tenantId.Value &&
+            entry.Key.UserId == userId.Value &&
+            entry.Key.DeviceId == deviceId.Value &&
+            entry.Key.RequestedPermission == Permission.View &&
+            entry.AllowedPermissions == Permission.View &&
+            entry.OfflineLeaseExpiresAtUtc > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task Open_uses_cached_decision_when_server_is_unavailable()
+    {
+        var tenantId = TenantId.New();
+        var ownerUserId = UserId.New();
+        var deviceId = DeviceId.New();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+        var protectedBytes = await new ProtectPdfWorkflow(new FakeDrmServerClient())
+            .ProtectAsync(tenantId, ownerUserId, "%PDF-1.7 offline"u8.ToArray(), fileKey, CancellationToken.None);
+        var package = Drm.Container.ProtectedFileReader.Read(new MemoryStream(protectedBytes, writable: false));
+        var cache = new RecordingPolicyDecisionCache
+        {
+            CachedEntry = new CachedPolicyDecision(
+                new PolicyDecisionCacheKey(
+                    tenantId.Value,
+                    package.Header.FileId,
+                    ownerUserId.Value,
+                    deviceId.Value,
+                    Permission.View),
+                "{user} offline",
+                Permission.View,
+                DateTimeOffset.UtcNow.AddMinutes(5))
+        };
+
+        var opened = await new OpenProtectedPdfWorkflow(new OfflineDrmServerClient(), cache)
+            .OpenAsync(protectedBytes, ownerUserId, deviceId, fileKey, CancellationToken.None);
+
+        opened.Content.Should().Equal("%PDF-1.7 offline"u8.ToArray());
+        opened.Watermark.Should().Contain("offline");
+        cache.LookupKeys.Should().ContainSingle(key =>
+            key.FileId == package.Header.FileId &&
+            key.UserId == ownerUserId.Value &&
+            key.DeviceId == deviceId.Value &&
+            key.RequestedPermission == Permission.View);
+    }
+
+    [Fact]
+    public async Task Open_denies_offline_when_cached_decision_is_missing()
+    {
+        var tenantId = TenantId.New();
+        var ownerUserId = UserId.New();
+        var deviceId = DeviceId.New();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+        var protectedBytes = await new ProtectPdfWorkflow(new FakeDrmServerClient())
+            .ProtectAsync(tenantId, ownerUserId, "%PDF-1.7"u8.ToArray(), fileKey, CancellationToken.None);
+
+        var act = () => new OpenProtectedPdfWorkflow(new OfflineDrmServerClient(), new RecordingPolicyDecisionCache())
+            .OpenAsync(protectedBytes, ownerUserId, deviceId, fileKey, CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Access denied: offline_lease_missing");
+    }
+
+    [Fact]
     public async Task DrmServerClient_posts_decision_request_and_parses_allowed_permissions()
     {
         HttpRequestMessage? capturedRequest = null;
@@ -62,7 +139,8 @@ public sealed class ProtectAndOpenWorkflowTests
                   "allowed": true,
                   "allowedPermissions": "View, Print",
                   "reasonCode": "allowed",
-                  "watermarkTemplate": "{user} {file}"
+                  "watermarkTemplate": "{user} {file}",
+                  "offlineLeaseExpiresAtUtc": "2026-05-15T01:00:00Z"
                 }
                 """;
 
@@ -89,6 +167,7 @@ public sealed class ProtectAndOpenWorkflowTests
         decision.AllowedPermissions.Should().Be(Permission.View | Permission.Print);
         decision.ReasonCode.Should().Be("allowed");
         decision.WatermarkTemplate.Should().Be("{user} {file}");
+        decision.OfflineLeaseExpiresAtUtc.Should().Be(DateTimeOffset.Parse("2026-05-15T01:00:00Z"));
         capturedRequest.Should().NotBeNull();
         capturedRequest!.Method.Should().Be(HttpMethod.Post);
         capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/policy/decide"));
@@ -171,10 +250,10 @@ public sealed class ProtectAndOpenWorkflowTests
         {
             if (tenantId == _tenantId && fileId == _fileId && userId == _ownerUserId && permission == Permission.View)
             {
-                return Task.FromResult(new OpenDecision(true, "allowed", "{user} {file}", Permission.View));
+                return Task.FromResult(new OpenDecision(true, "allowed", "{user} {file}", Permission.View, DateTimeOffset.UtcNow.AddMinutes(5)));
             }
 
-            return Task.FromResult(new OpenDecision(false, "denied", null, Permission.None));
+            return Task.FromResult(new OpenDecision(false, "denied", null, Permission.None, null));
         }
 
         public Task<AgentDeviceRegistration> RegisterDeviceAsync(AgentIdentity identity, string hostname, string operatingSystem, string agentVersion, CancellationToken cancellationToken)
@@ -199,6 +278,60 @@ public sealed class ProtectAndOpenWorkflowTests
         public Task UploadAuditAsync(AgentAuditRecord record, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class OfflineDrmServerClient : IDrmServerClient
+    {
+        public Task RegisterFileAsync(Guid tenantId, Guid fileId, Guid ownerUserId, string contentType, DateTimeOffset expiresAtUtc, Permission permissions, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<OpenDecision> DecideAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, Permission permission, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task<AgentDeviceRegistration> RegisterDeviceAsync(AgentIdentity identity, string hostname, string operatingSystem, string agentVersion, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task<AgentHeartbeat> RecordHeartbeatAsync(AgentIdentity identity, string status, string agentVersion, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task UploadAuditAsync(AgentAuditRecord record, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+    }
+
+    private sealed class RecordingPolicyDecisionCache : IPolicyDecisionCache
+    {
+        public CachedPolicyDecision? CachedEntry { get; init; }
+
+        public List<CachedPolicyDecision> StoredEntries { get; } = [];
+
+        public List<PolicyDecisionCacheKey> LookupKeys { get; } = [];
+
+        public Task StoreAsync(CachedPolicyDecision decision, CancellationToken cancellationToken)
+        {
+            StoredEntries.Add(decision);
+            return Task.CompletedTask;
+        }
+
+        public Task<CachedPolicyDecision?> TryGetAllowedAsync(PolicyDecisionCacheKey key, DateTimeOffset atUtc, CancellationToken cancellationToken)
+        {
+            LookupKeys.Add(key);
+            if (CachedEntry is null || CachedEntry.OfflineLeaseExpiresAtUtc <= atUtc)
+            {
+                return Task.FromResult<CachedPolicyDecision?>(null);
+            }
+
+            return Task.FromResult<CachedPolicyDecision?>(CachedEntry);
         }
     }
 

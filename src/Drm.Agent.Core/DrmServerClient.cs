@@ -41,7 +41,8 @@ public sealed record OpenDecision(
     bool Allowed,
     string ReasonCode,
     string? WatermarkTemplate,
-    Permission AllowedPermissions);
+    Permission AllowedPermissions,
+    DateTimeOffset? OfflineLeaseExpiresAtUtc);
 
 public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
 {
@@ -105,7 +106,8 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
             decision.Allowed,
             decision.ReasonCode,
             decision.WatermarkTemplate,
-            ParsePermissionsOrNone(decision.AllowedPermissions));
+            ParsePermissionsOrNone(decision.AllowedPermissions),
+            decision.OfflineLeaseExpiresAtUtc);
     }
 
     public async Task<AgentDeviceRegistration> RegisterDeviceAsync(
@@ -217,5 +219,6 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         bool Allowed,
         string? AllowedPermissions,
         string ReasonCode,
-        string? WatermarkTemplate);
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 }

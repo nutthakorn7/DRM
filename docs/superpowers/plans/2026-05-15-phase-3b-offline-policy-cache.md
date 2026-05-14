@@ -24,7 +24,7 @@
 
 ### Task 1: Server Lease Field
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add assertions:
 
@@ -39,17 +39,17 @@ For denied decisions:
 decision!.OfflineLeaseExpiresAtUtc.Should().BeNull();
 ```
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj --filter PolicyApiTests`
 
 Expected: compile failure because the response record has no `OfflineLeaseExpiresAtUtc`.
 
-- [ ] **Step 3: Implement server lease**
+- [x] **Step 3: Implement server lease**
 
 Set a default 15-minute offline lease on allowed policy decisions and null on denied/not-found/bad-request decisions.
 
-- [ ] **Step 4: Run passing test**
+- [x] **Step 4: Run passing test**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj --filter PolicyApiTests`
 
@@ -57,7 +57,7 @@ Expected: PASS.
 
 ### Task 2: Agent Cache and Offline Fallback
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests that:
 - server client parses `offlineLeaseExpiresAtUtc`;
@@ -65,17 +65,17 @@ Add tests that:
 - opening a file with server throwing `HttpRequestException` succeeds with a valid cached allow decision;
 - expired cache entries are denied offline.
 
-- [ ] **Step 2: Run failing test**
+- [x] **Step 2: Run failing test**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj --filter Offline`
 
 Expected: compile failure because `PolicyDecisionCache` and lease properties do not exist.
 
-- [ ] **Step 3: Implement cache**
+- [x] **Step 3: Implement cache**
 
 Add `IPolicyDecisionCache` with `StoreAsync` and `TryGetAllowedAsync`. Implement `JsonPolicyDecisionCache` with atomic temp-file writes and no reuse after `OfflineLeaseExpiresAtUtc <= now`.
 
-- [ ] **Step 4: Wire open workflow**
+- [x] **Step 4: Wire open workflow**
 
 `OpenProtectedPdfWorkflow` should:
 - call the server first;
@@ -83,7 +83,7 @@ Add `IPolicyDecisionCache` with `StoreAsync` and `TryGetAllowedAsync`. Implement
 - fallback to cache only for `HttpRequestException`;
 - throw `UnauthorizedAccessException("Access denied: offline_lease_missing")` when no valid cached allow exists.
 
-- [ ] **Step 5: Run passing test**
+- [x] **Step 5: Run passing test**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj --filter Offline`
 
@@ -91,11 +91,11 @@ Expected: PASS.
 
 ### Task 3: Docs and Verification
 
-- [ ] **Step 1: Document offline leases**
+- [x] **Step 1: Document offline leases**
 
 Update README with the 15-minute MVP lease, cache behavior, and deny-by-default behavior when the cache is absent or expired.
 
-- [ ] **Step 2: Run full verification**
+- [x] **Step 2: Run full verification**
 
 Run:
 
@@ -108,7 +108,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Run:
 

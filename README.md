@@ -104,3 +104,9 @@ Windows service configuration uses the `DrmAgent` section:
 ```
 
 The service registers the configured device, sends periodic heartbeat reports, and flushes locally queued JSONL audit events. This is a visible managed agent foundation; stealth installation, hidden persistence, and arbitrary file deletion are outside the product scope.
+
+## Phase 3B Offline Policy Cache
+
+Policy decisions now include a short `offlineLeaseExpiresAtUtc` value when access is allowed. The MVP lease duration is 15 minutes from the server decision time.
+
+Agent core can persist allowed decisions in a local JSON policy cache. `OpenProtectedPdfWorkflow` always tries the server first; it only falls back to the cache when the server call fails due to transport errors, and it denies access with `offline_lease_missing` when no valid unexpired lease exists. Denied server decisions are not cached as offline allow decisions.
