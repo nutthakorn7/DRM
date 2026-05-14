@@ -2,7 +2,19 @@ using System.Text.Json;
 
 namespace Drm.Agent.Core;
 
-public sealed class AgentAuditQueue(string path, IAgentAuditUploader uploader)
+public interface IAgentAuditQueue
+{
+    Task EnqueueAsync(
+        AgentIdentity identity,
+        string eventType,
+        string reasonCode,
+        Guid? fileId,
+        CancellationToken cancellationToken);
+
+    Task FlushAsync(CancellationToken cancellationToken);
+}
+
+public sealed class AgentAuditQueue(string path, IAgentAuditUploader uploader) : IAgentAuditQueue
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

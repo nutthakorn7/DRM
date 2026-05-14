@@ -51,6 +51,7 @@ Windows UI projects:
 
 ```powershell
 dotnet build src/Drm.Agent.Service.Windows/Drm.Agent.Service.Windows.csproj
+dotnet build src/Drm.Agent.Tray.Windows/Drm.Agent.Tray.Windows.csproj
 dotnet build src/Drm.Viewer.Windows/Drm.Viewer.Windows.csproj
 ```
 
@@ -75,3 +76,31 @@ The server includes admin APIs for local enterprise administration:
 - `GET /api/admin/siem-webhooks?tenantId=...`
 
 Identity-provider integrations such as AD, Entra ID, SAML/OIDC, and SCIM are intentionally deferred to a later phase. SIEM webhooks are also conservative in this MVP: outbound URLs must be HTTPS with public IP-literal hosts until a production allowlist or pinned resolver is added.
+
+## Phase 3A Agent Control Plane
+
+The server now exposes desktop-agent APIs for a visible, enterprise-managed endpoint client:
+
+- `POST /api/agent/devices/register`
+- `POST /api/agent/devices/{deviceId}/heartbeat`
+- `POST /api/agent/audit`
+
+Device registration creates tenant-scoped device records and an `agent_registered` audit event. Heartbeat updates device status/version and creates an `agent_heartbeat` audit event. Agent audit ingestion accepts endpoint-originated events with approved prefixes such as `agent_`, `file_`, and `access_`.
+
+Windows service configuration uses the `DrmAgent` section:
+
+```json
+{
+  "DrmAgent": {
+    "ServerUrl": "https://drm.example",
+    "TenantId": "00000000-0000-0000-0000-000000000000",
+    "UserId": "00000000-0000-0000-0000-000000000000",
+    "DeviceId": "00000000-0000-0000-0000-000000000000",
+    "AuditQueuePath": "%ProgramData%\\DRM\\agent-audit.jsonl",
+    "HeartbeatIntervalSeconds": 60,
+    "AgentVersion": "0.1.0"
+  }
+}
+```
+
+The service registers the configured device, sends periodic heartbeat reports, and flushes locally queued JSONL audit events. This is a visible managed agent foundation; stealth installation, hidden persistence, and arbitrary file deletion are outside the product scope.

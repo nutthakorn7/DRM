@@ -37,7 +37,7 @@
 - Modify: `src/Drm.Server/Program.cs`
 - Test: `tests/Drm.Server.Tests/AgentApiTests.cs`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests that assert:
 
@@ -78,13 +78,13 @@ public async Task Agent_can_register_device_and_registration_is_audited()
 
 Also add tests for heartbeat updating `LastHeartbeatAtUtc`/status, unknown device heartbeat returning 404, and audit ingestion writing an `agent_audit` event.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj --filter AgentApiTests`
 
 Expected: compile failure because `AgentDevices` and endpoints do not exist.
 
-- [ ] **Step 3: Implement minimal server API**
+- [x] **Step 3: Implement minimal server API**
 
 Create `AgentDeviceEntity`, configure EF keys/indexes, and implement endpoints:
 
@@ -100,13 +100,13 @@ Validation rules:
 - heartbeat requires existing tenant/device pair.
 - audit ingestion only accepts event types starting with `agent_`, `file_`, `access_`, `print_`, `export_`, or `copy_`; invalid event types return 400.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj --filter AgentApiTests`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -124,7 +124,7 @@ git commit -m "feat: add agent device APIs"
 - Test: `tests/Drm.Agent.Core.Tests/AgentAuditQueueTests.cs`
 - Modify: `tests/Drm.Agent.Core.Tests/ProtectAndOpenWorkflowTests.cs`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add client tests that capture requests and assert:
 
@@ -154,13 +154,13 @@ public async Task Audit_queue_keeps_failed_events_and_removes_uploaded_events()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj --filter Agent`
 
 Expected: compile failure because agent identity/client methods/queue do not exist.
 
-- [ ] **Step 3: Implement minimal agent core**
+- [x] **Step 3: Implement minimal agent core**
 
 Add:
 - `AgentIdentity(Guid TenantId, Guid UserId, Guid DeviceId)`
@@ -168,13 +168,13 @@ Add:
 - `IAgentAuditUploader` abstraction implemented by `DrmServerClient`.
 - `AgentAuditQueue` using JSONL append, temp-file rewrite on successful flush, and sequential upload so failed events remain on disk.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `/Users/pop7/.dotnet/dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj --filter Agent`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -190,7 +190,7 @@ git commit -m "feat: add agent audit queue"
 - Modify: `src/Drm.Agent.Service.Windows/Worker.cs`
 - Modify: `README.md`
 
-- [ ] **Step 1: Write build-facing implementation**
+- [x] **Step 1: Write build-facing implementation**
 
 Wire configuration keys:
 
@@ -207,15 +207,15 @@ Wire configuration keys:
 }
 ```
 
-The worker should register the device at startup, enqueue an `agent_heartbeat` event, flush the queue, then sleep for the configured interval.
+The worker should register the device at startup, record an online heartbeat, flush any queued audit events, then sleep for the configured interval.
 
-- [ ] **Step 2: Build service to verify wiring**
+- [x] **Step 2: Build service to verify wiring**
 
 Run: `/Users/pop7/.dotnet/dotnet build src/Drm.Agent.Service.Windows/Drm.Agent.Service.Windows.csproj`
 
 Expected: PASS.
 
-- [ ] **Step 3: Document APIs and configuration**
+- [x] **Step 3: Document APIs and configuration**
 
 Update README with:
 - device registration endpoint
@@ -224,7 +224,7 @@ Update README with:
 - Windows service configuration block
 - note that this is a visible managed agent, not stealth endpoint software
 
-- [ ] **Step 4: Full verification**
+- [x] **Step 4: Full verification**
 
 Run:
 
@@ -237,7 +237,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
