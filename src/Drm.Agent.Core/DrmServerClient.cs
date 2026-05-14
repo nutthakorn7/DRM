@@ -35,6 +35,16 @@ public interface IDrmServerClient : IAgentAuditUploader
         string status,
         string agentVersion,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AgentCommand>> GetPendingCommandsAsync(
+        AgentIdentity identity,
+        CancellationToken cancellationToken);
+
+    Task<AgentCommand> CompleteCommandAsync(
+        AgentIdentity identity,
+        Guid commandId,
+        AgentCommandCompletion completion,
+        CancellationToken cancellationToken);
 }
 
 public sealed record OpenDecision(
@@ -168,6 +178,36 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<IReadOnlyList<AgentCommand>> GetPendingCommandsAsync(
+        AgentIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        var commands = await httpClient.GetFromJsonAsync<IReadOnlyList<AgentCommand>>(
+            $"/api/agent/devices/{identity.DeviceId}/commands?tenantId={identity.TenantId}",
+            JsonOptions,
+            cancellationToken);
+
+        return commands ?? [];
+    }
+
+    public async Task<AgentCommand> CompleteCommandAsync(
+        AgentIdentity identity,
+        Guid commandId,
+        AgentCommandCompletion completion,
+        CancellationToken cancellationToken)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/agent/devices/{identity.DeviceId}/commands/{commandId}/complete",
+            new CompleteCommandRequest(identity.TenantId, completion.Status, completion.ReasonCode),
+            JsonOptions,
+            cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<AgentCommand>(JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("Agent command completion response was empty.");
+    }
+
     private static Permission ParsePermissionsOrNone(string? permissions)
     {
         if (string.IsNullOrWhiteSpace(permissions))
@@ -214,6 +254,8 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         Guid UserId,
         string Status,
         string AgentVersion);
+
+    private sealed record CompleteCommandRequest(Guid TenantId, string Status, string ReasonCode);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,

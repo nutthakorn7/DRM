@@ -69,6 +69,16 @@ public sealed class AgentHeartbeatWorkflowTests
         {
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<AgentCommand>> GetPendingCommandsAsync(AgentIdentity identity, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<AgentCommand>>([]);
+        }
+
+        public Task<AgentCommand> CompleteCommandAsync(AgentIdentity identity, Guid commandId, AgentCommandCompletion completion, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class RecordingAuditQueue : IAgentAuditQueue

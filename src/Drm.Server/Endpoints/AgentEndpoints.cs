@@ -21,6 +21,8 @@ public static class AgentEndpoints
 
         group.MapPost("/devices/register", RegisterDeviceAsync);
         group.MapPost("/devices/{deviceId:guid}/heartbeat", RecordHeartbeatAsync);
+        group.MapGet("/devices/{deviceId:guid}/commands", ListPendingCommandsAsync);
+        group.MapPost("/devices/{deviceId:guid}/commands/{commandId:guid}/complete", CompleteCommandAsync);
         group.MapPost("/audit", IngestAuditAsync);
 
         return endpoints;
@@ -128,6 +130,72 @@ public static class AgentEndpoints
         return TypedResults.Ok(new HeartbeatResponse(device.DeviceId, device.Status, now));
     }
 
+    private static async Task<IReadOnlyList<AgentCommandResponse>> ListPendingCommandsAsync(
+        Guid deviceId,
+        Guid tenantId,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var commands = await dbContext.AgentCommands
+            .AsNoTracking()
+            .Where(command =>
+                command.TenantId == tenantId &&
+                command.DeviceId == deviceId &&
+                command.Status == "Pending")
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        return commands
+            .OrderBy(command => command.CreatedAtUtc)
+            .Select(AgentCommandResponse.From)
+            .ToList();
+    }
+
+    private static async Task<Results<Ok<AgentCommandResponse>, BadRequest<ErrorResponse>, NotFound>> CompleteCommandAsync(
+        Guid deviceId,
+        Guid commandId,
+        CompleteCommandRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (request.Status is not ("Completed" or "Failed") || IsBlank(request.ReasonCode))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_command_completion"));
+        }
+
+        var command = await dbContext.AgentCommands
+            .SingleOrDefaultAsync(candidate =>
+                candidate.TenantId == request.TenantId &&
+                candidate.DeviceId == deviceId &&
+                candidate.CommandId == commandId,
+                cancellationToken);
+
+        if (command is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        command.Status = request.Status;
+        command.ReasonCode = request.ReasonCode.Trim();
+        command.CompletedAtUtc = now;
+
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = command.TenantId,
+            FileId = command.FileId,
+            EventType = command.Status == "Completed"
+                ? "protected_file_delete_completed"
+                : "protected_file_delete_failed",
+            ReasonCode = command.ReasonCode,
+            CreatedAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return TypedResults.Ok(AgentCommandResponse.From(command));
+    }
+
     private static async Task<Results<Accepted, BadRequest<ErrorResponse>>> IngestAuditAsync(
         AgentAuditRequest request,
         AppDbContext dbContext,
@@ -205,6 +273,32 @@ public static class AgentEndpoints
         string AgentVersion);
 
     private sealed record HeartbeatResponse(Guid DeviceId, string Status, DateTimeOffset LastHeartbeatAtUtc);
+
+    private sealed record CompleteCommandRequest(Guid TenantId, string Status, string ReasonCode);
+
+    private sealed record AgentCommandResponse(
+        Guid TenantId,
+        Guid CommandId,
+        Guid DeviceId,
+        Guid FileId,
+        string CommandType,
+        string Status,
+        string ReasonCode,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? CompletedAtUtc)
+    {
+        public static AgentCommandResponse From(AgentCommandEntity command)
+            => new(
+                command.TenantId,
+                command.CommandId,
+                command.DeviceId,
+                command.FileId,
+                command.CommandType,
+                command.Status,
+                command.ReasonCode,
+                command.CreatedAtUtc,
+                command.CompletedAtUtc);
+    }
 
     private sealed record AgentAuditRequest(
         Guid TenantId,

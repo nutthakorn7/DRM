@@ -11,6 +11,7 @@ public static class AdminFilesEndpoints
         var group = endpoints.MapGroup("/api/admin/files");
 
         group.MapGet("/", ListFilesAsync);
+        group.MapPost("/{fileId:guid}/commands/delete-protected-copy", EnqueueDeleteProtectedCopyCommandAsync);
         group.MapPost("/{fileId:guid}/grants", UpsertGrantAsync);
         group.MapPut("/{fileId:guid}/grants", ReplaceGrantsAsync);
 
@@ -37,6 +38,49 @@ public static class AdminFilesEndpoints
             .Take(100)
             .Select(file => FileResponse.From(file))
             .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<Results<Created<AgentCommandResponse>, NotFound>> EnqueueDeleteProtectedCopyCommandAsync(
+        Guid fileId,
+        EnqueueDeleteProtectedCopyCommandRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!await FileExistsAsync(dbContext, request.TenantId, fileId, cancellationToken) ||
+            !await DeviceExistsAsync(dbContext, request.TenantId, request.DeviceId, cancellationToken))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var command = new AgentCommandEntity
+        {
+            TenantId = request.TenantId,
+            CommandId = Guid.NewGuid(),
+            DeviceId = request.DeviceId,
+            FileId = fileId,
+            CommandType = "DeleteProtectedCopy",
+            Status = "Pending",
+            ReasonCode = "queued",
+            CreatedAtUtc = now
+        };
+
+        dbContext.AgentCommands.Add(command);
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = request.TenantId,
+            FileId = fileId,
+            UserId = request.AdminUserId,
+            EventType = "protected_file_delete_requested",
+            ReasonCode = "queued",
+            CreatedAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return TypedResults.Created(
+            $"/api/admin/files/{fileId}/commands/{command.CommandId}",
+            AgentCommandResponse.From(command));
     }
 
     private static async Task<Results<Created<FileGrantResponse>, BadRequest<ErrorResponse>, NotFound>> UpsertGrantAsync(
@@ -251,6 +295,19 @@ public static class AdminFilesEndpoints
             .AnyAsync(group => group.TenantId == tenantId && group.GroupId == groupId, cancellationToken);
     }
 
+    private static Task<bool> DeviceExistsAsync(
+        AppDbContext dbContext,
+        Guid tenantId,
+        Guid deviceId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.AgentDevices
+            .AsNoTracking()
+            .AnyAsync(device => device.TenantId == tenantId && device.DeviceId == deviceId, cancellationToken);
+    }
+
+    private sealed record EnqueueDeleteProtectedCopyCommandRequest(Guid TenantId, Guid DeviceId, Guid AdminUserId);
+
     private sealed record UpsertFileGrantRequest(
         Guid TenantId,
         string SubjectType,
@@ -295,6 +352,30 @@ public static class AdminFilesEndpoints
                 file.ExpiresAtUtc,
                 file.Permissions.ToString(),
                 file.WatermarkTemplate);
+    }
+
+    private sealed record AgentCommandResponse(
+        Guid TenantId,
+        Guid CommandId,
+        Guid DeviceId,
+        Guid FileId,
+        string CommandType,
+        string Status,
+        string ReasonCode,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? CompletedAtUtc)
+    {
+        public static AgentCommandResponse From(AgentCommandEntity command)
+            => new(
+                command.TenantId,
+                command.CommandId,
+                command.DeviceId,
+                command.FileId,
+                command.CommandType,
+                command.Status,
+                command.ReasonCode,
+                command.CreatedAtUtc,
+                command.CompletedAtUtc);
     }
 
     private sealed record ErrorResponse(string ReasonCode);

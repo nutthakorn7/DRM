@@ -110,3 +110,13 @@ The service registers the configured device, sends periodic heartbeat reports, a
 Policy decisions now include a short `offlineLeaseExpiresAtUtc` value when access is allowed. The MVP lease duration is 15 minutes from the server decision time.
 
 Agent core can persist allowed decisions in a local JSON policy cache. `OpenProtectedPdfWorkflow` always tries the server first; it only falls back to the cache when the server call fails due to transport errors, and it denies access with `offline_lease_missing` when no valid unexpired lease exists. Denied server decisions are not cached as offline allow decisions.
+
+## Phase 3C Agent Command Queue
+
+The management server includes an endpoint command queue for managed desktop devices:
+
+- `POST /api/admin/files/{fileId}/commands/delete-protected-copy`
+- `GET /api/agent/devices/{deviceId}/commands?tenantId=...`
+- `POST /api/agent/devices/{deviceId}/commands/{commandId}/complete`
+
+The first command type is `DeleteProtectedCopy`. Admin enqueue requires the protected file and device to exist in the same tenant. Agents poll pending commands and acknowledge either `Completed` or `Failed`. Local deletion is intentionally not implemented until the agent has a safe protected-container verifier so remote delete cannot apply to arbitrary user files.

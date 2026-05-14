@@ -142,3 +142,24 @@ public sealed class AgentDeviceEntity
 
     public DateTimeOffset? LastHeartbeatAtUtc { get; set; }
 }
+
+public sealed class AgentCommandEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid CommandId { get; set; }
+
+    public Guid DeviceId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string CommandType { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string ReasonCode { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? CompletedAtUtc { get; set; }
+}

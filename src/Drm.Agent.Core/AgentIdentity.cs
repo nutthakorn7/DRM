@@ -24,6 +24,19 @@ public sealed record AgentAuditRecord(
     string ReasonCode,
     DateTimeOffset CreatedAtUtc);
 
+public sealed record AgentCommand(
+    Guid TenantId,
+    Guid CommandId,
+    Guid DeviceId,
+    Guid FileId,
+    string CommandType,
+    string Status,
+    string ReasonCode,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? CompletedAtUtc);
+
+public sealed record AgentCommandCompletion(string Status, string ReasonCode);
+
 public interface IAgentAuditUploader
 {
     Task UploadAuditAsync(AgentAuditRecord record, CancellationToken cancellationToken);

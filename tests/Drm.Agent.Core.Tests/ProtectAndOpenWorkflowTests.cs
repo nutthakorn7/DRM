@@ -279,6 +279,16 @@ public sealed class ProtectAndOpenWorkflowTests
         {
             return Task.CompletedTask;
         }
+
+        public Task<IReadOnlyList<AgentCommand>> GetPendingCommandsAsync(AgentIdentity identity, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<AgentCommand>>([]);
+        }
+
+        public Task<AgentCommand> CompleteCommandAsync(AgentIdentity identity, Guid commandId, AgentCommandCompletion completion, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class OfflineDrmServerClient : IDrmServerClient
@@ -304,6 +314,16 @@ public sealed class ProtectAndOpenWorkflowTests
         }
 
         public Task UploadAuditAsync(AgentAuditRecord record, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task<IReadOnlyList<AgentCommand>> GetPendingCommandsAsync(AgentIdentity identity, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task<AgentCommand> CompleteCommandAsync(AgentIdentity identity, Guid commandId, AgentCommandCompletion completion, CancellationToken cancellationToken)
         {
             throw new HttpRequestException("server unavailable");
         }

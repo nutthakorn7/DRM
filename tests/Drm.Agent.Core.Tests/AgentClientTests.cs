@@ -138,6 +138,110 @@ public sealed class AgentClientTests
         document.RootElement.GetProperty("reasonCode").GetString().Should().Be("online");
     }
 
+    [Fact]
+    public async Task DrmServerClient_gets_pending_agent_commands()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var commandId = Guid.Parse("32fe8fae-c781-4e35-8dd7-39e656972911");
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            var json = """
+                [
+                  {
+                    "tenantId": "4ec64ccb-5f84-4ff5-bcbc-54286b882f36",
+                    "commandId": "COMMAND_ID",
+                    "deviceId": "e1ec77f7-3377-410b-baad-61f6466b1107",
+                    "fileId": "de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f",
+                    "commandType": "DeleteProtectedCopy",
+                    "status": "Pending",
+                    "reasonCode": "queued",
+                    "createdAtUtc": "2026-05-15T01:00:00Z",
+                    "completedAtUtc": null
+                  }
+                ]
+                """.Replace("COMMAND_ID", commandId.ToString(), StringComparison.Ordinal);
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        });
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        });
+        var identity = new AgentIdentity(
+            Guid.Parse("4ec64ccb-5f84-4ff5-bcbc-54286b882f36"),
+            Guid.NewGuid(),
+            Guid.Parse("e1ec77f7-3377-410b-baad-61f6466b1107"));
+
+        var commands = await client.GetPendingCommandsAsync(identity, CancellationToken.None);
+
+        commands.Should().ContainSingle(command =>
+            command.CommandId == commandId &&
+            command.CommandType == "DeleteProtectedCopy" &&
+            command.Status == "Pending");
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Method.Should().Be(HttpMethod.Get);
+        capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/agent/devices/e1ec77f7-3377-410b-baad-61f6466b1107/commands?tenantId=4ec64ccb-5f84-4ff5-bcbc-54286b882f36"));
+    }
+
+    [Fact]
+    public async Task DrmServerClient_completes_agent_command()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var commandId = Guid.Parse("32fe8fae-c781-4e35-8dd7-39e656972911");
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    $$"""
+                    {
+                      "tenantId": "4ec64ccb-5f84-4ff5-bcbc-54286b882f36",
+                      "commandId": "{{commandId}}",
+                      "deviceId": "e1ec77f7-3377-410b-baad-61f6466b1107",
+                      "fileId": "de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f",
+                      "commandType": "DeleteProtectedCopy",
+                      "status": "Completed",
+                      "reasonCode": "deleted",
+                      "createdAtUtc": "2026-05-15T01:00:00Z",
+                      "completedAtUtc": "2026-05-15T01:01:00Z"
+                    }
+                    """,
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        });
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        });
+        var identity = new AgentIdentity(
+            Guid.Parse("4ec64ccb-5f84-4ff5-bcbc-54286b882f36"),
+            Guid.NewGuid(),
+            Guid.Parse("e1ec77f7-3377-410b-baad-61f6466b1107"));
+
+        var completed = await client.CompleteCommandAsync(
+            identity,
+            commandId,
+            new AgentCommandCompletion("Completed", "deleted"),
+            CancellationToken.None);
+
+        completed.Status.Should().Be("Completed");
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Method.Should().Be(HttpMethod.Post);
+        capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/agent/devices/e1ec77f7-3377-410b-baad-61f6466b1107/commands/32fe8fae-c781-4e35-8dd7-39e656972911/complete"));
+
+        var body = await capturedRequest.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("tenantId").GetGuid().Should().Be(identity.TenantId);
+        document.RootElement.GetProperty("status").GetString().Should().Be("Completed");
+        document.RootElement.GetProperty("reasonCode").GetString().Should().Be("deleted");
+    }
+
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handle) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
