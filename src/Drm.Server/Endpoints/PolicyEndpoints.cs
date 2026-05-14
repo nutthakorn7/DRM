@@ -64,7 +64,7 @@ public static class PolicyEndpoints
             new UserId(request.UserId),
             new DeviceId(request.DeviceId),
             requestedPermission,
-            request.AtUtc));
+            request.AtUtc ?? DateTimeOffset.UtcNow));
 
         dbContext.AuditEvents.Add(new AuditEventEntity
         {
@@ -90,7 +90,7 @@ public static class PolicyEndpoints
         Guid UserId,
         Guid DeviceId,
         string RequestedPermission,
-        DateTimeOffset AtUtc);
+        DateTimeOffset? AtUtc);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,

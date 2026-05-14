@@ -57,7 +57,19 @@ public static class FilesEndpoints
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            if (await ProtectedFileExistsAsync(dbContext, file.TenantId, file.Id, cancellationToken))
+            {
+                return TypedResults.Conflict();
+            }
+
+            throw;
+        }
 
         return TypedResults.Created($"/api/files/{file.Id}", new RegisterFileResponse(
             file.Id,
@@ -97,6 +109,17 @@ public static class FilesEndpoints
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return TypedResults.Ok(new RevokeFileResponse(file.Id, file.Revoked));
+    }
+
+    private static Task<bool> ProtectedFileExistsAsync(
+        AppDbContext dbContext,
+        Guid tenantId,
+        Guid fileId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.ProtectedFiles
+            .AsNoTracking()
+            .AnyAsync(candidate => candidate.TenantId == tenantId && candidate.Id == fileId, cancellationToken);
     }
 
     private sealed record RegisterFileRequest(
