@@ -97,6 +97,7 @@ Windows service configuration uses the `DrmAgent` section:
     "UserId": "00000000-0000-0000-0000-000000000000",
     "DeviceId": "00000000-0000-0000-0000-000000000000",
     "AuditQueuePath": "%ProgramData%\\DRM\\agent-audit.jsonl",
+    "InventoryPath": "%ProgramData%\\DRM\\protected-inventory.json",
     "HeartbeatIntervalSeconds": 60,
     "AgentVersion": "0.1.0"
   }
@@ -119,4 +120,6 @@ The management server includes an endpoint command queue for managed desktop dev
 - `GET /api/agent/devices/{deviceId}/commands?tenantId=...`
 - `POST /api/agent/devices/{deviceId}/commands/{commandId}/complete`
 
-The first command type is `DeleteProtectedCopy`. Admin enqueue requires the protected file and device to exist in the same tenant. Agents poll pending commands and acknowledge either `Completed` or `Failed`. Local deletion is intentionally not implemented until the agent has a safe protected-container verifier so remote delete cannot apply to arbitrary user files.
+The first command type is `DeleteProtectedCopy`. Admin enqueue requires the protected file and device to exist in the same tenant. Agents poll pending commands and acknowledge either `Completed` or `Failed`.
+
+The Windows service now has a safe delete processor for this command. A local file is deleted only when it is present in the agent inventory and `ProtectedFileReader` verifies that the file is a protected container whose tenant and file IDs match the command. Missing inventory is reported as `not_found`; parse/header mismatch is reported as `verification_failed` and the file is left untouched.

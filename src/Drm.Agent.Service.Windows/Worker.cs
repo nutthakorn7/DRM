@@ -6,6 +6,7 @@ namespace Drm.Agent.Service.Windows;
 public class Worker(
     ILogger<Worker> logger,
     AgentHeartbeatWorkflow heartbeatWorkflow,
+    AgentCommandProcessor commandProcessor,
     IOptionsMonitor<AgentServiceOptions> options) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,6 +29,7 @@ public class Worker(
                     Environment.OSVersion.VersionString,
                     currentOptions.AgentVersion,
                     stoppingToken);
+                await commandProcessor.ProcessPendingAsync(currentOptions.ToIdentity(), stoppingToken);
 
                 logger.LogInformation("DRM Agent heartbeat sent at {Time}", DateTimeOffset.UtcNow);
             }

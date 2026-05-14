@@ -14,6 +14,8 @@ public sealed class AgentServiceOptions
 
     public string AuditQueuePath { get; set; } = "%ProgramData%\\DRM\\agent-audit.jsonl";
 
+    public string InventoryPath { get; set; } = "%ProgramData%\\DRM\\protected-inventory.json";
+
     public int HeartbeatIntervalSeconds { get; set; } = 60;
 
     public string AgentVersion { get; set; } = typeof(AgentServiceOptions).Assembly.GetName().Version?.ToString() ?? "0.1.0";
@@ -29,8 +31,14 @@ public sealed class AgentServiceOptions
     public AgentIdentity ToIdentity() => new(TenantId, UserId, DeviceId);
 
     public string ResolveAuditQueuePath()
+        => ResolveConfiguredPath(AuditQueuePath);
+
+    public string ResolveInventoryPath()
+        => ResolveConfiguredPath(InventoryPath);
+
+    private static string ResolveConfiguredPath(string configuredPath)
     {
-        var expanded = Environment.ExpandEnvironmentVariables(AuditQueuePath);
+        var expanded = Environment.ExpandEnvironmentVariables(configuredPath);
         var commonApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         if (string.IsNullOrWhiteSpace(commonApplicationData))
         {
