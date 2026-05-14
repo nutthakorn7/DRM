@@ -5,6 +5,8 @@ namespace Drm.Server.Endpoints;
 
 public static class FilesEndpoints
 {
+    private const string DefaultWatermarkTemplate = "{user} {time} {file}";
+
     public static IEndpointRouteBuilder MapFilesEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/files");
@@ -41,7 +43,7 @@ public static class FilesEndpoints
             ExpiresAtUtc = request.ExpiresAtUtc,
             Revoked = false,
             Permissions = permissions,
-            WatermarkTemplate = request.WatermarkTemplate
+            WatermarkTemplate = request.WatermarkTemplate ?? DefaultWatermarkTemplate
         };
 
         dbContext.ProtectedFiles.Add(file);
@@ -104,7 +106,7 @@ public static class FilesEndpoints
         string ContentType,
         DateTimeOffset ExpiresAtUtc,
         string Permissions,
-        string WatermarkTemplate);
+        string? WatermarkTemplate);
 
     private sealed record RegisterFileResponse(
         Guid FileId,

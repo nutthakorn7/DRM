@@ -64,6 +64,45 @@ public sealed class PolicyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Registering_task5_file_shape_uses_default_watermark()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View"
+        });
+
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var decideResponse = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            Guid.NewGuid(),
+            "View",
+            DateTimeOffset.UtcNow));
+
+        decideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var decision = await decideResponse.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "{user} {time} {file}"
+        });
+    }
+
+    [Fact]
     public async Task Revoking_file_denies_future_owner_view_decisions()
     {
         using var client = factory.CreateClient();
