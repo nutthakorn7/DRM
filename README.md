@@ -123,3 +123,9 @@ The management server includes an endpoint command queue for managed desktop dev
 The first command type is `DeleteProtectedCopy`. Admin enqueue requires the protected file and device to exist in the same tenant. Agents poll pending commands and acknowledge either `Completed` or `Failed`.
 
 The Windows service now has a safe delete processor for this command. A local file is deleted only when it is present in the agent inventory and `ProtectedFileReader` verifies that the file is a protected container whose tenant and file IDs match the command. Missing inventory is reported as `not_found`; parse/header mismatch is reported as `verification_failed` and the file is left untouched.
+
+## Phase 3E File Protection Inventory
+
+Agent core includes a file-based PDF protection workflow for desktop entry points such as tray actions and shell integration. Protecting `report.pdf` writes `report.pdf.drmx`, verifies the protected container header, and records the managed copy in the protected-file inventory used by safe remote delete.
+
+Original PDF deletion is opt-in. When requested, the original is deleted only after server registration, protected output creation, protected-container verification, final output move, and inventory update have all succeeded. If registration or output creation fails, no `.drmx` file is committed and the original PDF remains in place.
