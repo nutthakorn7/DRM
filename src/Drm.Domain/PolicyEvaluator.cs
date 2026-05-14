@@ -19,7 +19,7 @@ public static class PolicyEvaluator
             return PolicyDecision.Deny("revoked");
         }
 
-        if (request.AtUtc >= policy.ExpiresAtUtc)
+        if (request.AtUtc > policy.ExpiresAtUtc)
         {
             return PolicyDecision.Deny("expired");
         }
