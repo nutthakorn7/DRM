@@ -37,6 +37,7 @@ app.MapAdminUsersEndpoints();
 app.MapAdminGroupsEndpoints();
 app.MapAdminFilesEndpoints();
 app.MapAdminPolicyTemplatesEndpoints();
+app.MapAdminAuditEndpoints();
 
 app.Run();
 
