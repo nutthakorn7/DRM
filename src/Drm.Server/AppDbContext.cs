@@ -8,6 +8,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
 
+    public DbSet<TenantUserEntity> TenantUsers => Set<TenantUserEntity>();
+
+    public DbSet<TenantGroupEntity> TenantGroups => Set<TenantGroupEntity>();
+
+    public DbSet<GroupMemberEntity> GroupMembers => Set<GroupMemberEntity>();
+
+    public DbSet<PolicyTemplateEntity> PolicyTemplates => Set<PolicyTemplateEntity>();
+
+    public DbSet<FileGrantEntity> FileGrants => Set<FileGrantEntity>();
+
+    public DbSet<SiemWebhookEntity> SiemWebhooks => Set<SiemWebhookEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -24,6 +36,46 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(auditEvent => new { auditEvent.TenantId, auditEvent.CreatedAtUtc });
             entity.Property(auditEvent => auditEvent.EventType).HasMaxLength(128);
             entity.Property(auditEvent => auditEvent.ReasonCode).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<TenantUserEntity>(entity =>
+        {
+            entity.HasKey(user => new { user.TenantId, user.UserId });
+            entity.HasIndex(user => new { user.TenantId, user.Email }).IsUnique();
+            entity.Property(user => user.Email).HasMaxLength(320);
+            entity.Property(user => user.DisplayName).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<TenantGroupEntity>(entity =>
+        {
+            entity.HasKey(group => new { group.TenantId, group.GroupId });
+            entity.Property(group => group.Name).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<GroupMemberEntity>(entity =>
+        {
+            entity.HasKey(member => new { member.TenantId, member.GroupId, member.UserId });
+        });
+
+        modelBuilder.Entity<PolicyTemplateEntity>(entity =>
+        {
+            entity.HasKey(template => new { template.TenantId, template.TemplateId });
+            entity.Property(template => template.Name).HasMaxLength(256);
+            entity.Property(template => template.Permissions).HasMaxLength(256);
+            entity.Property(template => template.WatermarkTemplate).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<FileGrantEntity>(entity =>
+        {
+            entity.HasKey(grant => new { grant.TenantId, grant.FileId, grant.SubjectType, grant.SubjectId });
+            entity.Property(grant => grant.SubjectType).HasMaxLength(32);
+            entity.Property(grant => grant.Permissions).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<SiemWebhookEntity>(entity =>
+        {
+            entity.HasKey(webhook => new { webhook.TenantId, webhook.WebhookId });
+            entity.Property(webhook => webhook.Url).HasMaxLength(2048);
         });
     }
 }

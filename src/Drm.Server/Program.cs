@@ -33,6 +33,7 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapFilesEndpoints();
 app.MapPolicyEndpoints();
 app.MapAuditEndpoints();
+app.MapAdminUsersEndpoints();
 
 app.Run();
 

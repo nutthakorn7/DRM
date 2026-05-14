@@ -37,3 +37,85 @@ public sealed class AuditEventEntity
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
+
+public sealed class TenantUserEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public string Email { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class TenantGroupEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid GroupId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class GroupMemberEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid GroupId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class PolicyTemplateEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid TemplateId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Permissions { get; set; } = string.Empty;
+
+    public string WatermarkTemplate { get; set; } = string.Empty;
+
+    public int OfflineLeaseMinutes { get; set; }
+
+    public bool AllowPrint { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class FileGrantEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string SubjectType { get; set; } = string.Empty;
+
+    public Guid SubjectId { get; set; }
+
+    public string Permissions { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class SiemWebhookEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid WebhookId { get; set; }
+
+    public string Url { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
