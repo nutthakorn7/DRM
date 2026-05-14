@@ -54,12 +54,17 @@ public static class AdminGroupsEndpoints
         return TypedResults.Created($"/api/admin/groups/{group.GroupId}", GroupResponse.From(group));
     }
 
-    private static async Task<Results<Created<GroupMemberResponse>, Conflict>> AddMemberAsync(
+    private static async Task<Results<Created<GroupMemberResponse>, Conflict, NotFound>> AddMemberAsync(
         Guid groupId,
         AddMemberRequest request,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!await GroupExistsAsync(dbContext, request.TenantId, groupId, cancellationToken))
+        {
+            return TypedResults.NotFound();
+        }
+
         if (await GroupMemberExistsAsync(dbContext, request.TenantId, groupId, request.UserId, cancellationToken))
         {
             return TypedResults.Conflict();

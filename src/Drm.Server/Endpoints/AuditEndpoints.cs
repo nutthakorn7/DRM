@@ -18,7 +18,7 @@ public static class AuditEndpoints
     {
         return await dbContext.AuditEvents
             .Where(auditEvent => auditEvent.TenantId == tenantId)
-            .OrderByDescending(auditEvent => auditEvent.CreatedAtUtc)
+            .OrderByDescending(auditEvent => auditEvent.Id)
             .Take(100)
             .Select(auditEvent => new AuditEventResponse(
                 auditEvent.Id,

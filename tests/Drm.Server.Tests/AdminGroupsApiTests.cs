@@ -3,8 +3,6 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Drm.Server.Tests;
 
@@ -50,15 +48,19 @@ public sealed class AdminGroupsApiTests : IDisposable
         members.Should().NotBeNull();
         members.Should().ContainSingle(member => member.TenantId == tenantId && member.GroupId == groupId && member.UserId == userId);
 
-        using var scope = factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var auditEvents = await dbContext.AuditEvents
-            .AsNoTracking()
-            .Where(auditEvent => auditEvent.TenantId == tenantId)
-            .ToListAsync();
+        using var auditResponse = await client.GetAsync($"/api/audit?tenantId={tenantId}");
+        auditResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        auditEvents.Should().Contain(auditEvent => auditEvent.ReasonCode == "group_created");
-        auditEvents.Should().Contain(auditEvent => auditEvent.ReasonCode == "group_member_added" && auditEvent.UserId == userId);
+        var auditEvents = await auditResponse.Content.ReadFromJsonAsync<List<AuditEventResponse>>();
+
+        auditEvents.Should().NotBeNull();
+        auditEvents.Should().Contain(auditEvent =>
+            auditEvent.EventType == "system_changed" &&
+            auditEvent.ReasonCode == "group_created");
+        auditEvents.Should().Contain(auditEvent =>
+            auditEvent.EventType == "system_changed" &&
+            auditEvent.ReasonCode == "group_member_added" &&
+            auditEvent.UserId == userId);
     }
 
     [Fact]
@@ -96,13 +98,25 @@ public sealed class AdminGroupsApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_add_member_returns_not_found_for_missing_group_in_tenant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var addMember = await AddMemberAsync(client, tenantId, Guid.NewGuid(), Guid.NewGuid());
+
+        addMember.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Admin_list_members_is_scoped_to_tenant()
     {
         using var client = factory.CreateClient();
         var groupId = Guid.NewGuid();
         var firstTenantId = Guid.NewGuid();
         var secondTenantId = Guid.NewGuid();
-        var firstUserId = Guid.NewGuid();
+        var highFirstTenantUserId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var lowFirstTenantUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var secondUserId = Guid.NewGuid();
 
         using var firstGroup = await CreateGroupAsync(client, firstTenantId, groupId, "Legal");
@@ -110,16 +124,18 @@ public sealed class AdminGroupsApiTests : IDisposable
         firstGroup.StatusCode.Should().Be(HttpStatusCode.Created);
         secondGroup.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        using var firstAdd = await AddMemberAsync(client, firstTenantId, groupId, firstUserId);
+        using var firstAdd = await AddMemberAsync(client, firstTenantId, groupId, highFirstTenantUserId);
+        using var secondFirstTenantAdd = await AddMemberAsync(client, firstTenantId, groupId, lowFirstTenantUserId);
         using var secondAdd = await AddMemberAsync(client, secondTenantId, groupId, secondUserId);
         firstAdd.StatusCode.Should().Be(HttpStatusCode.Created);
+        secondFirstTenantAdd.StatusCode.Should().Be(HttpStatusCode.Created);
         secondAdd.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var members = await client.GetFromJsonAsync<List<GroupMemberResponse>>(
             $"/api/admin/groups/{groupId}/members?tenantId={firstTenantId}");
 
         members.Should().NotBeNull();
-        members.Should().ContainSingle(member => member.UserId == firstUserId);
+        members!.Select(member => member.UserId).Should().Equal(lowFirstTenantUserId, highFirstTenantUserId);
         members.Should().NotContain(member => member.UserId == secondUserId);
     }
 
@@ -168,4 +184,13 @@ public sealed class AdminGroupsApiTests : IDisposable
     }
 
     private sealed record GroupMemberResponse(Guid TenantId, Guid GroupId, Guid UserId);
+
+    private sealed record AuditEventResponse(
+        long Id,
+        Guid TenantId,
+        Guid? FileId,
+        Guid? UserId,
+        string EventType,
+        string ReasonCode,
+        DateTimeOffset CreatedAtUtc);
 }
