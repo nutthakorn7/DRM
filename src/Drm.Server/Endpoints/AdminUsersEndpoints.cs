@@ -20,10 +20,7 @@ public static class AdminUsersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        var exists = await dbContext.TenantUsers
-            .AnyAsync(user => user.TenantId == request.TenantId && user.UserId == request.UserId, cancellationToken);
-
-        if (exists)
+        if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
         {
             return TypedResults.Conflict();
         }
@@ -39,7 +36,20 @@ public static class AdminUsersEndpoints
 
         dbContext.TenantUsers.Add(user);
         dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, request.UserId, "user_created"));
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
+            {
+                return TypedResults.Conflict();
+            }
+
+            throw;
+        }
 
         return TypedResults.Created($"/api/admin/users/{user.UserId}", UserResponse.From(user));
     }
@@ -55,6 +65,21 @@ public static class AdminUsersEndpoints
             .OrderBy(user => user.Email)
             .Select(user => UserResponse.From(user))
             .ToListAsync(cancellationToken);
+    }
+
+    private static Task<bool> ConflictingUserExistsAsync(
+        AppDbContext dbContext,
+        Guid tenantId,
+        Guid userId,
+        string email,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.TenantUsers
+            .AsNoTracking()
+            .AnyAsync(user =>
+                user.TenantId == tenantId &&
+                (user.UserId == userId || user.Email == email),
+                cancellationToken);
     }
 
     private sealed record CreateUserRequest(Guid TenantId, Guid UserId, string Email, string DisplayName);

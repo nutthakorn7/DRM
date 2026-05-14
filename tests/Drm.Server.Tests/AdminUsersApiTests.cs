@@ -47,6 +47,48 @@ public sealed class AdminUsersApiTests : IDisposable
             user.DisplayName == "Owner User");
     }
 
+    [Fact]
+    public async Task Admin_create_user_returns_conflict_for_duplicate_user_id_in_same_tenant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        using var firstCreate = await CreateUserAsync(client, tenantId, userId, "owner@example.com");
+        firstCreate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var duplicateCreate = await CreateUserAsync(client, tenantId, userId, "other@example.com");
+
+        duplicateCreate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Admin_create_user_returns_conflict_for_duplicate_email_in_same_tenant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var firstCreate = await CreateUserAsync(client, tenantId, Guid.NewGuid(), "owner@example.com");
+        firstCreate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var duplicateCreate = await CreateUserAsync(client, tenantId, Guid.NewGuid(), "owner@example.com");
+
+        duplicateCreate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Admin_can_create_same_email_in_different_tenants()
+    {
+        using var client = factory.CreateClient();
+        var email = "owner@example.com";
+
+        using var firstCreate = await CreateUserAsync(client, Guid.NewGuid(), Guid.NewGuid(), email);
+        using var secondCreate = await CreateUserAsync(client, Guid.NewGuid(), Guid.NewGuid(), email);
+
+        firstCreate.StatusCode.Should().Be(HttpStatusCode.Created);
+        secondCreate.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -62,6 +104,21 @@ public sealed class AdminUsersApiTests : IDisposable
                 File.Delete(candidate);
             }
         }
+    }
+
+    private static Task<HttpResponseMessage> CreateUserAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid userId,
+        string email)
+    {
+        return client.PostAsJsonAsync("/api/admin/users", new
+        {
+            tenantId,
+            userId,
+            email,
+            displayName = "Owner User"
+        });
     }
 
     private sealed record UserResponse(Guid UserId, Guid TenantId, string Email, string DisplayName);
