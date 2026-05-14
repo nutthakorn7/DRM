@@ -13,11 +13,20 @@ public static class PolicyEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Ok<PolicyDecisionResponse>, NotFound<PolicyDecisionResponse>>> DecideAsync(
+    private static async Task<Results<Ok<PolicyDecisionResponse>, NotFound<PolicyDecisionResponse>, BadRequest<PolicyDecisionResponse>>> DecideAsync(
         DecidePolicyRequest request,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!PermissionParser.TryParse(request.RequestedPermission, out var requestedPermission))
+        {
+            return TypedResults.BadRequest(new PolicyDecisionResponse(
+                false,
+                Permission.None.ToString(),
+                "invalid_permissions",
+                null));
+        }
+
         var file = await dbContext.ProtectedFiles
             .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == request.FileId, cancellationToken);
 
@@ -36,7 +45,7 @@ public static class PolicyEndpoints
 
             return TypedResults.NotFound(new PolicyDecisionResponse(
                 false,
-                Permission.None,
+                Permission.None.ToString(),
                 "file_not_found",
                 null));
         }
@@ -54,7 +63,7 @@ public static class PolicyEndpoints
             new ProtectedFileId(request.FileId),
             new UserId(request.UserId),
             new DeviceId(request.DeviceId),
-            request.RequestedPermission,
+            requestedPermission,
             request.AtUtc));
 
         dbContext.AuditEvents.Add(new AuditEventEntity
@@ -70,7 +79,7 @@ public static class PolicyEndpoints
 
         return TypedResults.Ok(new PolicyDecisionResponse(
             decision.Allowed,
-            decision.AllowedPermissions,
+            decision.AllowedPermissions.ToString(),
             decision.ReasonCode,
             decision.WatermarkTemplate));
     }
@@ -80,12 +89,12 @@ public static class PolicyEndpoints
         Guid FileId,
         Guid UserId,
         Guid DeviceId,
-        Permission RequestedPermission,
+        string RequestedPermission,
         DateTimeOffset AtUtc);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,
-        Permission AllowedPermissions,
+        string AllowedPermissions,
         string ReasonCode,
         string? WatermarkTemplate);
 }

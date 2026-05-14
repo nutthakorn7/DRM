@@ -1,4 +1,3 @@
-using Drm.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,20 +15,32 @@ public static class FilesEndpoints
         return endpoints;
     }
 
-    private static async Task<Created<RegisterFileResponse>> RegisterFileAsync(
+    private static async Task<Results<Created<RegisterFileResponse>, Conflict, BadRequest<ErrorResponse>>> RegisterFileAsync(
         RegisterFileRequest request,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!PermissionParser.TryParse(request.Permissions, out var permissions))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_permissions"));
+        }
+
+        var duplicateExists = await dbContext.ProtectedFiles
+            .AnyAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == request.FileId, cancellationToken);
+        if (duplicateExists)
+        {
+            return TypedResults.Conflict();
+        }
+
         var file = new ProtectedFileEntity
         {
-            Id = Guid.NewGuid(),
+            Id = request.FileId,
             TenantId = request.TenantId,
             OwnerUserId = request.OwnerUserId,
             ContentType = request.ContentType,
             ExpiresAtUtc = request.ExpiresAtUtc,
             Revoked = false,
-            Permissions = request.Permissions,
+            Permissions = permissions,
             WatermarkTemplate = request.WatermarkTemplate
         };
 
@@ -52,17 +63,18 @@ public static class FilesEndpoints
             file.OwnerUserId,
             file.ContentType,
             file.ExpiresAtUtc,
-            file.Permissions,
+            file.Permissions.ToString(),
             file.WatermarkTemplate));
     }
 
     private static async Task<Results<Ok<RevokeFileResponse>, NotFound>> RevokeFileAsync(
         Guid fileId,
+        Guid tenantId,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
         var file = await dbContext.ProtectedFiles
-            .SingleOrDefaultAsync(candidate => candidate.Id == fileId, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.TenantId == tenantId && candidate.Id == fileId, cancellationToken);
 
         if (file is null)
         {
@@ -87,10 +99,11 @@ public static class FilesEndpoints
 
     private sealed record RegisterFileRequest(
         Guid TenantId,
+        Guid FileId,
         Guid OwnerUserId,
         string ContentType,
         DateTimeOffset ExpiresAtUtc,
-        Permission Permissions,
+        string Permissions,
         string WatermarkTemplate);
 
     private sealed record RegisterFileResponse(
@@ -99,8 +112,10 @@ public static class FilesEndpoints
         Guid OwnerUserId,
         string ContentType,
         DateTimeOffset ExpiresAtUtc,
-        Permission Permissions,
+        string Permissions,
         string WatermarkTemplate);
 
     private sealed record RevokeFileResponse(Guid FileId, bool Revoked);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

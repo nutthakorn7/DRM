@@ -12,8 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
         {
-            entity.HasKey(file => file.Id);
-            entity.HasIndex(file => new { file.TenantId, file.Id }).IsUnique();
+            entity.HasKey(file => new { file.TenantId, file.Id });
             entity.Property(file => file.ContentType).HasMaxLength(256);
             entity.Property(file => file.WatermarkTemplate).HasMaxLength(1024);
             entity.Property(file => file.Permissions).HasConversion<int>();
