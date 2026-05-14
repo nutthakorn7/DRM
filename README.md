@@ -129,3 +129,9 @@ The Windows service now has a safe delete processor for this command. A local fi
 Agent core includes a file-based PDF protection workflow for desktop entry points such as tray actions and shell integration. Protecting `report.pdf` writes `report.pdf.drmx`, verifies the protected container header, and records the managed copy in the protected-file inventory used by safe remote delete.
 
 Original PDF deletion is opt-in. When requested, the original is deleted only after server registration, protected output creation, protected-container verification, final output move, and inventory update have all succeeded. If registration or output creation fails, no `.drmx` file is committed and the original PDF remains in place.
+
+## Phase 3F Local Key Store
+
+Agent core includes a file-key store abstraction and JSON implementation so local desktop workflows can open protected files without passing raw keys through UI code. `ProtectPdfFileWorkflow` can persist the generated file key, and `OpenProtectedPdfFileWorkflow` reads the `.drmx` header, loads the matching key, performs the server policy decision, and decrypts the file.
+
+The JSON key store is a local MVP bridge for development and desktop integration work. Production deployments must replace it with server-side key wrapping, tenant keys, KMS/HSM integration, and unwrap authorization.

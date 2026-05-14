@@ -3,7 +3,10 @@ using Drm.Domain;
 
 namespace Drm.Agent.Core;
 
-public sealed class ProtectPdfFileWorkflow(IDrmServerClient serverClient, IProtectedFileInventory inventory)
+public sealed class ProtectPdfFileWorkflow(
+    IDrmServerClient serverClient,
+    IProtectedFileInventory inventory,
+    IFileKeyStore? fileKeyStore = null)
 {
     private const string PdfContentType = "application/pdf";
     private const string ProtectedExtension = ".drmx";
@@ -52,6 +55,11 @@ public sealed class ProtectPdfFileWorkflow(IDrmServerClient serverClient, IProte
 
             VerifyProtectedOutput(tempPath, tenantId.Value, fileId.Value);
             File.Move(tempPath, destinationPath, overwrite: false);
+
+            if (fileKeyStore is not null)
+            {
+                await fileKeyStore.SaveAsync(tenantId.Value, fileId.Value, fileKey, cancellationToken);
+            }
 
             await inventory.UpsertAsync(
                 new ProtectedFileInventoryEntry(
