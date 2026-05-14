@@ -43,6 +43,7 @@ app.MapAdminFilesEndpoints();
 app.MapAdminPolicyTemplatesEndpoints();
 app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
+app.MapAgentEndpoints();
 
 app.Run();
 

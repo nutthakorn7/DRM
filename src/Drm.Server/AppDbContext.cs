@@ -20,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<SiemWebhookEntity> SiemWebhooks => Set<SiemWebhookEntity>();
 
+    public DbSet<AgentDeviceEntity> AgentDevices => Set<AgentDeviceEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -76,6 +78,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasKey(webhook => new { webhook.TenantId, webhook.WebhookId });
             entity.Property(webhook => webhook.Url).HasMaxLength(2048);
+        });
+
+        modelBuilder.Entity<AgentDeviceEntity>(entity =>
+        {
+            entity.HasKey(device => new { device.TenantId, device.DeviceId });
+            entity.HasIndex(device => new { device.TenantId, device.UserId });
+            entity.Property(device => device.Hostname).HasMaxLength(256);
+            entity.Property(device => device.OperatingSystem).HasMaxLength(256);
+            entity.Property(device => device.AgentVersion).HasMaxLength(64);
+            entity.Property(device => device.Status).HasMaxLength(64);
         });
     }
 }

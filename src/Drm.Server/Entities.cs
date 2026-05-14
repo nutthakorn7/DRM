@@ -119,3 +119,26 @@ public sealed class SiemWebhookEntity
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
+
+public sealed class AgentDeviceEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid DeviceId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public string Hostname { get; set; } = string.Empty;
+
+    public string OperatingSystem { get; set; } = string.Empty;
+
+    public string AgentVersion { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public DateTimeOffset RegisteredAtUtc { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    public DateTimeOffset? LastHeartbeatAtUtc { get; set; }
+}
