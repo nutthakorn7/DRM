@@ -75,7 +75,7 @@ public static class PolicyEndpoints
         }
 
         var hasUserGrant = grantRows.Any(grant => grant.SubjectType == GrantSubjectType.User.ToString());
-        if (!hasUserGrant && file.OwnerUserId == request.UserId)
+        if (!hasUserGrant && file.OwnerUserId == request.UserId && file.Permissions != Permission.None)
         {
             effectivePermissions |= file.Permissions;
         }

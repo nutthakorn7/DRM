@@ -12,6 +12,7 @@ public static class AdminFilesEndpoints
 
         group.MapGet("/", ListFilesAsync);
         group.MapPost("/{fileId:guid}/grants", UpsertGrantAsync);
+        group.MapPut("/{fileId:guid}/grants", ReplaceGrantsAsync);
 
         return endpoints;
     }
@@ -134,6 +135,83 @@ public static class AdminFilesEndpoints
             FileGrantResponse.From(grant));
     }
 
+    private static async Task<Results<Ok<IReadOnlyList<FileGrantResponse>>, BadRequest<ErrorResponse>, NotFound>> ReplaceGrantsAsync(
+        Guid fileId,
+        ReplaceGrantsRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var file = await dbContext.ProtectedFiles
+            .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId, cancellationToken);
+
+        if (file is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (request.Grants is null)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_grants"));
+        }
+
+        var parsed = new List<FileGrantEntity>();
+        var seenSubjects = new HashSet<(string SubjectType, Guid SubjectId)>();
+        foreach (var grant in request.Grants)
+        {
+            if (grant is null)
+            {
+                return TypedResults.BadRequest(new ErrorResponse("invalid_grants"));
+            }
+
+            if (!Enum.TryParse<GrantSubjectType>(grant.SubjectType, ignoreCase: true, out var subjectType)
+                || !Enum.IsDefined(subjectType))
+            {
+                return TypedResults.BadRequest(new ErrorResponse("invalid_subject_type"));
+            }
+
+            if (!PermissionParser.TryParse(grant.Permissions, out var permissions))
+            {
+                return TypedResults.BadRequest(new ErrorResponse("invalid_permissions"));
+            }
+
+            if (subjectType == GrantSubjectType.Group
+                && !await GroupExistsAsync(dbContext, request.TenantId, grant.SubjectId, cancellationToken))
+            {
+                return TypedResults.NotFound();
+            }
+
+            var normalizedSubjectType = subjectType.ToString();
+            if (!seenSubjects.Add((normalizedSubjectType, grant.SubjectId)))
+            {
+                return TypedResults.BadRequest(new ErrorResponse("duplicate_grant"));
+            }
+
+            parsed.Add(new FileGrantEntity
+            {
+                TenantId = request.TenantId,
+                FileId = fileId,
+                SubjectType = normalizedSubjectType,
+                SubjectId = grant.SubjectId,
+                Permissions = permissions.ToString(),
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+
+        var existing = await dbContext.FileGrants
+            .Where(grant => grant.TenantId == request.TenantId && grant.FileId == fileId)
+            .ToListAsync(cancellationToken);
+
+        dbContext.FileGrants.RemoveRange(existing);
+        dbContext.FileGrants.AddRange(parsed);
+        file.Permissions = Permission.None;
+        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grants_replaced"));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return TypedResults.Ok<IReadOnlyList<FileGrantResponse>>(parsed
+            .Select(FileGrantResponse.From)
+            .ToList());
+    }
+
     private static Task<FileGrantEntity?> FindGrantAsync(
         AppDbContext dbContext,
         Guid tenantId,
@@ -178,6 +256,10 @@ public static class AdminFilesEndpoints
         string SubjectType,
         Guid SubjectId,
         string Permissions);
+
+    private sealed record ReplaceGrantsRequest(Guid TenantId, IReadOnlyList<ReplaceGrantItem?>? Grants);
+
+    private sealed record ReplaceGrantItem(string SubjectType, Guid SubjectId, string Permissions);
 
     private sealed record FileGrantResponse(
         Guid TenantId,
