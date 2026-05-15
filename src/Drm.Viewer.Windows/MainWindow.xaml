@@ -57,8 +57,34 @@
         </Grid>
         </Border>
 
-        <DockPanel Grid.Row="1" Background="#1F2937" LastChildFill="False">
+        <DockPanel Grid.Row="1" Background="#1F2937" LastChildFill="True">
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="0,0,12,0">
+                <Button x:Name="CopyButton"
+                        Width="70"
+                        Height="28"
+                        Margin="0,0,8,0"
+                        Content="Copy"
+                        IsEnabled="False"
+                        Click="CopyButton_Click" />
+                <Button x:Name="PrintButton"
+                        Width="70"
+                        Height="28"
+                        Margin="0,0,8,0"
+                        Content="Print"
+                        IsEnabled="False"
+                        Click="PrintButton_Click" />
+                <Button x:Name="ExportButton"
+                        Width="90"
+                        Height="28"
+                        Content="Export"
+                        IsEnabled="False"
+                        Click="ExportButton_Click" />
+            </StackPanel>
             <TextBlock Text="Protected PDF"
+                       DockPanel.Dock="Left"
                        Foreground="White"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"

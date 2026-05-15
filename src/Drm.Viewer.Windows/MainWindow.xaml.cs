@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Input;
 using Drm.Agent.Core;
 using Drm.Domain;
 using Microsoft.Win32;
@@ -10,13 +11,16 @@ namespace Drm.Viewer.Windows;
 public partial class MainWindow : Window
 {
     private string? temporaryPdfPath;
+    private byte[]? currentContent;
+    private Permission currentPermissions = Permission.None;
 
     public MainWindow()
     {
         InitializeComponent();
-        PermissionText.Text = "Permissions: not loaded";
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
         WatermarkText.Text = "DRM Protected";
         StatusText.Text = "No document loaded.";
+        ApplyPermissionState();
     }
 
     private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -61,7 +65,7 @@ public partial class MainWindow : Window
 
             var tempPath = Path.Combine(Path.GetTempPath(), $"drm-viewer-{Guid.NewGuid():N}.pdf");
             await File.WriteAllBytesAsync(tempPath, opened.Content);
-            LoadPdfFromTemporaryFile(tempPath, opened.Watermark, opened.Permissions.ToString());
+            LoadPdfFromTemporaryFile(tempPath, opened.Watermark, opened.Permissions);
         }
         catch (Exception exception)
         {
@@ -73,7 +77,7 @@ public partial class MainWindow : Window
         }
     }
 
-    public void LoadPdfFromTemporaryFile(string path, string watermark, string permissions)
+    public void LoadPdfFromTemporaryFile(string path, string watermark, Permission permissions)
     {
         if (!File.Exists(path))
         {
@@ -82,10 +86,100 @@ public partial class MainWindow : Window
 
         DeleteTemporaryPdf();
         temporaryPdfPath = path;
-        PermissionText.Text = permissions;
+        currentContent = File.ReadAllBytes(path);
+        currentPermissions = permissions;
+        ApplyPermissionState();
         WatermarkText.Text = watermark;
         StatusText.Text = $"Loaded protected PDF: {Path.GetFileName(path)}";
         PdfHost.Navigate(path);
+    }
+
+    private void CopyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireViewerAction(ViewerControlledAction.Copy, "Copy"))
+        {
+            return;
+        }
+
+        StatusText.Text = "Copy is allowed by policy; use text selection in the embedded PDF renderer when available.";
+    }
+
+    private void PrintButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireViewerAction(ViewerControlledAction.Print, "Print"))
+        {
+            return;
+        }
+
+        try
+        {
+            PdfHost.InvokeScript("print");
+            StatusText.Text = "Print requested.";
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = $"Print unavailable: {exception.Message}";
+        }
+    }
+
+    private async void ExportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireViewerAction(ViewerControlledAction.ExportOriginal, "Export"))
+        {
+            return;
+        }
+
+        var baseName = Path.GetFileNameWithoutExtension(ProtectedPathBox.Text.Trim());
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            baseName = "protected";
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            AddExtension = true,
+            DefaultExt = ".pdf",
+            FileName = $"{baseName}.pdf",
+            Filter = "PDF files (*.pdf)|*.pdf",
+            OverwritePrompt = true,
+            Title = "Export original PDF"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        await File.WriteAllBytesAsync(dialog.FileName, currentContent!);
+        StatusText.Text = $"Exported original PDF: {dialog.FileName}";
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+        {
+            return;
+        }
+
+        if (e.Key == Key.P)
+        {
+            e.Handled = true;
+            PrintButton_Click(sender, new RoutedEventArgs());
+            return;
+        }
+
+        if (e.Key == Key.S)
+        {
+            e.Handled = true;
+            ExportButton_Click(sender, new RoutedEventArgs());
+            return;
+        }
+
+        if (e.Key == Key.C && !ViewerPermissionState.From(currentPermissions).CanCopy)
+        {
+            e.Handled = true;
+            StatusText.Text = "Copy is blocked by policy.";
+        }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -129,6 +223,9 @@ public partial class MainWindow : Window
     {
         if (temporaryPdfPath is null || !File.Exists(temporaryPdfPath))
         {
+            currentContent = null;
+            currentPermissions = Permission.None;
+            ApplyPermissionState();
             return;
         }
 
@@ -143,6 +240,39 @@ public partial class MainWindow : Window
         finally
         {
             temporaryPdfPath = null;
+            currentContent = null;
+            currentPermissions = Permission.None;
+            ApplyPermissionState();
         }
+    }
+
+    private bool RequireViewerAction(ViewerControlledAction action, string label)
+    {
+        if (temporaryPdfPath is null || currentContent is null)
+        {
+            StatusText.Text = "No document loaded.";
+            return false;
+        }
+
+        if (!ViewerPermissionState.From(currentPermissions).Allows(action))
+        {
+            StatusText.Text = $"{label} is blocked by policy.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ApplyPermissionState()
+    {
+        var state = ViewerPermissionState.From(currentPermissions);
+        var hasDocument = temporaryPdfPath is not null && currentContent is not null;
+
+        CopyButton.IsEnabled = hasDocument && state.CanCopy;
+        PrintButton.IsEnabled = hasDocument && state.CanPrint;
+        ExportButton.IsEnabled = hasDocument && state.CanExportOriginal;
+        PermissionText.Text = hasDocument
+            ? $"Permissions: {currentPermissions}"
+            : "Permissions: not loaded";
     }
 }

@@ -222,3 +222,7 @@ The management API now exposes `GET /api/admin/devices?tenantId=...&userId=...&s
 ## Phase 5D Device Disable Enforcement
 
 Administrators can disable a registered device with `POST /api/admin/devices/{deviceId}/disable`. Disabled devices keep their inventory record with `status = disabled`, cannot re-register or heartbeat back online, and receive `device_disabled` denials for future policy decisions and file-key unwrap attempts. The `/admin/` console exposes this as a Disable action in the Agent devices table.
+
+## Phase 5E Viewer Permission Controls
+
+The Windows protected viewer now gates its visible Copy, Print, and Export controls from the opened file's returned permissions. `Ctrl+C`, `Ctrl+P`, and `Ctrl+S` are blocked when the matching permission is missing, and original PDF export is only available when `ExportOriginal` is granted. These are viewer-level controls and do not claim to prevent out-of-band capture or endpoint tampering.
