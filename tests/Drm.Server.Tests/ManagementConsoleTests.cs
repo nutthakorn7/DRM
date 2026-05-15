@@ -56,6 +56,9 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Policy simulator");
         html.Should().Contain("Simulate access");
         html.Should().Contain("Agent devices");
+        html.Should().Contain("Device health");
+        html.Should().Contain("deviceHealthSummary");
+        html.Should().Contain("Stale after");
         html.Should().Contain("Filter by status");
         html.Should().Contain("Filter by user ID");
         html.Should().Contain("Disable");
@@ -108,8 +111,12 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("simulatePolicy");
         js.Should().Contain("simulatorOutput");
         js.Should().Contain("/api/admin/devices");
+        js.Should().Contain("/api/admin/devices/health");
         js.Should().Contain("refreshDevices");
+        js.Should().Contain("refreshDeviceHealth");
+        js.Should().Contain("renderDeviceHealth");
         js.Should().Contain("devicesBody");
+        js.Should().Contain("deviceHealthSummary");
         js.Should().Contain("disableDevice");
         js.Should().Contain("/grants");
         js.Should().Contain("/revoke");

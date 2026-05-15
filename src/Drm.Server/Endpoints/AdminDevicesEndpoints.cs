@@ -9,6 +9,7 @@ public static class AdminDevicesEndpoints
         var group = endpoints.MapGroup("/api/admin/devices");
 
         group.MapGet("/", ListDevicesAsync);
+        group.MapGet("/health", GetDeviceHealthAsync);
         group.MapPost("/{deviceId:guid}/disable", DisableDeviceAsync);
 
         return endpoints;
@@ -41,6 +42,46 @@ public static class AdminDevicesEndpoints
             .Take(500)
             .Select(device => DeviceResponse.From(device))
             .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<IResult> GetDeviceHealthAsync(
+        Guid tenantId,
+        int? staleAfterMinutes,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var effectiveStaleAfterMinutes = staleAfterMinutes ?? 15;
+        if (effectiveStaleAfterMinutes is < 1 or > 10080)
+        {
+            return Results.BadRequest(new ErrorResponse("invalid_stale_after_minutes"));
+        }
+
+        var staleThresholdUtc = DateTimeOffset.UtcNow.AddMinutes(-effectiveStaleAfterMinutes);
+        var devices = await dbContext.AgentDevices
+            .AsNoTracking()
+            .Where(device => device.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
+
+        var disabled = devices.Count(IsDisabled);
+        var activeDevices = devices.Where(device => !IsDisabled(device)).ToList();
+        var neverSeen = activeDevices.Count(device => device.LastHeartbeatAtUtc is null);
+        var online = activeDevices.Count(device => device.LastHeartbeatAtUtc >= staleThresholdUtc);
+        var stale = activeDevices.Count(device => device.LastHeartbeatAtUtc < staleThresholdUtc);
+        var newestHeartbeatAtUtc = devices
+            .Where(device => device.LastHeartbeatAtUtc is not null)
+            .Select(device => device.LastHeartbeatAtUtc)
+            .Max();
+
+        return Results.Ok(new DeviceHealthResponse(
+            tenantId,
+            devices.Count,
+            online,
+            stale,
+            neverSeen,
+            disabled,
+            effectiveStaleAfterMinutes,
+            staleThresholdUtc,
+            newestHeartbeatAtUtc));
     }
 
     private static async Task<IResult> DisableDeviceAsync(
@@ -118,5 +159,19 @@ public static class AdminDevicesEndpoints
 
     private sealed record DisableDeviceRequest(Guid TenantId, Guid AdminUserId, string Reason);
 
+    private sealed record DeviceHealthResponse(
+        Guid TenantId,
+        int Total,
+        int Online,
+        int Stale,
+        int NeverSeen,
+        int Disabled,
+        int StaleAfterMinutes,
+        DateTimeOffset StaleThresholdUtc,
+        DateTimeOffset? NewestHeartbeatAtUtc);
+
     private sealed record ErrorResponse(string ReasonCode);
+
+    private static bool IsDisabled(AgentDeviceEntity device)
+        => device.DisabledAtUtc is not null || device.Status == "disabled";
 }

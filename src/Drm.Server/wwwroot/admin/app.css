@@ -217,6 +217,53 @@ button.danger:hover {
   gap: 10px;
 }
 
+.device-health-head {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
+  align-items: end;
+  gap: 14px;
+}
+
+.device-health-head h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.device-health-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.metric {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.metric span,
+.metric strong {
+  display: block;
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.metric strong {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.metric.wide strong {
+  font-size: 13px;
+}
+
 .template-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -336,6 +383,8 @@ pre {
   .apply-template-row,
   .audit-filter-row,
   .device-filter-row,
+  .device-health-head,
+  .device-health-summary,
   .template-row,
   .watermark-row,
   .simulator-row,

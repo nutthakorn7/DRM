@@ -134,6 +134,39 @@
           <button id="refreshDevices" type="button">Refresh devices</button>
         </div>
 
+        <div class="device-health-head">
+          <div>
+            <p class="eyebrow">Device health</p>
+            <h4>Heartbeat summary</h4>
+          </div>
+          <label>
+            <span>Stale after</span>
+            <input id="deviceStaleAfterMinutes" type="number" min="1" max="10080" value="15">
+          </label>
+        </div>
+        <div class="device-health-summary" id="deviceHealthSummary">
+          <div class="metric">
+            <span>Total</span>
+            <strong>-</strong>
+          </div>
+          <div class="metric">
+            <span>Online</span>
+            <strong>-</strong>
+          </div>
+          <div class="metric">
+            <span>Stale</span>
+            <strong>-</strong>
+          </div>
+          <div class="metric">
+            <span>Never seen</span>
+            <strong>-</strong>
+          </div>
+          <div class="metric">
+            <span>Disabled</span>
+            <strong>-</strong>
+          </div>
+        </div>
+
         <div class="device-filter-row">
           <input id="deviceStatusFilter" autocomplete="off" placeholder="Filter by status">
           <input id="deviceUserFilter" autocomplete="off" placeholder="Filter by user ID">

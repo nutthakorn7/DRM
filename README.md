@@ -262,3 +262,7 @@ Desktop shell integration assets are available under `deploy/desktop/`. The Powe
 ## Phase 5N Tamper-Evident Audit Queue
 
 New local agent audit queue entries are written as hash-chained JSONL envelopes with the previous entry hash and current entry hash. Flush verifies each envelope before uploading its embedded `AgentAuditRecord`, stops at tampered entries, and preserves the unuploaded suffix for investigation or retry. Legacy raw audit-record queue lines remain flushable for compatibility with older agent builds.
+
+## Phase 5O Agent Health Dashboard
+
+The management API now exposes `GET /api/admin/devices/health?tenantId=...&staleAfterMinutes=...` for tenant-scoped endpoint fleet health counts: total, online, stale, never seen, and disabled. The `/admin/` console shows the summary above the Agent devices table using the same tenant/admin-key context as the device inventory.

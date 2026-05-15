@@ -125,6 +125,79 @@ public sealed class AdminDevicesApiTests : IDisposable
         audit.ReasonCode.Should().Be("lost_device");
     }
 
+    [Fact]
+    public async Task Admin_device_health_summarizes_online_stale_never_seen_and_disabled_devices()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var onlineDeviceId = Guid.Parse("00000000-0000-0000-0000-000000000101");
+        var staleDeviceId = Guid.Parse("00000000-0000-0000-0000-000000000102");
+        var neverSeenDeviceId = Guid.Parse("00000000-0000-0000-0000-000000000103");
+        var disabledDeviceId = Guid.Parse("00000000-0000-0000-0000-000000000104");
+        var otherTenantDeviceId = Guid.Parse("00000000-0000-0000-0000-000000000105");
+
+        await RegisterDeviceAsync(client, tenantId, userId, onlineDeviceId, "WIN-ONLINE");
+        await RegisterDeviceAsync(client, tenantId, userId, staleDeviceId, "WIN-STALE");
+        await RegisterDeviceAsync(client, tenantId, userId, neverSeenDeviceId, "WIN-NEW");
+        await RegisterDeviceAsync(client, tenantId, userId, disabledDeviceId, "WIN-DISABLED");
+        await RegisterDeviceAsync(client, otherTenantId, userId, otherTenantDeviceId, "WIN-OTHER");
+
+        using var onlineHeartbeat = await client.PostAsJsonAsync($"/api/agent/devices/{onlineDeviceId}/heartbeat", new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.2.0"
+        });
+        onlineHeartbeat.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var disable = await client.PostAsJsonAsync($"/api/admin/devices/{disabledDeviceId}/disable", new
+        {
+            tenantId,
+            adminUserId = Guid.NewGuid(),
+            reason = "lost_device"
+        });
+        disable.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var stale = await dbContext.AgentDevices.SingleAsync(device => device.DeviceId == staleDeviceId);
+            stale.LastHeartbeatAtUtc = DateTimeOffset.UtcNow.AddHours(-2);
+            stale.Status = "online";
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var response = await client.GetAsync($"/api/admin/devices/health?tenantId={tenantId}&staleAfterMinutes=30");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var health = await response.Content.ReadFromJsonAsync<DeviceHealthResponse>();
+        health.Should().BeEquivalentTo(new
+        {
+            TenantId = tenantId,
+            Total = 4,
+            Online = 1,
+            Stale = 1,
+            NeverSeen = 1,
+            Disabled = 1,
+            StaleAfterMinutes = 30
+        });
+        health!.StaleThresholdUtc.Should().BeCloseTo(DateTimeOffset.UtcNow.AddMinutes(-30), TimeSpan.FromMinutes(1));
+        health.NewestHeartbeatAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Admin_device_health_rejects_invalid_stale_threshold()
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/admin/devices/health?tenantId={Guid.NewGuid()}&staleAfterMinutes=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -173,4 +246,15 @@ public sealed class AdminDevicesApiTests : IDisposable
         DateTimeOffset? LastHeartbeatAtUtc,
         DateTimeOffset? DisabledAtUtc,
         string? DisabledReason);
+
+    private sealed record DeviceHealthResponse(
+        Guid TenantId,
+        int Total,
+        int Online,
+        int Stale,
+        int NeverSeen,
+        int Disabled,
+        int StaleAfterMinutes,
+        DateTimeOffset StaleThresholdUtc,
+        DateTimeOffset? NewestHeartbeatAtUtc);
 }

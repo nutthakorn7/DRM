@@ -10,6 +10,7 @@ const adminUserIdInput = document.querySelector("#adminUserId");
 const connectionState = document.querySelector("#connectionState");
 const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
+const deviceHealthSummary = document.querySelector("#deviceHealthSummary");
 const devicesBody = document.querySelector("#devicesBody");
 const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
 const watermarkTemplatesBody = document.querySelector("#watermarkTemplatesBody");
@@ -263,9 +264,18 @@ async function refreshDevices() {
     params.set("userId", userId);
   }
 
+  await refreshDeviceHealth();
   const devices = await apiFetch(`/api/admin/devices?${params.toString()}`);
   renderDevices(devices);
   setStatus(`${devices.length} device${devices.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshDeviceHealth() {
+  const tenantId = requireTenantId();
+  const staleAfterMinutes = document.querySelector("#deviceStaleAfterMinutes").value.trim() || "15";
+  const params = new URLSearchParams({ tenantId, staleAfterMinutes });
+  const health = await apiFetch(`/api/admin/devices/health?${params.toString()}`);
+  renderDeviceHealth(health);
 }
 
 async function refreshPolicyTemplates() {
@@ -472,6 +482,35 @@ function renderDevices(devices) {
       <td>${isDeviceDisabled(device) ? "" : `<button class="danger" type="button" data-disable-device-id="${escapeHtml(device.deviceId)}">Disable</button>`}</td>
     </tr>
   `).join("");
+}
+
+function renderDeviceHealth(health) {
+  deviceHealthSummary.innerHTML = `
+    <div class="metric">
+      <span>Total</span>
+      <strong>${escapeHtml(health.total)}</strong>
+    </div>
+    <div class="metric">
+      <span>Online</span>
+      <strong>${escapeHtml(health.online)}</strong>
+    </div>
+    <div class="metric">
+      <span>Stale</span>
+      <strong>${escapeHtml(health.stale)}</strong>
+    </div>
+    <div class="metric">
+      <span>Never seen</span>
+      <strong>${escapeHtml(health.neverSeen)}</strong>
+    </div>
+    <div class="metric">
+      <span>Disabled</span>
+      <strong>${escapeHtml(health.disabled)}</strong>
+    </div>
+    <div class="metric wide">
+      <span>Newest heartbeat</span>
+      <strong>${escapeHtml(formatDate(health.newestHeartbeatAtUtc) || "-")}</strong>
+    </div>
+  `;
 }
 
 function renderPolicyTemplates(templates) {
