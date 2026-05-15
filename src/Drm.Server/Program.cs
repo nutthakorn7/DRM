@@ -40,6 +40,12 @@ app.UseAdminApiKeyAuthentication();
 app.UseClientApiKeyAuthentication();
 app.Use(async (context, next) =>
 {
+    if (context.Request.Path.Equals("/", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/share/");
+        return;
+    }
+
     if (context.Request.Path.Equals("/admin", StringComparison.OrdinalIgnoreCase))
     {
         context.Response.Redirect("/admin/");

@@ -21,6 +21,20 @@ public sealed class ExternalShareViewerShellTests : IDisposable
     }
 
     [Fact]
+    public async Task Root_path_redirects_to_share_viewer()
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await client.GetAsync("/");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location.Should().Be("/share/");
+    }
+
+    [Fact]
     public async Task Share_path_redirects_to_viewer_root()
     {
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
