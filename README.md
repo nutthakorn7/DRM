@@ -258,3 +258,7 @@ The agent core now includes `OpenProtectedFileWorkflow` for opening `.drmx` cont
 ## Phase 5M Desktop Shell Integration
 
 Desktop shell integration assets are available under `deploy/desktop/`. The PowerShell registration script writes current-user `HKCU:\Software\Classes` entries for a `Protect with DRM` file context menu and `.drmx` viewer association. Shell commands prefill the tray/viewer file path with `--protect` or `--open`; users still review server, identity, policy, and recipient fields before running protect or open.
+
+## Phase 5N Tamper-Evident Audit Queue
+
+New local agent audit queue entries are written as hash-chained JSONL envelopes with the previous entry hash and current entry hash. Flush verifies each envelope before uploading its embedded `AgentAuditRecord`, stops at tampered entries, and preserves the unuploaded suffix for investigation or retry. Legacy raw audit-record queue lines remain flushable for compatibility with older agent builds.
