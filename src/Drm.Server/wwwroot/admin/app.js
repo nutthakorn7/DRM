@@ -7,6 +7,8 @@ const tenantIdInput = document.querySelector("#tenantId");
 const adminKeyInput = document.querySelector("#adminKey");
 const connectionState = document.querySelector("#connectionState");
 const usersBody = document.querySelector("#usersBody");
+const groupMembersBody = document.querySelector("#groupMembersBody");
+const filesBody = document.querySelector("#filesBody");
 const healthOutput = document.querySelector("#healthOutput");
 
 tenantIdInput.value = state.tenantId;
@@ -47,11 +49,91 @@ document.querySelector("#createUserForm").addEventListener("submit", async (even
   await refreshUsers();
 });
 
+document.querySelector("#createGroupForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    groupId: document.querySelector("#newGroupId").value.trim(),
+    name: document.querySelector("#newGroupName").value.trim()
+  };
+
+  await apiFetch("/api/admin/groups", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  event.target.reset();
+  setStatus("Group created", "ok");
+});
+
+document.querySelector("#addGroupMemberForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const groupId = document.querySelector("#memberGroupId").value.trim();
+  const body = {
+    tenantId: requireTenantId(),
+    userId: document.querySelector("#memberUserId").value.trim()
+  };
+
+  await apiFetch(`/api/admin/groups/${encodeURIComponent(groupId)}/members`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  await refreshGroupMembers(groupId);
+});
+
+document.querySelector("#listGroupMembers").addEventListener("click", () => {
+  refreshGroupMembers(document.querySelector("#memberGroupId").value.trim());
+});
+
+document.querySelector("#refreshFiles").addEventListener("click", () => {
+  refreshFiles();
+});
+
+document.querySelector("#grantForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fileId = document.querySelector("#grantFileId").value.trim();
+  const body = {
+    tenantId: requireTenantId(),
+    subjectType: document.querySelector("#grantSubjectType").value,
+    subjectId: document.querySelector("#grantSubjectId").value.trim(),
+    permissions: document.querySelector("#grantPermissions").value.trim()
+  };
+
+  await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/grants`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  setStatus("Grant saved", "ok");
+});
+
 async function refreshUsers() {
   const tenantId = requireTenantId();
   const users = await apiFetch(`/api/admin/users?tenantId=${encodeURIComponent(tenantId)}`);
   renderUsers(users);
   setStatus(`${users.length} user${users.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshGroupMembers(groupId) {
+  if (!groupId) {
+    setStatus("Group ID required", "error");
+    throw new Error("Group ID required");
+  }
+
+  const tenantId = requireTenantId();
+  const members = await apiFetch(`/api/admin/groups/${encodeURIComponent(groupId)}/members?tenantId=${encodeURIComponent(tenantId)}`);
+  renderGroupMembers(members);
+  setStatus(`${members.length} member${members.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshFiles() {
+  const tenantId = requireTenantId();
+  const query = document.querySelector("#fileQuery").value.trim();
+  const url = `/api/admin/files?tenantId=${encodeURIComponent(tenantId)}&q=${encodeURIComponent(query)}`;
+  const files = await apiFetch(url);
+  renderFiles(files);
+  setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
 async function apiFetch(url, options = {}) {
@@ -92,6 +174,37 @@ function renderUsers(users) {
   `).join("");
 }
 
+function renderGroupMembers(members) {
+  if (!members.length) {
+    groupMembersBody.innerHTML = '<tr><td colspan="2" class="empty">No members in this group.</td></tr>';
+    return;
+  }
+
+  groupMembersBody.innerHTML = members.map((member) => `
+    <tr>
+      <td><code>${escapeHtml(member.groupId)}</code></td>
+      <td><code>${escapeHtml(member.userId)}</code></td>
+    </tr>
+  `).join("");
+}
+
+function renderFiles(files) {
+  if (!files.length) {
+    filesBody.innerHTML = '<tr><td colspan="5" class="empty">No protected files found.</td></tr>';
+    return;
+  }
+
+  filesBody.innerHTML = files.map((file) => `
+    <tr>
+      <td><code>${escapeHtml(file.fileId)}</code></td>
+      <td><code>${escapeHtml(file.ownerUserId)}</code></td>
+      <td>${escapeHtml(file.contentType)}</td>
+      <td>${escapeHtml(file.permissions)}</td>
+      <td>${escapeHtml(formatDate(file.expiresAtUtc))}</td>
+    </tr>
+  `).join("");
+}
+
 function requireTenantId() {
   const tenantId = tenantIdInput.value.trim();
   if (!tenantId) {
@@ -124,4 +237,12 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleString();
 }

@@ -186,3 +186,7 @@ When `Drm:Security:AdminApiKey` is configured, `/api/admin/*` endpoints require 
 The management server now serves a browser console at `/admin/`. The shell stores the tenant ID and admin API key in browser session storage, sends `X-DRM-Admin-Key` on admin API calls, lists tenant users, creates users, and checks `/healthz`.
 
 This is an MVP operations shell. The admin APIs still enforce the configured API key; production deployments should add TLS, stronger identity, CSRF/CORS policy, and audit review before broad operator rollout.
+
+## Phase 4D Console Admin Operations
+
+The `/admin/` console now includes group creation, group membership management, protected file listing, and file grant updates in addition to user management and health checks. Grant updates call the existing `/api/admin/files/{fileId}/grants` endpoint with subject type, subject ID, and permissions.

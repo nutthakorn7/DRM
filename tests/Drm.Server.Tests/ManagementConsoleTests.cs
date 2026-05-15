@@ -47,6 +47,10 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("DRM Management");
         html.Should().Contain("X-DRM-Admin-Key");
         html.Should().Contain("Tenant ID");
+        html.Should().Contain("Groups");
+        html.Should().Contain("Protected files");
+        html.Should().Contain("Subject type");
+        html.Should().Contain("Permissions");
         html.Should().Contain("app.css");
         html.Should().Contain("app.js");
     }
@@ -67,6 +71,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("sessionStorage");
         js.Should().Contain("X-DRM-Admin-Key");
         js.Should().Contain("/api/admin/users");
+        js.Should().Contain("/api/admin/groups");
+        js.Should().Contain("/api/admin/files");
+        js.Should().Contain("/grants");
     }
 
     public void Dispose()
