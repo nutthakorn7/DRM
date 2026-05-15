@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Drm.Server.Tests;
 
@@ -602,6 +604,242 @@ public sealed class AdminFilesApiTests : IDisposable
         missingGroup.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task Admin_can_create_list_and_revoke_external_share_links()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+        var expiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(30);
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, ownerUserId);
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var create = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "external.user@example.com",
+            expiresAtUtc,
+            maxUses: 1);
+
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await create.Content.ReadFromJsonAsync<CreateExternalShareLinkResponse>();
+        created.Should().NotBeNull();
+        created!.TenantId.Should().Be(tenantId);
+        created.FileId.Should().Be(fileId);
+        created.GuestEmail.Should().Be("external.user@example.com");
+        created.MaxUses.Should().Be(1);
+        created.UsedCount.Should().Be(0);
+        created.Revoked.Should().BeFalse();
+        created.AccessToken.Should().NotBeNullOrWhiteSpace();
+        created.AccessToken.Length.Should().BeGreaterThan(30);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var stored = await dbContext.ExternalShareLinks.AsNoTracking().SingleAsync();
+            stored.TokenHash.Should().NotBe(created.AccessToken);
+            stored.TokenHash.Should().NotBeNullOrWhiteSpace();
+        }
+
+        using var listResponse = await client.GetAsync($"/api/admin/files/{fileId}/share-links?tenantId={tenantId}");
+        var listJson = await listResponse.Content.ReadAsStringAsync();
+        listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        listJson.Should().NotContain(created.AccessToken);
+        listJson.ToLowerInvariant().Should().NotContain("tokenhash");
+
+        var links = await listResponse.Content.ReadFromJsonAsync<List<ExternalShareLinkResponse>>();
+        links.Should().BeEquivalentTo([
+            new ExternalShareLinkResponse(
+                tenantId,
+                created.ShareLinkId,
+                fileId,
+                "external.user@example.com",
+                created.ExpiresAtUtc,
+                1,
+                0,
+                false,
+                created.CreatedAtUtc,
+                null)
+        ], options => options
+            .Using<DateTimeOffset>(ctx => ctx.Subject.Should().BeCloseTo(ctx.Expectation, TimeSpan.FromSeconds(2)))
+            .WhenTypeIs<DateTimeOffset>());
+
+        using var revoke = await RevokeShareLinkAsync(client, tenantId, fileId, created.ShareLinkId, adminUserId);
+        revoke.StatusCode.Should().Be(HttpStatusCode.OK);
+        var revoked = await revoke.Content.ReadFromJsonAsync<ExternalShareLinkResponse>();
+        revoked!.Revoked.Should().BeTrue();
+        revoked.RevokedAtUtc.Should().NotBeNull();
+
+        var afterRevoke = await client.GetFromJsonAsync<List<ExternalShareLinkResponse>>(
+            $"/api/admin/files/{fileId}/share-links?tenantId={tenantId}");
+        afterRevoke.Should().ContainSingle(link => link.ShareLinkId == created.ShareLinkId && link.Revoked);
+
+        using var auditResponse = await client.GetAsync($"/api/audit?tenantId={tenantId}");
+        auditResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var auditEvents = await auditResponse.Content.ReadFromJsonAsync<List<AuditEventResponse>>();
+        auditEvents.Should().Contain(auditEvent =>
+            auditEvent.EventType == "external_share_changed" &&
+            auditEvent.ReasonCode == "external_share_link_created" &&
+            auditEvent.FileId == fileId &&
+            auditEvent.UserId == adminUserId);
+        auditEvents.Should().Contain(auditEvent =>
+            auditEvent.EventType == "external_share_changed" &&
+            auditEvent.ReasonCode == "external_share_link_revoked" &&
+            auditEvent.FileId == fileId &&
+            auditEvent.UserId == adminUserId);
+    }
+
+    [Fact]
+    public async Task Admin_create_external_share_link_validates_request_and_file_state()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, Guid.NewGuid());
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var missingFile = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            Guid.NewGuid(),
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            maxUses: 1);
+        missingFile.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var wrongTenant = await CreateShareLinkAsync(
+            client,
+            Guid.NewGuid(),
+            fileId,
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            maxUses: 1);
+        wrongTenant.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var invalidEmail = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "not-email",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            maxUses: 1);
+        invalidEmail.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await invalidEmail.Content.ReadFromJsonAsync<ErrorResponse>())
+            .Should().BeEquivalentTo(new ErrorResponse("invalid_guest_email"));
+
+        using var expiredLink = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            maxUses: 1);
+        expiredLink.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await expiredLink.Content.ReadFromJsonAsync<ErrorResponse>())
+            .Should().BeEquivalentTo(new ErrorResponse("invalid_expires_at"));
+
+        using var invalidMaxUses = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            maxUses: 0);
+        invalidMaxUses.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await invalidMaxUses.Content.ReadFromJsonAsync<ErrorResponse>())
+            .Should().BeEquivalentTo(new ErrorResponse("invalid_max_uses"));
+
+        using var beyondFileExpiry = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddHours(2),
+            maxUses: 1);
+        beyondFileExpiry.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await beyondFileExpiry.Content.ReadFromJsonAsync<ErrorResponse>())
+            .Should().BeEquivalentTo(new ErrorResponse("share_link_exceeds_file_expiry"));
+
+        using var revokeFile = await client.PostAsJsonAsync($"/api/admin/files/{fileId}/revoke", new
+        {
+            tenantId,
+            adminUserId
+        });
+        revokeFile.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var revokedFile = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            maxUses: 1);
+        revokedFile.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await revokedFile.Content.ReadFromJsonAsync<ErrorResponse>())
+            .Should().BeEquivalentTo(new ErrorResponse("file_revoked"));
+    }
+
+    [Fact]
+    public async Task Admin_external_share_link_revoke_is_tenant_and_file_scoped()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var otherFileId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, Guid.NewGuid());
+        using var otherRegister = await RegisterFileAsync(client, tenantId, otherFileId, Guid.NewGuid());
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+        otherRegister.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var create = await CreateShareLinkAsync(
+            client,
+            tenantId,
+            fileId,
+            adminUserId,
+            "guest@example.com",
+            DateTimeOffset.UtcNow.AddMinutes(10),
+            maxUses: 1);
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await create.Content.ReadFromJsonAsync<CreateExternalShareLinkResponse>();
+
+        using var wrongTenant = await RevokeShareLinkAsync(
+            client,
+            otherTenantId,
+            fileId,
+            created!.ShareLinkId,
+            adminUserId);
+        wrongTenant.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var wrongFile = await RevokeShareLinkAsync(
+            client,
+            tenantId,
+            otherFileId,
+            created.ShareLinkId,
+            adminUserId);
+        wrongFile.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var links = await client.GetFromJsonAsync<List<ExternalShareLinkResponse>>(
+            $"/api/admin/files/{fileId}/share-links?tenantId={tenantId}");
+        links.Should().ContainSingle(link => link.ShareLinkId == created.ShareLinkId && !link.Revoked);
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -724,6 +962,39 @@ public sealed class AdminFilesApiTests : IDisposable
         });
     }
 
+    private static Task<HttpResponseMessage> CreateShareLinkAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid fileId,
+        Guid adminUserId,
+        string guestEmail,
+        DateTimeOffset expiresAtUtc,
+        int maxUses)
+    {
+        return client.PostAsJsonAsync($"/api/admin/files/{fileId}/share-links", new
+        {
+            tenantId,
+            adminUserId,
+            guestEmail,
+            expiresAtUtc,
+            maxUses
+        });
+    }
+
+    private static Task<HttpResponseMessage> RevokeShareLinkAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid fileId,
+        Guid shareLinkId,
+        Guid adminUserId)
+    {
+        return client.PostAsJsonAsync($"/api/admin/files/{fileId}/share-links/{shareLinkId}/revoke", new
+        {
+            tenantId,
+            adminUserId
+        });
+    }
+
     private sealed record ErrorResponse(string ReasonCode);
 
     private sealed record GrantRequest(string SubjectType, Guid SubjectId, string Permissions);
@@ -746,6 +1017,31 @@ public sealed class AdminFilesApiTests : IDisposable
         bool Revoked);
 
     private sealed record RevokeFileResponse(Guid TenantId, Guid FileId, bool Revoked);
+
+    private sealed record CreateExternalShareLinkResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        string GuestEmail,
+        DateTimeOffset ExpiresAtUtc,
+        int MaxUses,
+        int UsedCount,
+        bool Revoked,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? RevokedAtUtc,
+        string AccessToken);
+
+    private sealed record ExternalShareLinkResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        string GuestEmail,
+        DateTimeOffset ExpiresAtUtc,
+        int MaxUses,
+        int UsedCount,
+        bool Revoked,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? RevokedAtUtc);
 
     private sealed record AuditEventResponse(
         long Id,

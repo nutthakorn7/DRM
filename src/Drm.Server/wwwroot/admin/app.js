@@ -17,6 +17,8 @@ const watermarkTemplatesBody = document.querySelector("#watermarkTemplatesBody")
 const simulatorOutput = document.querySelector("#simulatorOutput");
 const filesBody = document.querySelector("#filesBody");
 const commandsBody = document.querySelector("#commandsBody");
+const shareLinksBody = document.querySelector("#shareLinksBody");
+const shareLinkCreatedOutput = document.querySelector("#shareLinkCreatedOutput");
 const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
 const auditEventsBody = document.querySelector("#auditEventsBody");
 const healthOutput = document.querySelector("#healthOutput");
@@ -164,6 +166,10 @@ document.querySelector("#refreshCommands").addEventListener("click", () => {
   refreshCommands();
 });
 
+document.querySelector("#refreshShareLinks").addEventListener("click", () => {
+  refreshShareLinks();
+});
+
 document.querySelector("#refreshAuditEvents").addEventListener("click", () => {
   refreshAuditEvents();
 });
@@ -225,6 +231,11 @@ document.querySelector("#deleteCopyForm").addEventListener("submit", async (even
   event.target.reset();
 });
 
+document.querySelector("#createShareLinkForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await createShareLink();
+});
+
 filesBody.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-revoke-file-id]");
   if (!button) {
@@ -232,6 +243,15 @@ filesBody.addEventListener("click", async (event) => {
   }
 
   await revokeFile(button.dataset.revokeFileId);
+});
+
+shareLinksBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-revoke-share-link-id]");
+  if (!button) {
+    return;
+  }
+
+  await revokeShareLink(button.dataset.shareLinkFileId, button.dataset.revokeShareLinkId);
 });
 
 devicesBody.addEventListener("click", async (event) => {
@@ -343,6 +363,14 @@ async function refreshCommands() {
   setStatus(`${commands.length} command${commands.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
+async function refreshShareLinks() {
+  const fileId = document.querySelector("#shareLinksFileId").value.trim();
+  const tenantId = requireTenantId();
+  const links = await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/share-links?tenantId=${encodeURIComponent(tenantId)}`);
+  renderShareLinks(links);
+  setStatus(`${links.length} share link${links.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
 async function refreshSiemWebhooks() {
   const tenantId = requireTenantId();
   const webhooks = await apiFetch(`/api/admin/siem-webhooks?tenantId=${encodeURIComponent(tenantId)}`);
@@ -416,6 +444,49 @@ async function deleteProtectedCopy() {
   });
 
   setStatus("Delete command queued", "ok");
+}
+
+async function createShareLink() {
+  const fileId = document.querySelector("#shareLinkFileId").value.trim();
+  const expiresAtValue = document.querySelector("#shareLinkExpiresAt").value;
+  const expiresAt = new Date(expiresAtValue);
+  if (!expiresAtValue || Number.isNaN(expiresAt.getTime())) {
+    setStatus("Share link expiry required", "error");
+    throw new Error("Share link expiry required");
+  }
+
+  const body = {
+    tenantId: requireTenantId(),
+    adminUserId: requireAdminUserId(),
+    guestEmail: document.querySelector("#shareLinkGuestEmail").value.trim(),
+    expiresAtUtc: expiresAt.toISOString(),
+    maxUses: Number(document.querySelector("#shareLinkMaxUses").value || "1")
+  };
+
+  const created = await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/share-links`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  document.querySelector("#shareLinksFileId").value = fileId;
+  renderCreatedShareLink(created);
+  await refreshShareLinks();
+  setStatus("External share link created", "ok");
+}
+
+async function revokeShareLink(fileId, shareLinkId) {
+  const body = {
+    tenantId: requireTenantId(),
+    adminUserId: requireAdminUserId()
+  };
+
+  await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  await refreshShareLinks();
+  setStatus("External share link revoked", "ok");
 }
 
 async function disableDevice(deviceId) {
@@ -650,6 +721,15 @@ function renderFiles(files) {
   `).join("");
 }
 
+function renderCreatedShareLink(link) {
+  shareLinkCreatedOutput.textContent = JSON.stringify({
+    shareLinkId: link.shareLinkId,
+    guestEmail: link.guestEmail,
+    expiresAtUtc: link.expiresAtUtc,
+    accessToken: link.accessToken
+  }, null, 2);
+}
+
 function renderCommands(commands) {
   if (!commands.length) {
     commandsBody.innerHTML = '<tr><td colspan="7" class="empty">No commands found for this file.</td></tr>';
@@ -665,6 +745,25 @@ function renderCommands(commands) {
       <td>${escapeHtml(command.reasonCode)}</td>
       <td>${escapeHtml(formatDate(command.createdAtUtc))}</td>
       <td>${escapeHtml(formatDate(command.completedAtUtc) || "-")}</td>
+    </tr>
+  `).join("");
+}
+
+function renderShareLinks(links) {
+  if (!links.length) {
+    shareLinksBody.innerHTML = '<tr><td colspan="7" class="empty">No external share links found for this file.</td></tr>';
+    return;
+  }
+
+  shareLinksBody.innerHTML = links.map((link) => `
+    <tr>
+      <td><code>${escapeHtml(link.shareLinkId)}</code></td>
+      <td>${escapeHtml(link.guestEmail)}</td>
+      <td>${escapeHtml(`${link.usedCount}/${link.maxUses}`)}</td>
+      <td>${renderShareLinkStatus(link)}</td>
+      <td>${escapeHtml(formatDate(link.expiresAtUtc))}</td>
+      <td>${escapeHtml(formatDate(link.createdAtUtc))}</td>
+      <td>${isShareLinkInactive(link) ? "" : `<button class="danger" type="button" data-share-link-file-id="${escapeHtml(link.fileId)}" data-revoke-share-link-id="${escapeHtml(link.shareLinkId)}">Revoke</button>`}</td>
     </tr>
   `).join("");
 }
@@ -738,6 +837,22 @@ function renderEnabledBadge(enabled) {
   return enabled
     ? '<span class="badge">Enabled</span>'
     : '<span class="badge disabled">Disabled</span>';
+}
+
+function renderShareLinkStatus(link) {
+  if (link.revoked) {
+    return '<span class="badge revoked">Revoked</span>';
+  }
+
+  if (new Date(link.expiresAtUtc) <= new Date()) {
+    return '<span class="badge disabled">Expired</span>';
+  }
+
+  return '<span class="badge">Active</span>';
+}
+
+function isShareLinkInactive(link) {
+  return link.revoked || new Date(link.expiresAtUtc) <= new Date();
 }
 
 function isDeviceDisabled(device) {

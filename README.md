@@ -70,6 +70,9 @@ The server includes admin APIs for local enterprise administration:
 - `GET /api/admin/files?tenantId=...&q=...`
 - `POST /api/admin/files/{fileId}/grants`
 - `PUT /api/admin/files/{fileId}/grants`
+- `POST /api/admin/files/{fileId}/share-links`
+- `GET /api/admin/files/{fileId}/share-links?tenantId=...`
+- `POST /api/admin/files/{fileId}/share-links/{shareLinkId}/revoke`
 - `GET /api/admin/audit?tenantId=...&eventType=...`
 - `GET /api/admin/audit.csv?tenantId=...&eventType=...`
 - `POST /api/admin/siem-webhooks`
@@ -295,3 +298,9 @@ Desktop open workflows now render `{userId}` and `{fileId}` watermark placeholde
 dotnet run --project src/Drm.Cli -- protect --server-url https://drm.example --tenant-id <tenant-guid> --user-id <user-guid> --file ./contract.docx --policy-template-id <template-guid>
 dotnet run --project src/Drm.Cli -- open --server-url https://drm.example --user-id <user-guid> --device-id <device-guid> --file ./contract.docx.drmx --output ./contract.docx
 ```
+
+## Phase 5V External Share Link Foundation
+
+Administrators can now create, list, and revoke external share links for protected files with `POST /api/admin/files/{fileId}/share-links`, `GET /api/admin/files/{fileId}/share-links?tenantId=...`, and `POST /api/admin/files/{fileId}/share-links/{shareLinkId}/revoke`. Create responses return a high-entropy access token once, while the server stores only its SHA-256 hash and list/revoke responses never expose token material.
+
+Share links are tenant- and file-scoped, require a guest email, expiry, and max-use limit, cannot outlive the protected file, and cannot be created for revoked files. This phase intentionally stops at enterprise link lifecycle management; guest identity verification, browser viewing, and public decrypt/file-key release remain future external-sharing work.

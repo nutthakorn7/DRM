@@ -20,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<FileGrantEntity> FileGrants => Set<FileGrantEntity>();
 
+    public DbSet<ExternalShareLinkEntity> ExternalShareLinks => Set<ExternalShareLinkEntity>();
+
     public DbSet<SiemWebhookEntity> SiemWebhooks => Set<SiemWebhookEntity>();
 
     public DbSet<AgentDeviceEntity> AgentDevices => Set<AgentDeviceEntity>();
@@ -85,6 +87,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(grant => new { grant.TenantId, grant.FileId, grant.SubjectType, grant.SubjectId });
             entity.Property(grant => grant.SubjectType).HasMaxLength(32);
             entity.Property(grant => grant.Permissions).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<ExternalShareLinkEntity>(entity =>
+        {
+            entity.HasKey(shareLink => new { shareLink.TenantId, shareLink.ShareLinkId });
+            entity.HasIndex(shareLink => new { shareLink.TenantId, shareLink.FileId });
+            entity.HasIndex(shareLink => new { shareLink.TenantId, shareLink.TokenHash }).IsUnique();
+            entity.Property(shareLink => shareLink.TokenHash).HasMaxLength(128);
+            entity.Property(shareLink => shareLink.GuestEmail).HasMaxLength(320);
         });
 
         modelBuilder.Entity<SiemWebhookEntity>(entity =>

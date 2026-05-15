@@ -58,6 +58,10 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Command status");
         html.Should().Contain("commandsBody");
         html.Should().Contain("Refresh commands");
+        html.Should().Contain("External share links");
+        html.Should().Contain("createShareLinkForm");
+        html.Should().Contain("shareLinksBody");
+        html.Should().Contain("Refresh share links");
         html.Should().Contain("Policy templates");
         html.Should().Contain("Policy simulator");
         html.Should().Contain("Simulate access");
@@ -114,6 +118,12 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("refreshCommands");
         js.Should().Contain("renderCommands");
         js.Should().Contain("commandsBody");
+        js.Should().Contain("/share-links");
+        js.Should().Contain("createShareLinkForm");
+        js.Should().Contain("refreshShareLinks");
+        js.Should().Contain("renderShareLinks");
+        js.Should().Contain("revokeShareLink");
+        js.Should().Contain("shareLinksBody");
         js.Should().Contain("/api/admin/policy-templates");
         js.Should().Contain("refreshPolicyTemplates");
         js.Should().Contain("createPolicyTemplateForm");

@@ -205,6 +205,25 @@ button.danger:hover {
   gap: 10px;
 }
 
+.share-link-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) minmax(190px, 0.8fr) minmax(120px, 0.5fr) auto;
+  gap: 10px;
+}
+
+.share-link-filter-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px);
+}
+
+.token-output {
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 12px;
+}
+
 .compact-head h4 {
   margin: 0;
   font-size: 16px;
@@ -399,6 +418,8 @@ pre {
   .grant-row,
   .apply-template-row,
   .delete-copy-row,
+  .share-link-row,
+  .share-link-filter-row,
   .command-filter-row,
   .audit-filter-row,
   .device-filter-row,

@@ -13,6 +13,9 @@ public static class AdminFilesEndpoints
         group.MapGet("/", ListFilesAsync);
         group.MapGet("/{fileId:guid}/commands", ListFileCommandsAsync);
         group.MapPost("/{fileId:guid}/commands/delete-protected-copy", EnqueueDeleteProtectedCopyCommandAsync);
+        group.MapPost("/{fileId:guid}/share-links", CreateExternalShareLinkAsync);
+        group.MapGet("/{fileId:guid}/share-links", ListExternalShareLinksAsync);
+        group.MapPost("/{fileId:guid}/share-links/{shareLinkId:guid}/revoke", RevokeExternalShareLinkAsync);
         group.MapPost("/{fileId:guid}/grants", UpsertGrantAsync);
         group.MapPut("/{fileId:guid}/grants", ReplaceGrantsAsync);
         group.MapPost("/{fileId:guid}/apply-policy-template", ApplyPolicyTemplateAsync);
@@ -115,6 +118,121 @@ public static class AdminFilesEndpoints
         return TypedResults.Created(
             $"/api/admin/files/{fileId}/commands/{command.CommandId}",
             AgentCommandResponse.From(command));
+    }
+
+    private static async Task<Results<Created<CreateExternalShareLinkResponse>, BadRequest<ErrorResponse>, NotFound>> CreateExternalShareLinkAsync(
+        Guid fileId,
+        CreateExternalShareLinkRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var file = await dbContext.ProtectedFiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId,
+                cancellationToken);
+
+        if (file is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var validationError = ValidateCreateExternalShareLinkRequest(file, request, now);
+        if (validationError is not null)
+        {
+            return TypedResults.BadRequest(validationError);
+        }
+
+        var token = ExternalShareToken.Create();
+        var shareLink = new ExternalShareLinkEntity
+        {
+            TenantId = request.TenantId,
+            ShareLinkId = Guid.NewGuid(),
+            FileId = fileId,
+            TokenHash = token.Hash,
+            GuestEmail = NormalizeEmail(request.GuestEmail),
+            ExpiresAtUtc = request.ExpiresAtUtc,
+            MaxUses = request.MaxUses,
+            UsedCount = 0,
+            Revoked = false,
+            CreatedAtUtc = now
+        };
+
+        dbContext.ExternalShareLinks.Add(shareLink);
+        dbContext.AuditEvents.Add(ExternalShareAuditEvent(
+            request.TenantId,
+            fileId,
+            request.AdminUserId,
+            "external_share_link_created",
+            now));
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return TypedResults.Created(
+            $"/api/admin/files/{fileId}/share-links/{shareLink.ShareLinkId}",
+            CreateExternalShareLinkResponse.From(shareLink, token.Plaintext));
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<ExternalShareLinkResponse>>, NotFound>> ListExternalShareLinksAsync(
+        Guid fileId,
+        Guid tenantId,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!await FileExistsAsync(dbContext, tenantId, fileId, cancellationToken))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var links = await dbContext.ExternalShareLinks
+            .AsNoTracking()
+            .Where(link => link.TenantId == tenantId && link.FileId == fileId)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        return TypedResults.Ok<IReadOnlyList<ExternalShareLinkResponse>>(links
+            .OrderByDescending(link => link.CreatedAtUtc)
+            .ThenBy(link => link.ShareLinkId)
+            .Select(ExternalShareLinkResponse.From)
+            .ToList());
+    }
+
+    private static async Task<Results<Ok<ExternalShareLinkResponse>, NotFound>> RevokeExternalShareLinkAsync(
+        Guid fileId,
+        Guid shareLinkId,
+        RevokeExternalShareLinkRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var shareLink = await dbContext.ExternalShareLinks
+            .SingleOrDefaultAsync(
+                candidate =>
+                    candidate.TenantId == request.TenantId &&
+                    candidate.FileId == fileId &&
+                    candidate.ShareLinkId == shareLinkId,
+                cancellationToken);
+
+        if (shareLink is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (!shareLink.Revoked)
+        {
+            var now = DateTimeOffset.UtcNow;
+            shareLink.Revoked = true;
+            shareLink.RevokedAtUtc = now;
+            dbContext.AuditEvents.Add(ExternalShareAuditEvent(
+                request.TenantId,
+                fileId,
+                request.AdminUserId,
+                "external_share_link_revoked",
+                now));
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return TypedResults.Ok(ExternalShareLinkResponse.From(shareLink));
     }
 
     private static async Task<Results<Ok<RevokeFileResponse>, NotFound>> RevokeFileAsync(
@@ -446,9 +564,85 @@ public static class AdminFilesEndpoints
             .AnyAsync(device => device.TenantId == tenantId && device.DeviceId == deviceId, cancellationToken);
     }
 
+    private static ErrorResponse? ValidateCreateExternalShareLinkRequest(
+        ProtectedFileEntity file,
+        CreateExternalShareLinkRequest request,
+        DateTimeOffset now)
+    {
+        if (file.Revoked)
+        {
+            return new ErrorResponse("file_revoked");
+        }
+
+        if (!IsValidGuestEmail(request.GuestEmail))
+        {
+            return new ErrorResponse("invalid_guest_email");
+        }
+
+        if (request.ExpiresAtUtc <= now)
+        {
+            return new ErrorResponse("invalid_expires_at");
+        }
+
+        if (request.ExpiresAtUtc > file.ExpiresAtUtc)
+        {
+            return new ErrorResponse("share_link_exceeds_file_expiry");
+        }
+
+        if (request.MaxUses is < 1 or > 1000)
+        {
+            return new ErrorResponse("invalid_max_uses");
+        }
+
+        return null;
+    }
+
+    private static bool IsValidGuestEmail(string? email)
+    {
+        var normalized = NormalizeEmail(email);
+        var atIndex = normalized.IndexOf('@');
+        return normalized.Length is >= 3 and <= 320
+            && atIndex > 0
+            && atIndex == normalized.LastIndexOf('@')
+            && atIndex < normalized.Length - 1
+            && normalized.IndexOfAny([' ', '\t', '\r', '\n']) < 0;
+    }
+
+    private static string NormalizeEmail(string? email)
+    {
+        return (email ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private static AuditEventEntity ExternalShareAuditEvent(
+        Guid tenantId,
+        Guid fileId,
+        Guid adminUserId,
+        string reasonCode,
+        DateTimeOffset createdAtUtc)
+    {
+        return new AuditEventEntity
+        {
+            TenantId = tenantId,
+            FileId = fileId,
+            UserId = adminUserId,
+            EventType = "external_share_changed",
+            ReasonCode = reasonCode,
+            CreatedAtUtc = createdAtUtc
+        };
+    }
+
     private sealed record EnqueueDeleteProtectedCopyCommandRequest(Guid TenantId, Guid DeviceId, Guid AdminUserId);
 
     private sealed record RevokeFileRequest(Guid TenantId, Guid AdminUserId);
+
+    private sealed record CreateExternalShareLinkRequest(
+        Guid TenantId,
+        Guid AdminUserId,
+        string GuestEmail,
+        DateTimeOffset ExpiresAtUtc,
+        int MaxUses);
+
+    private sealed record RevokeExternalShareLinkRequest(Guid TenantId, Guid AdminUserId);
 
     private sealed record UpsertFileGrantRequest(
         Guid TenantId,
@@ -501,6 +695,60 @@ public static class AdminFilesEndpoints
     }
 
     private sealed record RevokeFileResponse(Guid TenantId, Guid FileId, bool Revoked);
+
+    private sealed record CreateExternalShareLinkResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        string GuestEmail,
+        DateTimeOffset ExpiresAtUtc,
+        int MaxUses,
+        int UsedCount,
+        bool Revoked,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? RevokedAtUtc,
+        string AccessToken)
+    {
+        public static CreateExternalShareLinkResponse From(ExternalShareLinkEntity link, string accessToken)
+            => new(
+                link.TenantId,
+                link.ShareLinkId,
+                link.FileId,
+                link.GuestEmail,
+                link.ExpiresAtUtc,
+                link.MaxUses,
+                link.UsedCount,
+                link.Revoked,
+                link.CreatedAtUtc,
+                link.RevokedAtUtc,
+                accessToken);
+    }
+
+    private sealed record ExternalShareLinkResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        string GuestEmail,
+        DateTimeOffset ExpiresAtUtc,
+        int MaxUses,
+        int UsedCount,
+        bool Revoked,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? RevokedAtUtc)
+    {
+        public static ExternalShareLinkResponse From(ExternalShareLinkEntity link)
+            => new(
+                link.TenantId,
+                link.ShareLinkId,
+                link.FileId,
+                link.GuestEmail,
+                link.ExpiresAtUtc,
+                link.MaxUses,
+                link.UsedCount,
+                link.Revoked,
+                link.CreatedAtUtc,
+                link.RevokedAtUtc);
+    }
 
     private sealed record AgentCommandResponse(
         Guid TenantId,

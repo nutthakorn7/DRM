@@ -122,6 +122,31 @@ public sealed class FileGrantEntity
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 
+public sealed class ExternalShareLinkEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid ShareLinkId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string TokenHash { get; set; } = string.Empty;
+
+    public string GuestEmail { get; set; } = string.Empty;
+
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+
+    public int MaxUses { get; set; }
+
+    public int UsedCount { get; set; }
+
+    public bool Revoked { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? RevokedAtUtc { get; set; }
+}
+
 public sealed class SiemWebhookEntity
 {
     public Guid TenantId { get; set; }

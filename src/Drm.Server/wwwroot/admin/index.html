@@ -330,6 +330,49 @@
 
         <div class="section-head compact-head">
           <div>
+            <p class="eyebrow">External sharing</p>
+            <h4>External share links</h4>
+          </div>
+          <button id="refreshShareLinks" type="button">Refresh share links</button>
+        </div>
+
+        <form class="share-link-row" id="createShareLinkForm">
+          <input id="shareLinkFileId" autocomplete="off" placeholder="File ID">
+          <input id="shareLinkGuestEmail" type="email" autocomplete="off" placeholder="Guest email">
+          <input id="shareLinkExpiresAt" type="datetime-local" autocomplete="off">
+          <input id="shareLinkMaxUses" type="number" min="1" max="1000" value="1" autocomplete="off" placeholder="Max uses">
+          <button type="submit">Create share link</button>
+        </form>
+
+        <div class="share-link-filter-row">
+          <input id="shareLinksFileId" autocomplete="off" placeholder="File ID">
+        </div>
+
+        <pre class="token-output" id="shareLinkCreatedOutput">Created share tokens appear once.</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Share link ID</th>
+                <th>Guest email</th>
+                <th>Uses</th>
+                <th>Status</th>
+                <th>Expires</th>
+                <th>Created</th>
+                <th>Revoke</th>
+              </tr>
+            </thead>
+            <tbody id="shareLinksBody">
+              <tr>
+                <td colspan="7" class="empty">Enter a file ID and refresh share links.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-head compact-head">
+          <div>
             <p class="eyebrow">Command status</p>
             <h4>Remote delete commands</h4>
           </div>
