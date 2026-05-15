@@ -10,6 +10,7 @@ const adminUserIdInput = document.querySelector("#adminUserId");
 const connectionState = document.querySelector("#connectionState");
 const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
+const devicesBody = document.querySelector("#devicesBody");
 const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
 const filesBody = document.querySelector("#filesBody");
 const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
@@ -92,6 +93,10 @@ document.querySelector("#addGroupMemberForm").addEventListener("submit", async (
 
 document.querySelector("#listGroupMembers").addEventListener("click", () => {
   refreshGroupMembers(document.querySelector("#memberGroupId").value.trim());
+});
+
+document.querySelector("#refreshDevices").addEventListener("click", () => {
+  refreshDevices();
 });
 
 document.querySelector("#refreshPolicyTemplates").addEventListener("click", () => {
@@ -199,6 +204,24 @@ async function refreshGroupMembers(groupId) {
   const members = await apiFetch(`/api/admin/groups/${encodeURIComponent(groupId)}/members?tenantId=${encodeURIComponent(tenantId)}`);
   renderGroupMembers(members);
   setStatus(`${members.length} member${members.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshDevices() {
+  const tenantId = requireTenantId();
+  const params = new URLSearchParams({ tenantId });
+  const status = document.querySelector("#deviceStatusFilter").value.trim();
+  const userId = document.querySelector("#deviceUserFilter").value.trim();
+  if (status) {
+    params.set("status", status);
+  }
+
+  if (userId) {
+    params.set("userId", userId);
+  }
+
+  const devices = await apiFetch(`/api/admin/devices?${params.toString()}`);
+  renderDevices(devices);
+  setStatus(`${devices.length} device${devices.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
 async function refreshPolicyTemplates() {
@@ -325,6 +348,25 @@ function renderGroupMembers(members) {
     <tr>
       <td><code>${escapeHtml(member.groupId)}</code></td>
       <td><code>${escapeHtml(member.userId)}</code></td>
+    </tr>
+  `).join("");
+}
+
+function renderDevices(devices) {
+  if (!devices.length) {
+    devicesBody.innerHTML = '<tr><td colspan="7" class="empty">No agent devices found.</td></tr>';
+    return;
+  }
+
+  devicesBody.innerHTML = devices.map((device) => `
+    <tr>
+      <td>${escapeHtml(device.hostname)}</td>
+      <td><code>${escapeHtml(device.deviceId)}</code></td>
+      <td><code>${escapeHtml(device.userId)}</code></td>
+      <td>${escapeHtml(device.operatingSystem)}</td>
+      <td>${escapeHtml(device.agentVersion)}</td>
+      <td>${escapeHtml(device.status)}</td>
+      <td>${escapeHtml(formatDate(device.lastHeartbeatAtUtc))}</td>
     </tr>
   `).join("");
 }

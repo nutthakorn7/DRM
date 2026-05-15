@@ -51,6 +51,9 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Groups");
         html.Should().Contain("Protected files");
         html.Should().Contain("Policy templates");
+        html.Should().Contain("Agent devices");
+        html.Should().Contain("Filter by status");
+        html.Should().Contain("Filter by user ID");
         html.Should().Contain("Admin user ID");
         html.Should().Contain("Subject type");
         html.Should().Contain("Permissions");
@@ -89,6 +92,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/policy-templates");
         js.Should().Contain("refreshPolicyTemplates");
         js.Should().Contain("createPolicyTemplateForm");
+        js.Should().Contain("/api/admin/devices");
+        js.Should().Contain("refreshDevices");
+        js.Should().Contain("devicesBody");
         js.Should().Contain("/grants");
         js.Should().Contain("/revoke");
         js.Should().Contain("/api/admin/audit");

@@ -57,6 +57,7 @@ app.MapPolicyEndpoints();
 app.MapAuditEndpoints();
 app.MapAdminUsersEndpoints();
 app.MapAdminGroupsEndpoints();
+app.MapAdminDevicesEndpoints();
 app.MapAdminFilesEndpoints();
 app.MapAdminPolicyTemplatesEndpoints();
 app.MapAdminAuditEndpoints();

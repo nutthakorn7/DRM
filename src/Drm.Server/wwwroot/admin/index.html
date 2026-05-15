@@ -17,6 +17,7 @@
       <nav>
         <a class="active" href="#users">Users</a>
         <a href="#groups">Groups</a>
+        <a href="#devices">Devices</a>
         <a href="#templates">Templates</a>
         <a href="#files">Files</a>
         <a href="#siem">SIEM</a>
@@ -116,6 +117,42 @@
             <tbody id="groupMembersBody">
               <tr>
                 <td colspan="2" class="empty">Enter a group ID and list members.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="devices">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Endpoint fleet</p>
+            <h3>Agent devices</h3>
+          </div>
+          <button id="refreshDevices" type="button">Refresh devices</button>
+        </div>
+
+        <div class="device-filter-row">
+          <input id="deviceStatusFilter" autocomplete="off" placeholder="Filter by status">
+          <input id="deviceUserFilter" autocomplete="off" placeholder="Filter by user ID">
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Hostname</th>
+                <th>Device ID</th>
+                <th>User ID</th>
+                <th>OS</th>
+                <th>Version</th>
+                <th>Status</th>
+                <th>Last heartbeat</th>
+              </tr>
+            </thead>
+            <tbody id="devicesBody">
+              <tr>
+                <td colspan="7" class="empty">Refresh to load agent devices.</td>
               </tr>
             </tbody>
           </table>

@@ -205,6 +205,12 @@ button.danger:hover {
   grid-template-columns: minmax(220px, 360px);
 }
 
+.device-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 360px));
+  gap: 10px;
+}
+
 .template-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -302,6 +308,7 @@ pre {
   .filter-row,
   .grant-row,
   .audit-filter-row,
+  .device-filter-row,
   .template-row,
   .webhook-row,
   .topbar,

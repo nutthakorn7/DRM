@@ -214,3 +214,7 @@ When `Drm:Security:ClientApiKey` is configured, non-admin `/api/*` endpoints req
 ## Phase 5B Desktop Client API Key
 
 Desktop clients can now send `X-DRM-Client-Key`. The Windows service reads `DrmAgent:ClientApiKey`, and the tray protector/viewer include Client API key fields for manual workflows.
+
+## Phase 5C Admin Device Inventory
+
+The management API now exposes `GET /api/admin/devices?tenantId=...&userId=...&status=...` for tenant-scoped desktop agent inventory. The `/admin/` console includes an Agent devices section with status and user filters.
