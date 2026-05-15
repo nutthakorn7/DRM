@@ -12,6 +12,7 @@ public static class ExternalShareEndpoints
         group.MapPost("/redeem", RedeemShareLinkAsync);
         group.MapPost("/verification/start", StartVerificationAsync);
         group.MapPost("/verification/confirm", ConfirmVerificationAsync);
+        group.MapPost("/viewer/session", OpenViewerSessionAsync);
 
         return endpoints;
     }
@@ -287,6 +288,98 @@ public static class ExternalShareEndpoints
             "verification_confirmed"));
     }
 
+    private static async Task<Results<Ok<ExternalShareViewerSessionResponse>, BadRequest<ErrorResponse>, NotFound>> OpenViewerSessionAsync(
+        OpenExternalShareViewerSessionRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (request.TenantId == Guid.Empty)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.VerificationSessionToken))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_verification_session_token"));
+        }
+
+        var sessionTokenHash = ExternalShareToken.Hash(request.VerificationSessionToken.Trim());
+        var verification = await dbContext.ExternalShareVerifications
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == request.TenantId && candidate.SessionTokenHash == sessionTokenHash,
+                cancellationToken);
+
+        if (verification is null || verification.VerifiedAtUtc is null || verification.SessionExpiresAtUtc is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (verification.SessionExpiresAtUtc <= now)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("verification_session_expired"));
+        }
+
+        var shareLink = await dbContext.ExternalShareLinks
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == verification.TenantId && candidate.ShareLinkId == verification.ShareLinkId,
+                cancellationToken);
+
+        if (shareLink is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var file = await dbContext.ProtectedFiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == shareLink.TenantId && candidate.Id == shareLink.FileId,
+                cancellationToken);
+
+        if (file is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        var stateError = ValidateViewerSessionState(verification, shareLink, file, now);
+        if (stateError is not null)
+        {
+            return TypedResults.BadRequest(stateError);
+        }
+
+        if (verification.ViewerOpenedAtUtc is null)
+        {
+            verification.ViewerOpenedAtUtc = now;
+            shareLink.UsedCount += 1;
+            dbContext.AuditEvents.Add(new AuditEventEntity
+            {
+                TenantId = shareLink.TenantId,
+                FileId = shareLink.FileId,
+                UserId = null,
+                EventType = "external_share_viewer",
+                ReasonCode = "external_share_viewer_opened",
+                CreatedAtUtc = now
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return TypedResults.Ok(new ExternalShareViewerSessionResponse(
+            shareLink.TenantId,
+            shareLink.ShareLinkId,
+            shareLink.FileId,
+            shareLink.GuestEmail,
+            file.ContentType,
+            file.ExpiresAtUtc,
+            shareLink.ExpiresAtUtc,
+            verification.SessionExpiresAtUtc.Value,
+            file.WatermarkTemplate,
+            DownloadDisabled: true,
+            PrintDisabled: true,
+            ExportDisabled: true,
+            "viewer_session_ready"));
+    }
+
     private static ErrorResponse? ValidateRedeemable(
         ExternalShareLinkEntity shareLink,
         ProtectedFileEntity file,
@@ -303,6 +396,40 @@ public static class ExternalShareEndpoints
         }
 
         if (shareLink.UsedCount >= shareLink.MaxUses)
+        {
+            return new ErrorResponse("share_link_max_uses_exceeded");
+        }
+
+        if (file.Revoked)
+        {
+            return new ErrorResponse("file_revoked");
+        }
+
+        if (file.ExpiresAtUtc <= now)
+        {
+            return new ErrorResponse("file_expired");
+        }
+
+        return null;
+    }
+
+    private static ErrorResponse? ValidateViewerSessionState(
+        ExternalShareVerificationEntity verification,
+        ExternalShareLinkEntity shareLink,
+        ProtectedFileEntity file,
+        DateTimeOffset now)
+    {
+        if (shareLink.Revoked)
+        {
+            return new ErrorResponse("share_link_revoked");
+        }
+
+        if (shareLink.ExpiresAtUtc <= now)
+        {
+            return new ErrorResponse("share_link_expired");
+        }
+
+        if (verification.ViewerOpenedAtUtc is null && shareLink.UsedCount >= shareLink.MaxUses)
         {
             return new ErrorResponse("share_link_max_uses_exceeded");
         }
@@ -390,6 +517,10 @@ public static class ExternalShareEndpoints
         Guid VerificationId,
         string Code);
 
+    private sealed record OpenExternalShareViewerSessionRequest(
+        Guid TenantId,
+        string VerificationSessionToken);
+
     private sealed record ExternalShareRedemptionResponse(
         Guid TenantId,
         Guid ShareLinkId,
@@ -416,6 +547,21 @@ public static class ExternalShareEndpoints
         string GuestEmail,
         DateTimeOffset SessionExpiresAtUtc,
         string VerificationSessionToken,
+        string ReasonCode);
+
+    private sealed record ExternalShareViewerSessionResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        string GuestEmail,
+        string ContentType,
+        DateTimeOffset FileExpiresAtUtc,
+        DateTimeOffset ShareLinkExpiresAtUtc,
+        DateTimeOffset SessionExpiresAtUtc,
+        string WatermarkTemplate,
+        bool DownloadDisabled,
+        bool PrintDisabled,
+        bool ExportDisabled,
         string ReasonCode);
 
     private sealed record ErrorResponse(string ReasonCode);

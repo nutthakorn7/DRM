@@ -62,6 +62,7 @@ The server includes admin and external-sharing APIs for local enterprise adminis
 - `POST /api/share-links/redeem`
 - `POST /api/share-links/verification/start`
 - `POST /api/share-links/verification/confirm`
+- `POST /api/share-links/viewer/session`
 - `POST /api/admin/users`
 - `GET /api/admin/users?tenantId=...`
 - `POST /api/admin/groups`
@@ -319,3 +320,9 @@ Redemption rejects wrong tokens or guest emails without revealing link state, an
 External recipients can now start and confirm a guest verification session with `POST /api/share-links/verification/start` and `POST /api/share-links/verification/confirm`. Start validates the share token, guest email, and active file/link state, generates a six-digit verification code, stores only its hash, and sends the code through the injectable `IExternalShareVerificationSender` abstraction. The default sender is a no-op placeholder for production mail/SMS integration.
 
 Confirm validates the code, tracks failed attempts, blocks expired or exhausted verifications, stores only a short-lived session-token hash, and returns the plaintext verification session token once. This is still identity/session groundwork only; browser viewing and file-key release remain separate gated work.
+
+## Phase 5Y Verified Viewer Session Foundation
+
+Verified external guests can now open a viewer session with `POST /api/share-links/viewer/session` by submitting `tenantId` and the one-time verification session token from Phase 5X. The endpoint hashes the submitted token, rechecks session expiry plus active share-link and file state, consumes the share link's max-use count only once per verification session, and records an `external_share_viewer/external_share_viewer_opened` audit event.
+
+The response is limited to viewer-safe metadata: IDs, guest email, content type, file/link/session expiry, watermark template, and fixed disabled-action flags for download, print, and export. It still does not return file keys, wrapped keys, ciphertext, decrypted content, or browser-rendered document bytes.

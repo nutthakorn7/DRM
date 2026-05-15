@@ -172,6 +172,8 @@ public sealed class ExternalShareVerificationEntity
     public string? SessionTokenHash { get; set; }
 
     public DateTimeOffset? SessionExpiresAtUtc { get; set; }
+
+    public DateTimeOffset? ViewerOpenedAtUtc { get; set; }
 }
 
 public sealed class SiemWebhookEntity

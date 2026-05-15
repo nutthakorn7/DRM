@@ -425,6 +425,154 @@ public sealed class ExternalShareApiTests : IDisposable
             .Should().BeEquivalentTo(new ErrorResponse("file_revoked"));
     }
 
+    [Fact]
+    public async Task Guest_can_open_verified_viewer_session_without_key_or_content_release()
+    {
+        var started = await CreateStartedVerificationAsync();
+        using var confirm = await ConfirmVerificationAsync(
+            started.GuestClient,
+            started.TenantId,
+            started.VerificationId,
+            started.Code);
+        confirm.StatusCode.Should().Be(HttpStatusCode.OK);
+        var confirmed = await confirm.Content.ReadFromJsonAsync<ExternalShareVerificationConfirmResponse>();
+
+        using var open = await OpenViewerSessionAsync(
+            started.GuestClient,
+            started.TenantId,
+            confirmed!.VerificationSessionToken);
+
+        open.StatusCode.Should().Be(HttpStatusCode.OK);
+        var openJson = await open.Content.ReadAsStringAsync();
+        openJson.Should().NotContain(confirmed.VerificationSessionToken);
+        openJson.ToLowerInvariant().Should().NotContain("tokenhash");
+        openJson.ToLowerInvariant().Should().NotContain("sessiontokenhash");
+        openJson.ToLowerInvariant().Should().NotContain("wrappedkey");
+        openJson.ToLowerInvariant().Should().NotContain("ciphertext");
+        openJson.ToLowerInvariant().Should().NotContain("decrypted");
+
+        var viewerSession = await open.Content.ReadFromJsonAsync<ExternalShareViewerSessionResponse>();
+        viewerSession.Should().BeEquivalentTo(new
+        {
+            TenantId = started.TenantId,
+            ShareLinkId = started.ShareLinkId,
+            FileId = started.FileId,
+            GuestEmail = "guest@example.com",
+            ContentType = "application/pdf",
+            WatermarkTemplate = "user:{userId}",
+            DownloadDisabled = true,
+            PrintDisabled = true,
+            ExportDisabled = true,
+            ReasonCode = "viewer_session_ready"
+        });
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var link = await dbContext.ExternalShareLinks.AsNoTracking().SingleAsync(candidate => candidate.ShareLinkId == started.ShareLinkId);
+            link.UsedCount.Should().Be(1);
+            var verification = await dbContext.ExternalShareVerifications.AsNoTracking().SingleAsync(candidate => candidate.VerificationId == started.VerificationId);
+            verification.ViewerOpenedAtUtc.Should().NotBeNull();
+            var auditEvents = await dbContext.AuditEvents.AsNoTracking().ToListAsync();
+            auditEvents.Should().Contain(audit =>
+                audit.EventType == "external_share_viewer" &&
+                audit.ReasonCode == "external_share_viewer_opened" &&
+                audit.FileId == started.FileId);
+        }
+
+        using var repeatOpen = await OpenViewerSessionAsync(
+            started.GuestClient,
+            started.TenantId,
+            confirmed.VerificationSessionToken);
+
+        repeatOpen.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var link = await dbContext.ExternalShareLinks.AsNoTracking().SingleAsync(candidate => candidate.ShareLinkId == started.ShareLinkId);
+            link.UsedCount.Should().Be(1);
+        }
+    }
+
+    [Fact]
+    public async Task Guest_viewer_session_rejects_invalid_or_inactive_verified_session()
+    {
+        var invalid = await CreateConfirmedVerificationAsync();
+        using var invalidToken = await OpenViewerSessionAsync(
+            invalid.Started.GuestClient,
+            invalid.Started.TenantId,
+            "wrong-session-token");
+        invalidToken.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        await AssertViewerSessionRejectedAsync(
+            mutateState: async started =>
+            {
+                using var scope = factory.Services.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var verification = await dbContext.ExternalShareVerifications.SingleAsync(candidate => candidate.VerificationId == started.VerificationId);
+                verification.SessionExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
+                await dbContext.SaveChangesAsync();
+            },
+            expectedReasonCode: "verification_session_expired");
+
+        await AssertViewerSessionRejectedAsync(
+            mutateState: async started =>
+            {
+                using var scope = factory.Services.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var link = await dbContext.ExternalShareLinks.SingleAsync(candidate => candidate.ShareLinkId == started.ShareLinkId);
+                link.UsedCount = link.MaxUses;
+                await dbContext.SaveChangesAsync();
+            },
+            expectedReasonCode: "share_link_max_uses_exceeded");
+
+        await AssertViewerSessionRejectedAsync(
+            mutateState: async started =>
+            {
+                using var scope = factory.Services.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var link = await dbContext.ExternalShareLinks.SingleAsync(candidate => candidate.ShareLinkId == started.ShareLinkId);
+                link.ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
+                await dbContext.SaveChangesAsync();
+            },
+            expectedReasonCode: "share_link_expired");
+
+        await AssertViewerSessionRejectedAsync(
+            mutateState: async started =>
+            {
+                using var revokeLink = await started.SetupClient.PostAsJsonAsync(
+                    $"/api/admin/files/{started.FileId}/share-links/{started.ShareLinkId}/revoke",
+                    new
+                    {
+                        tenantId = started.TenantId,
+                        adminUserId = Guid.NewGuid()
+                    });
+                revokeLink.StatusCode.Should().Be(HttpStatusCode.OK);
+            },
+            expectedReasonCode: "share_link_revoked");
+
+        await AssertViewerSessionRejectedAsync(
+            mutateState: async started =>
+            {
+                using var revokeFile = await started.SetupClient.PostAsync(
+                    $"/api/files/{started.FileId}/revoke?tenantId={started.TenantId}",
+                    content: null);
+                revokeFile.StatusCode.Should().Be(HttpStatusCode.OK);
+            },
+            expectedReasonCode: "file_revoked");
+
+        await AssertViewerSessionRejectedAsync(
+            mutateState: async started =>
+            {
+                using var scope = factory.Services.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var file = await dbContext.ProtectedFiles.SingleAsync(candidate => candidate.TenantId == started.TenantId && candidate.Id == started.FileId);
+                file.ExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
+                await dbContext.SaveChangesAsync();
+            },
+            expectedReasonCode: "file_expired");
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -556,6 +704,53 @@ public sealed class ExternalShareApiTests : IDisposable
         });
     }
 
+    private static Task<HttpResponseMessage> OpenViewerSessionAsync(
+        HttpClient client,
+        Guid tenantId,
+        string verificationSessionToken)
+    {
+        return client.PostAsJsonAsync("/api/share-links/viewer/session", new
+        {
+            tenantId,
+            verificationSessionToken
+        });
+    }
+
+    private async Task<ConfirmedVerification> CreateConfirmedVerificationAsync()
+    {
+        var started = await CreateStartedVerificationAsync();
+        using var confirm = await ConfirmVerificationAsync(
+            started.GuestClient,
+            started.TenantId,
+            started.VerificationId,
+            started.Code);
+        confirm.StatusCode.Should().Be(HttpStatusCode.OK);
+        var confirmed = await confirm.Content.ReadFromJsonAsync<ExternalShareVerificationConfirmResponse>();
+        return new ConfirmedVerification(started, confirmed!.VerificationSessionToken);
+    }
+
+    private async Task AssertViewerSessionRejectedAsync(
+        Func<StartedVerification, Task> mutateState,
+        string expectedReasonCode)
+    {
+        var confirmed = await CreateConfirmedVerificationAsync();
+        await mutateState(confirmed.Started);
+
+        using var open = await OpenViewerSessionAsync(
+            confirmed.Started.GuestClient,
+            confirmed.Started.TenantId,
+            confirmed.VerificationSessionToken);
+
+        open.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var error = await open.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new ErrorResponse(expectedReasonCode));
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var verification = await dbContext.ExternalShareVerifications.AsNoTracking().SingleAsync(candidate => candidate.VerificationId == confirmed.Started.VerificationId);
+        verification.ViewerOpenedAtUtc.Should().BeNull();
+    }
+
     private async Task<StartedVerification> CreateStartedVerificationAsync()
     {
         var setupClient = factory.CreateClient();
@@ -663,6 +858,25 @@ public sealed class ExternalShareApiTests : IDisposable
         DateTimeOffset SessionExpiresAtUtc,
         string VerificationSessionToken,
         string ReasonCode);
+
+    private sealed record ExternalShareViewerSessionResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        string GuestEmail,
+        string ContentType,
+        DateTimeOffset FileExpiresAtUtc,
+        DateTimeOffset ShareLinkExpiresAtUtc,
+        DateTimeOffset SessionExpiresAtUtc,
+        string WatermarkTemplate,
+        bool DownloadDisabled,
+        bool PrintDisabled,
+        bool ExportDisabled,
+        string ReasonCode);
+
+    private sealed record ConfirmedVerification(
+        StartedVerification Started,
+        string VerificationSessionToken);
 
     private sealed record StartedVerification(
         HttpClient SetupClient,
