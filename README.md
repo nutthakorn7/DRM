@@ -234,3 +234,7 @@ Viewer-controlled Copy, Print, and Export actions now emit endpoint audit events
 ## Phase 5G Admin Policy Simulator
 
 Administrators can preview policy outcomes with `POST /api/admin/policy-simulator` without issuing file keys or writing endpoint access audit events. The `/admin/` console includes a Policy simulator section for tenant-scoped file, user, device, and permission checks.
+
+## Phase 5H Watermark Template Management
+
+Administrators can manage reusable watermark patterns with `POST /api/admin/watermark-templates`, `GET /api/admin/watermark-templates?tenantId=...`, and `GET /api/admin/watermark-templates/{watermarkTemplateId}?tenantId=...`. The `/admin/` console includes a Watermark templates section for tenant-scoped pattern management.

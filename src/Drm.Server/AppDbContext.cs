@@ -16,6 +16,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<PolicyTemplateEntity> PolicyTemplates => Set<PolicyTemplateEntity>();
 
+    public DbSet<WatermarkTemplateEntity> WatermarkTemplates => Set<WatermarkTemplateEntity>();
+
     public DbSet<FileGrantEntity> FileGrants => Set<FileGrantEntity>();
 
     public DbSet<SiemWebhookEntity> SiemWebhooks => Set<SiemWebhookEntity>();
@@ -69,6 +71,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(template => template.Name).HasMaxLength(256);
             entity.Property(template => template.Permissions).HasMaxLength(256);
             entity.Property(template => template.WatermarkTemplate).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<WatermarkTemplateEntity>(entity =>
+        {
+            entity.HasKey(template => new { template.TenantId, template.WatermarkTemplateId });
+            entity.Property(template => template.Name).HasMaxLength(256);
+            entity.Property(template => template.Pattern).HasMaxLength(1024);
         });
 
         modelBuilder.Entity<FileGrantEntity>(entity =>

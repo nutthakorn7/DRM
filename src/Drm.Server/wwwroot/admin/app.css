@@ -217,6 +217,12 @@ button.danger:hover {
   gap: 10px;
 }
 
+.watermark-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr) minmax(260px, 1.6fr) auto;
+  gap: 10px;
+}
+
 .simulator-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
@@ -324,6 +330,7 @@ pre {
   .audit-filter-row,
   .device-filter-row,
   .template-row,
+  .watermark-row,
   .simulator-row,
   .webhook-row,
   .topbar,

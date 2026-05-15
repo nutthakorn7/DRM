@@ -61,6 +61,8 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Subject type");
         html.Should().Contain("Permissions");
         html.Should().Contain("Watermark template");
+        html.Should().Contain("Watermark templates");
+        html.Should().Contain("Watermark pattern");
         html.Should().Contain("Offline lease");
         html.Should().Contain("Allow print");
         html.Should().Contain("Revoke");
@@ -95,6 +97,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/policy-templates");
         js.Should().Contain("refreshPolicyTemplates");
         js.Should().Contain("createPolicyTemplateForm");
+        js.Should().Contain("/api/admin/watermark-templates");
+        js.Should().Contain("refreshWatermarkTemplates");
+        js.Should().Contain("createWatermarkTemplateForm");
         js.Should().Contain("/api/admin/policy-simulator");
         js.Should().Contain("simulatePolicy");
         js.Should().Contain("simulatorOutput");

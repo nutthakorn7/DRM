@@ -12,6 +12,7 @@ const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
 const devicesBody = document.querySelector("#devicesBody");
 const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
+const watermarkTemplatesBody = document.querySelector("#watermarkTemplatesBody");
 const simulatorOutput = document.querySelector("#simulatorOutput");
 const filesBody = document.querySelector("#filesBody");
 const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
@@ -104,6 +105,10 @@ document.querySelector("#refreshPolicyTemplates").addEventListener("click", () =
   refreshPolicyTemplates();
 });
 
+document.querySelector("#refreshWatermarkTemplates").addEventListener("click", () => {
+  refreshWatermarkTemplates();
+});
+
 document.querySelector("#createPolicyTemplateForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const offlineLeaseValue = document.querySelector("#templateOfflineLease").value.trim();
@@ -124,6 +129,24 @@ document.querySelector("#createPolicyTemplateForm").addEventListener("submit", a
 
   event.target.reset();
   await refreshPolicyTemplates();
+});
+
+document.querySelector("#createWatermarkTemplateForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    watermarkTemplateId: document.querySelector("#watermarkTemplateId").value.trim(),
+    name: document.querySelector("#watermarkTemplateName").value.trim(),
+    pattern: document.querySelector("#watermarkTemplatePattern").value.trim()
+  };
+
+  await apiFetch("/api/admin/watermark-templates", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  event.target.reset();
+  await refreshWatermarkTemplates();
 });
 
 document.querySelector("#simulatePolicyForm").addEventListener("submit", async (event) => {
@@ -244,6 +267,13 @@ async function refreshPolicyTemplates() {
   const templates = await apiFetch(`/api/admin/policy-templates?tenantId=${encodeURIComponent(tenantId)}`);
   renderPolicyTemplates(templates);
   setStatus(`${templates.length} template${templates.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshWatermarkTemplates() {
+  const tenantId = requireTenantId();
+  const templates = await apiFetch(`/api/admin/watermark-templates?tenantId=${encodeURIComponent(tenantId)}`);
+  renderWatermarkTemplates(templates);
+  setStatus(`${templates.length} watermark template${templates.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
 async function simulatePolicy() {
@@ -435,6 +465,22 @@ function renderPolicyTemplates(templates) {
       <td>${escapeHtml(template.watermarkTemplate)}</td>
       <td>${escapeHtml(`${template.offlineLeaseMinutes} min`)}</td>
       <td>${template.allowPrint ? "Yes" : "No"}</td>
+    </tr>
+  `).join("");
+}
+
+function renderWatermarkTemplates(templates) {
+  if (!templates.length) {
+    watermarkTemplatesBody.innerHTML = '<tr><td colspan="4" class="empty">No watermark templates in this tenant.</td></tr>';
+    return;
+  }
+
+  watermarkTemplatesBody.innerHTML = templates.map((template) => `
+    <tr>
+      <td>${escapeHtml(template.name)}</td>
+      <td><code>${escapeHtml(template.watermarkTemplateId)}</code></td>
+      <td>${escapeHtml(template.pattern)}</td>
+      <td>${escapeHtml(formatDate(template.createdAtUtc))}</td>
     </tr>
   `).join("");
 }

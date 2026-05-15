@@ -92,6 +92,19 @@ public sealed class PolicyTemplateEntity
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 
+public sealed class WatermarkTemplateEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid WatermarkTemplateId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Pattern { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
 public sealed class FileGrantEntity
 {
     public Guid TenantId { get; set; }

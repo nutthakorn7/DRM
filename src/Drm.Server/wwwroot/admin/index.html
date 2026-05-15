@@ -19,6 +19,7 @@
         <a href="#groups">Groups</a>
         <a href="#devices">Devices</a>
         <a href="#templates">Templates</a>
+        <a href="#watermarks">Watermarks</a>
         <a href="#simulator">Simulator</a>
         <a href="#files">Files</a>
         <a href="#siem">SIEM</a>
@@ -198,6 +199,41 @@
             <tbody id="policyTemplatesBody">
               <tr>
                 <td colspan="6" class="empty">Refresh to load policy templates.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="watermarks">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Policy</p>
+            <h3>Watermark templates</h3>
+          </div>
+          <button id="refreshWatermarkTemplates" type="button">Refresh watermarks</button>
+        </div>
+
+        <form class="watermark-row" id="createWatermarkTemplateForm">
+          <input id="watermarkTemplateId" autocomplete="off" placeholder="Watermark template ID">
+          <input id="watermarkTemplateName" autocomplete="off" placeholder="Name">
+          <input id="watermarkTemplatePattern" autocomplete="off" placeholder="Watermark pattern">
+          <button type="submit">Create watermark</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Template ID</th>
+                <th>Watermark pattern</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="watermarkTemplatesBody">
+              <tr>
+                <td colspan="4" class="empty">Refresh to load watermark templates.</td>
               </tr>
             </tbody>
           </table>
