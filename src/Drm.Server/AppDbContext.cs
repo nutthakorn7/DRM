@@ -22,6 +22,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<ExternalShareLinkEntity> ExternalShareLinks => Set<ExternalShareLinkEntity>();
 
+    public DbSet<ExternalShareVerificationEntity> ExternalShareVerifications => Set<ExternalShareVerificationEntity>();
+
     public DbSet<SiemWebhookEntity> SiemWebhooks => Set<SiemWebhookEntity>();
 
     public DbSet<AgentDeviceEntity> AgentDevices => Set<AgentDeviceEntity>();
@@ -96,6 +98,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(shareLink => new { shareLink.TenantId, shareLink.TokenHash }).IsUnique();
             entity.Property(shareLink => shareLink.TokenHash).HasMaxLength(128);
             entity.Property(shareLink => shareLink.GuestEmail).HasMaxLength(320);
+        });
+
+        modelBuilder.Entity<ExternalShareVerificationEntity>(entity =>
+        {
+            entity.HasKey(verification => new { verification.TenantId, verification.VerificationId });
+            entity.HasIndex(verification => new { verification.TenantId, verification.ShareLinkId });
+            entity.Property(verification => verification.GuestEmail).HasMaxLength(320);
+            entity.Property(verification => verification.CodeHash).HasMaxLength(128);
+            entity.Property(verification => verification.SessionTokenHash).HasMaxLength(128);
         });
 
         modelBuilder.Entity<SiemWebhookEntity>(entity =>

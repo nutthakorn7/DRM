@@ -26,6 +26,7 @@ builder.Services
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
+builder.Services.AddSingleton<IExternalShareVerificationSender, NoopExternalShareVerificationSender>();
 
 var app = builder.Build();
 

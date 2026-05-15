@@ -147,6 +147,33 @@ public sealed class ExternalShareLinkEntity
     public DateTimeOffset? RevokedAtUtc { get; set; }
 }
 
+public sealed class ExternalShareVerificationEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid VerificationId { get; set; }
+
+    public Guid ShareLinkId { get; set; }
+
+    public string GuestEmail { get; set; } = string.Empty;
+
+    public string CodeHash { get; set; } = string.Empty;
+
+    public int AttemptCount { get; set; }
+
+    public int MaxAttempts { get; set; } = 5;
+
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? VerifiedAtUtc { get; set; }
+
+    public string? SessionTokenHash { get; set; }
+
+    public DateTimeOffset? SessionExpiresAtUtc { get; set; }
+}
+
 public sealed class SiemWebhookEntity
 {
     public Guid TenantId { get; set; }

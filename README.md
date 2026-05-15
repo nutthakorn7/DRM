@@ -60,6 +60,8 @@ dotnet build src/Drm.Viewer.Windows/Drm.Viewer.Windows.csproj
 The server includes admin and external-sharing APIs for local enterprise administration:
 
 - `POST /api/share-links/redeem`
+- `POST /api/share-links/verification/start`
+- `POST /api/share-links/verification/confirm`
 - `POST /api/admin/users`
 - `GET /api/admin/users?tenantId=...`
 - `POST /api/admin/groups`
@@ -311,3 +313,9 @@ Share links are tenant- and file-scoped, require a guest email, expiry, and max-
 Guests can now redeem an external share token with `POST /api/share-links/redeem` by submitting `tenantId`, `accessToken`, and `guestEmail`. This public endpoint is intentionally exempt from client API-key authentication so external recipients can reach it, but it only validates the token/email, consumes the link's max-use count, records an `external_share_accessed/external_share_link_redeemed` audit event, and returns safe file metadata.
 
 Redemption rejects wrong tokens or guest emails without revealing link state, and it blocks revoked links, expired links, exhausted max-use links, revoked files, and expired files with explicit reason codes. It still does not return wrapped keys, decrypted content, or browser-view data; those remain separate browser viewer and guest identity-verification work.
+
+## Phase 5X External Share Verification Sessions
+
+External recipients can now start and confirm a guest verification session with `POST /api/share-links/verification/start` and `POST /api/share-links/verification/confirm`. Start validates the share token, guest email, and active file/link state, generates a six-digit verification code, stores only its hash, and sends the code through the injectable `IExternalShareVerificationSender` abstraction. The default sender is a no-op placeholder for production mail/SMS integration.
+
+Confirm validates the code, tracks failed attempts, blocks expired or exhausted verifications, stores only a short-lived session-token hash, and returns the plaintext verification session token once. This is still identity/session groundwork only; browser viewing and file-key release remain separate gated work.
