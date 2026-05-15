@@ -55,4 +55,12 @@ X-DRM-Admin-Key: <long-random-admin-api-key>
 curl http://localhost:5080/healthz
 ```
 
+Open the management console:
+
+```text
+http://localhost:5080/admin/
+```
+
+Enter the tenant ID and admin API key. The console sends `X-DRM-Admin-Key` for `/api/admin/*` operations.
+
 This is an install baseline, not a production hardening checklist. Real deployment still needs TLS termination, API authentication, service supervision, backups, audit retention, key rotation, and host monitoring.

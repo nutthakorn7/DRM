@@ -180,3 +180,9 @@ This is a runnable management install baseline, not final production hardening. 
 ## Phase 4B Admin API Key Auth
 
 When `Drm:Security:AdminApiKey` is configured, `/api/admin/*` endpoints require `X-DRM-Admin-Key`. Missing keys return 401 and wrong keys return 403. The on-prem management start script now requires `DRM_ADMIN_API_KEY` and exports it as server configuration.
+
+## Phase 4C Management Console Shell
+
+The management server now serves a browser console at `/admin/`. The shell stores the tenant ID and admin API key in browser session storage, sends `X-DRM-Admin-Key` on admin API calls, lists tenant users, creates users, and checks `/healthz`.
+
+This is an MVP operations shell. The admin APIs still enforce the configured API key; production deployments should add TLS, stronger identity, CSRF/CORS policy, and audit review before broad operator rollout.

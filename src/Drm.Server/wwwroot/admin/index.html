@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DRM Management</title>
+  <link rel="stylesheet" href="/admin/app.css">
+</head>
+<body>
+  <main class="workspace">
+    <aside class="rail" aria-label="Console navigation">
+      <div>
+        <p class="eyebrow">DRM</p>
+        <h1>DRM Management</h1>
+      </div>
+      <nav>
+        <a class="active" href="#users">Users</a>
+        <a href="#status">Status</a>
+      </nav>
+    </aside>
+
+    <section class="surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Management API</p>
+          <h2>Tenant operations</h2>
+        </div>
+        <div class="status-line" id="connectionState">Not connected</div>
+      </header>
+
+      <section class="settings" aria-label="API settings">
+        <label>
+          <span>Tenant ID</span>
+          <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+        </label>
+        <label>
+          <span>X-DRM-Admin-Key</span>
+          <input id="adminKey" type="password" autocomplete="off" placeholder="Admin API key">
+        </label>
+        <button id="saveSession" type="button">Save session</button>
+      </section>
+
+      <section class="panel" id="users">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Directory</p>
+            <h3>Users</h3>
+          </div>
+          <button id="refreshUsers" type="button">Refresh</button>
+        </div>
+
+        <form class="create-row" id="createUserForm">
+          <input id="newUserId" autocomplete="off" placeholder="User ID">
+          <input id="newUserEmail" type="email" autocomplete="off" placeholder="Email">
+          <input id="newUserDisplayName" autocomplete="off" placeholder="Display name">
+          <button type="submit">Create</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Display name</th>
+                <th>User ID</th>
+              </tr>
+            </thead>
+            <tbody id="usersBody">
+              <tr>
+                <td colspan="3" class="empty">Set tenant and admin key, then refresh.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel compact" id="status">
+        <div>
+          <p class="eyebrow">Server</p>
+          <h3>Health</h3>
+        </div>
+        <button id="checkHealth" type="button">Check /healthz</button>
+        <pre id="healthOutput">No check run.</pre>
+      </section>
+    </section>
+  </main>
+  <script src="/admin/app.js" defer></script>
+</body>
+</html>

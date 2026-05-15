@@ -36,6 +36,18 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseAdminApiKeyAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Equals("/admin", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/admin/");
+        return;
+    }
+
+    await next(context);
+});
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapFilesEndpoints();
