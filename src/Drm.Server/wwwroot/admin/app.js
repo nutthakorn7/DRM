@@ -1,10 +1,12 @@
 const state = {
   tenantId: sessionStorage.getItem("drm:tenantId") || "",
-  adminKey: sessionStorage.getItem("drm:adminKey") || ""
+  adminKey: sessionStorage.getItem("drm:adminKey") || "",
+  adminUserId: sessionStorage.getItem("drm:adminUserId") || ""
 };
 
 const tenantIdInput = document.querySelector("#tenantId");
 const adminKeyInput = document.querySelector("#adminKey");
+const adminUserIdInput = document.querySelector("#adminUserId");
 const connectionState = document.querySelector("#connectionState");
 const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
@@ -13,12 +15,15 @@ const healthOutput = document.querySelector("#healthOutput");
 
 tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
+adminUserIdInput.value = state.adminUserId;
 
 document.querySelector("#saveSession").addEventListener("click", () => {
   state.tenantId = tenantIdInput.value.trim();
   state.adminKey = adminKeyInput.value.trim();
+  state.adminUserId = adminUserIdInput.value.trim();
   sessionStorage.setItem("drm:tenantId", state.tenantId);
   sessionStorage.setItem("drm:adminKey", state.adminKey);
+  sessionStorage.setItem("drm:adminUserId", state.adminUserId);
   setStatus("Session saved", "ok");
 });
 
@@ -108,6 +113,15 @@ document.querySelector("#grantForm").addEventListener("submit", async (event) =>
   setStatus("Grant saved", "ok");
 });
 
+filesBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-revoke-file-id]");
+  if (!button) {
+    return;
+  }
+
+  await revokeFile(button.dataset.revokeFileId);
+});
+
 async function refreshUsers() {
   const tenantId = requireTenantId();
   const users = await apiFetch(`/api/admin/users?tenantId=${encodeURIComponent(tenantId)}`);
@@ -134,6 +148,21 @@ async function refreshFiles() {
   const files = await apiFetch(url);
   renderFiles(files);
   setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function revokeFile(fileId) {
+  const body = {
+    tenantId: requireTenantId(),
+    adminUserId: requireAdminUserId()
+  };
+
+  await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/revoke`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  await refreshFiles();
+  setStatus("File revoked", "ok");
 }
 
 async function apiFetch(url, options = {}) {
@@ -190,7 +219,7 @@ function renderGroupMembers(members) {
 
 function renderFiles(files) {
   if (!files.length) {
-    filesBody.innerHTML = '<tr><td colspan="5" class="empty">No protected files found.</td></tr>';
+    filesBody.innerHTML = '<tr><td colspan="7" class="empty">No protected files found.</td></tr>';
     return;
   }
 
@@ -200,7 +229,9 @@ function renderFiles(files) {
       <td><code>${escapeHtml(file.ownerUserId)}</code></td>
       <td>${escapeHtml(file.contentType)}</td>
       <td>${escapeHtml(file.permissions)}</td>
+      <td>${renderRevokedBadge(file.revoked)}</td>
       <td>${escapeHtml(formatDate(file.expiresAtUtc))}</td>
+      <td>${file.revoked ? "" : `<button class="danger" type="button" data-revoke-file-id="${escapeHtml(file.fileId)}">Revoke</button>`}</td>
     </tr>
   `).join("");
 }
@@ -225,6 +256,16 @@ function requireAdminKey() {
   return adminKey;
 }
 
+function requireAdminUserId() {
+  const adminUserId = adminUserIdInput.value.trim();
+  if (!adminUserId) {
+    setStatus("Admin user ID required", "error");
+    throw new Error("Admin user ID required");
+  }
+
+  return adminUserId;
+}
+
 function setStatus(message, mode) {
   connectionState.textContent = message;
   connectionState.className = `status-line ${mode || ""}`.trim();
@@ -245,4 +286,10 @@ function formatDate(value) {
   }
 
   return new Date(value).toLocaleString();
+}
+
+function renderRevokedBadge(revoked) {
+  return revoked
+    ? '<span class="badge revoked">Revoked</span>'
+    : '<span class="badge">Active</span>';
 }

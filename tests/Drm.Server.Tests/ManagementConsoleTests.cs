@@ -49,8 +49,10 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Tenant ID");
         html.Should().Contain("Groups");
         html.Should().Contain("Protected files");
+        html.Should().Contain("Admin user ID");
         html.Should().Contain("Subject type");
         html.Should().Contain("Permissions");
+        html.Should().Contain("Revoke");
         html.Should().Contain("app.css");
         html.Should().Contain("app.js");
     }
@@ -74,6 +76,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/groups");
         js.Should().Contain("/api/admin/files");
         js.Should().Contain("/grants");
+        js.Should().Contain("/revoke");
+        js.Should().Contain("adminUserId");
+        js.Should().Contain("revoked");
     }
 
     public void Dispose()

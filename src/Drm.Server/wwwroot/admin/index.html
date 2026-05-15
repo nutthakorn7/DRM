@@ -39,6 +39,10 @@
           <span>X-DRM-Admin-Key</span>
           <input id="adminKey" type="password" autocomplete="off" placeholder="Admin API key">
         </label>
+        <label>
+          <span>Admin user ID</span>
+          <input id="adminUserId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+        </label>
         <button id="saveSession" type="button">Save session</button>
       </section>
 
@@ -146,12 +150,14 @@
                 <th>Owner</th>
                 <th>Type</th>
                 <th>Permissions</th>
+                <th>Status</th>
                 <th>Expires</th>
+                <th>Revoke</th>
               </tr>
             </thead>
             <tbody id="filesBody">
               <tr>
-                <td colspan="5" class="empty">Refresh to load protected files.</td>
+                <td colspan="7" class="empty">Refresh to load protected files.</td>
               </tr>
             </tbody>
           </table>

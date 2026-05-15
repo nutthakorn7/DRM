@@ -207,6 +207,74 @@ public sealed class AdminFilesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_revoke_file_and_policy_denies_future_access()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, ownerUserId);
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var revoke = await client.PostAsJsonAsync($"/api/admin/files/{fileId}/revoke", new
+        {
+            tenantId,
+            adminUserId
+        });
+
+        revoke.StatusCode.Should().Be(HttpStatusCode.OK);
+        var revoked = await revoke.Content.ReadFromJsonAsync<RevokeFileResponse>();
+        revoked.Should().BeEquivalentTo(new RevokeFileResponse(tenantId, fileId, true));
+
+        var files = await client.GetFromJsonAsync<List<FileResponse>>($"/api/admin/files?tenantId={tenantId}&q=");
+        files.Should().ContainSingle(file => file.FileId == fileId && file.Revoked);
+
+        using var decide = await client.PostAsJsonAsync("/api/policy/decide", new
+        {
+            tenantId,
+            fileId,
+            userId = ownerUserId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "View"
+        });
+
+        var decision = await decide.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = false,
+            AllowedPermissions = "None",
+            ReasonCode = "revoked",
+            WatermarkTemplate = (string?)null
+        });
+    }
+
+    [Fact]
+    public async Task Admin_revoke_with_wrong_tenant_returns_not_found_and_does_not_revoke_actual_file()
+    {
+        using var client = factory.CreateClient();
+        var actualTenantId = Guid.NewGuid();
+        var wrongTenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, actualTenantId, fileId, ownerUserId);
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var revoke = await client.PostAsJsonAsync($"/api/admin/files/{fileId}/revoke", new
+        {
+            tenantId = wrongTenantId,
+            adminUserId = Guid.NewGuid()
+        });
+
+        revoke.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var files = await client.GetFromJsonAsync<List<FileResponse>>($"/api/admin/files?tenantId={actualTenantId}&q=");
+        files.Should().ContainSingle(file => file.FileId == fileId && !file.Revoked);
+    }
+
+    [Fact]
     public async Task Admin_can_bulk_replace_file_grants()
     {
         using var client = factory.CreateClient();
@@ -478,7 +546,10 @@ public sealed class AdminFilesApiTests : IDisposable
         string ContentType,
         DateTimeOffset ExpiresAtUtc,
         string Permissions,
-        string WatermarkTemplate);
+        string WatermarkTemplate,
+        bool Revoked);
+
+    private sealed record RevokeFileResponse(Guid TenantId, Guid FileId, bool Revoked);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,

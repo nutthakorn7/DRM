@@ -14,6 +14,7 @@ public static class AdminFilesEndpoints
         group.MapPost("/{fileId:guid}/commands/delete-protected-copy", EnqueueDeleteProtectedCopyCommandAsync);
         group.MapPost("/{fileId:guid}/grants", UpsertGrantAsync);
         group.MapPut("/{fileId:guid}/grants", ReplaceGrantsAsync);
+        group.MapPost("/{fileId:guid}/revoke", RevokeFileAsync);
 
         return endpoints;
     }
@@ -81,6 +82,39 @@ public static class AdminFilesEndpoints
         return TypedResults.Created(
             $"/api/admin/files/{fileId}/commands/{command.CommandId}",
             AgentCommandResponse.From(command));
+    }
+
+    private static async Task<Results<Ok<RevokeFileResponse>, NotFound>> RevokeFileAsync(
+        Guid fileId,
+        RevokeFileRequest request,
+        AppDbContext dbContext,
+        ISiemDispatcher siemDispatcher,
+        CancellationToken cancellationToken)
+    {
+        var file = await dbContext.ProtectedFiles
+            .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId, cancellationToken);
+
+        if (file is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        file.Revoked = true;
+        var auditEvent = new AuditEventEntity
+        {
+            TenantId = file.TenantId,
+            FileId = file.Id,
+            UserId = request.AdminUserId,
+            EventType = "file_revoked",
+            ReasonCode = "revoked",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+        dbContext.AuditEvents.Add(auditEvent);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await siemDispatcher.DispatchAsync(auditEvent, cancellationToken);
+
+        return TypedResults.Ok(new RevokeFileResponse(file.TenantId, file.Id, file.Revoked));
     }
 
     private static async Task<Results<Created<FileGrantResponse>, BadRequest<ErrorResponse>, NotFound>> UpsertGrantAsync(
@@ -308,6 +342,8 @@ public static class AdminFilesEndpoints
 
     private sealed record EnqueueDeleteProtectedCopyCommandRequest(Guid TenantId, Guid DeviceId, Guid AdminUserId);
 
+    private sealed record RevokeFileRequest(Guid TenantId, Guid AdminUserId);
+
     private sealed record UpsertFileGrantRequest(
         Guid TenantId,
         string SubjectType,
@@ -341,7 +377,8 @@ public static class AdminFilesEndpoints
         string ContentType,
         DateTimeOffset ExpiresAtUtc,
         string Permissions,
-        string WatermarkTemplate)
+        string WatermarkTemplate,
+        bool Revoked)
     {
         public static FileResponse From(ProtectedFileEntity file)
             => new(
@@ -351,8 +388,11 @@ public static class AdminFilesEndpoints
                 file.ContentType,
                 file.ExpiresAtUtc,
                 file.Permissions.ToString(),
-                file.WatermarkTemplate);
+                file.WatermarkTemplate,
+                file.Revoked);
     }
+
+    private sealed record RevokeFileResponse(Guid TenantId, Guid FileId, bool Revoked);
 
     private sealed record AgentCommandResponse(
         Guid TenantId,

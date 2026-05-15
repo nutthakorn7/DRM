@@ -9,6 +9,9 @@
   --accent-dark: #6f3a08;
   --ok: #1f7a47;
   --error: #a02e2e;
+  --warning-bg: #fff4e5;
+  --warning-ink: #7a3f00;
+  --ok-bg: #eaf6ee;
 }
 
 * {
@@ -123,7 +126,7 @@ nav a.active {
 
 .settings {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
 }
 
 label {
@@ -157,6 +160,15 @@ button {
 
 button:hover {
   background: var(--accent-dark);
+}
+
+button.danger {
+  border-color: var(--error);
+  background: var(--error);
+}
+
+button.danger:hover {
+  background: #7f1f1f;
 }
 
 .panel {
@@ -208,6 +220,23 @@ th {
 
 .empty {
   color: var(--muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: var(--ok);
+  background: var(--ok-bg);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge.revoked {
+  color: var(--warning-ink);
+  background: var(--warning-bg);
 }
 
 pre {

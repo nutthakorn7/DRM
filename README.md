@@ -190,3 +190,7 @@ This is an MVP operations shell. The admin APIs still enforce the configured API
 ## Phase 4D Console Admin Operations
 
 The `/admin/` console now includes group creation, group membership management, protected file listing, and file grant updates in addition to user management and health checks. Grant updates call the existing `/api/admin/files/{fileId}/grants` endpoint with subject type, subject ID, and permissions.
+
+## Phase 4E Admin File Revocation
+
+Management revocation is available at `POST /api/admin/files/{fileId}/revoke` with `tenantId` and `adminUserId`. Admin file search responses now include `revoked`, and the `/admin/` console shows active/revoked status with a revoke action for active files. Revoked files are denied by the existing policy evaluator and key unwrap flow.
