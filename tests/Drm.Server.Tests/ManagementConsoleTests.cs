@@ -50,6 +50,8 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("rel=\"icon\"");
         html.Should().Contain("Groups");
         html.Should().Contain("Protected files");
+        html.Should().Contain("Apply policy template");
+        html.Should().Contain("Policy template ID");
         html.Should().Contain("Policy templates");
         html.Should().Contain("Policy simulator");
         html.Should().Contain("Simulate access");
@@ -94,6 +96,8 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/users");
         js.Should().Contain("/api/admin/groups");
         js.Should().Contain("/api/admin/files");
+        js.Should().Contain("/apply-policy-template");
+        js.Should().Contain("applyPolicyTemplateForm");
         js.Should().Contain("/api/admin/policy-templates");
         js.Should().Contain("refreshPolicyTemplates");
         js.Should().Contain("createPolicyTemplateForm");

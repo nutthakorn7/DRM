@@ -207,6 +207,122 @@ public sealed class AdminFilesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_apply_policy_template_to_file()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, ownerUserId, permissions: "View");
+        using var createTemplate = await CreatePolicyTemplateAsync(
+            client,
+            tenantId,
+            templateId,
+            "Restricted",
+            "View, Print",
+            "restricted:{userId}:{fileId}");
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var apply = await ApplyPolicyTemplateAsync(client, tenantId, fileId, templateId, adminUserId);
+
+        apply.StatusCode.Should().Be(HttpStatusCode.OK);
+        var applied = await apply.Content.ReadFromJsonAsync<FileResponse>();
+        applied.Should().BeEquivalentTo(new
+        {
+            TenantId = tenantId,
+            FileId = fileId,
+            OwnerUserId = ownerUserId,
+            ContentType = "application/pdf",
+            Permissions = "View, Print",
+            WatermarkTemplate = "restricted:{userId}:{fileId}",
+            Revoked = false
+        });
+
+        using var decide = await client.PostAsJsonAsync("/api/policy/decide", new
+        {
+            tenantId,
+            fileId,
+            userId = ownerUserId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "Print"
+        });
+        var policyDecision = await decide.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        policyDecision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View, Print",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "restricted:{userId}:{fileId}"
+        });
+
+        var files = await client.GetFromJsonAsync<List<FileResponse>>($"/api/admin/files?tenantId={tenantId}&q=");
+        files.Should().ContainSingle(file =>
+            file.FileId == fileId &&
+            file.Permissions == "View, Print" &&
+            file.WatermarkTemplate == "restricted:{userId}:{fileId}");
+
+        using var auditResponse = await client.GetAsync($"/api/audit?tenantId={tenantId}");
+        auditResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var auditEvents = await auditResponse.Content.ReadFromJsonAsync<List<AuditEventResponse>>();
+        auditEvents.Should().Contain(auditEvent =>
+            auditEvent.EventType == "permission_changed" &&
+            auditEvent.ReasonCode == "policy_template_applied" &&
+            auditEvent.FileId == fileId &&
+            auditEvent.UserId == adminUserId);
+    }
+
+    [Fact]
+    public async Task Admin_apply_policy_template_returns_not_found_for_missing_file_or_template()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var otherTenantTemplateId = Guid.NewGuid();
+
+        using var missingFile = await ApplyPolicyTemplateAsync(
+            client,
+            tenantId,
+            fileId,
+            templateId,
+            Guid.NewGuid());
+        missingFile.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, Guid.NewGuid());
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var missingTemplate = await ApplyPolicyTemplateAsync(
+            client,
+            tenantId,
+            fileId,
+            templateId,
+            Guid.NewGuid());
+        missingTemplate.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var createOtherTenantTemplate = await CreatePolicyTemplateAsync(
+            client,
+            otherTenantId,
+            otherTenantTemplateId,
+            "Other tenant",
+            "View, Print",
+            "other:{userId}");
+        createOtherTenantTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var crossTenantTemplate = await ApplyPolicyTemplateAsync(
+            client,
+            tenantId,
+            fileId,
+            otherTenantTemplateId,
+            Guid.NewGuid());
+        crossTenantTemplate.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Admin_can_revoke_file_and_policy_denies_future_access()
     {
         using var client = factory.CreateClient();
@@ -528,6 +644,41 @@ public sealed class AdminFilesApiTests : IDisposable
         });
     }
 
+    private static Task<HttpResponseMessage> CreatePolicyTemplateAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid templateId,
+        string name,
+        string permissions,
+        string watermarkTemplate)
+    {
+        return client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name,
+            permissions,
+            watermarkTemplate,
+            offlineLeaseMinutes = 15,
+            allowPrint = true
+        });
+    }
+
+    private static Task<HttpResponseMessage> ApplyPolicyTemplateAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid fileId,
+        Guid templateId,
+        Guid adminUserId)
+    {
+        return client.PostAsJsonAsync($"/api/admin/files/{fileId}/apply-policy-template", new
+        {
+            tenantId,
+            templateId,
+            adminUserId
+        });
+    }
+
     private sealed record ErrorResponse(string ReasonCode);
 
     private sealed record GrantRequest(string SubjectType, Guid SubjectId, string Permissions);
@@ -550,6 +701,15 @@ public sealed class AdminFilesApiTests : IDisposable
         bool Revoked);
 
     private sealed record RevokeFileResponse(Guid TenantId, Guid FileId, bool Revoked);
+
+    private sealed record AuditEventResponse(
+        long Id,
+        Guid TenantId,
+        Guid? FileId,
+        Guid? UserId,
+        string EventType,
+        string ReasonCode,
+        DateTimeOffset CreatedAtUtc);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,

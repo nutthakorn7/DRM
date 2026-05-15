@@ -238,3 +238,7 @@ Administrators can preview policy outcomes with `POST /api/admin/policy-simulato
 ## Phase 5H Watermark Template Management
 
 Administrators can manage reusable watermark patterns with `POST /api/admin/watermark-templates`, `GET /api/admin/watermark-templates?tenantId=...`, and `GET /api/admin/watermark-templates/{watermarkTemplateId}?tenantId=...`. The `/admin/` console includes a Watermark templates section for tenant-scoped pattern management.
+
+## Phase 5I Apply Policy Templates
+
+Administrators can apply an existing policy template to a protected file with `POST /api/admin/files/{fileId}/apply-policy-template`. Applying a template updates the file permissions and watermark template, synchronizes the owner grant with the template permissions, and records a `permission_changed/policy_template_applied` audit event. The `/admin/` console exposes this action from the Protected files section.

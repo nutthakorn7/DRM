@@ -207,6 +207,12 @@ document.querySelector("#grantForm").addEventListener("submit", async (event) =>
   setStatus("Grant saved", "ok");
 });
 
+document.querySelector("#applyPolicyTemplateForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await applyPolicyTemplate();
+  event.target.reset();
+});
+
 filesBody.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-revoke-file-id]");
   if (!button) {
@@ -343,6 +349,23 @@ async function revokeFile(fileId) {
 
   await refreshFiles();
   setStatus("File revoked", "ok");
+}
+
+async function applyPolicyTemplate() {
+  const fileId = document.querySelector("#applyTemplateFileId").value.trim();
+  const body = {
+    tenantId: requireTenantId(),
+    templateId: document.querySelector("#applyPolicyTemplateId").value.trim(),
+    adminUserId: requireAdminUserId()
+  };
+
+  await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/apply-policy-template`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  await refreshFiles();
+  setStatus("Policy template applied", "ok");
 }
 
 async function disableDevice(deviceId) {

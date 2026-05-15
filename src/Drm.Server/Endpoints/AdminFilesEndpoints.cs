@@ -14,6 +14,7 @@ public static class AdminFilesEndpoints
         group.MapPost("/{fileId:guid}/commands/delete-protected-copy", EnqueueDeleteProtectedCopyCommandAsync);
         group.MapPost("/{fileId:guid}/grants", UpsertGrantAsync);
         group.MapPut("/{fileId:guid}/grants", ReplaceGrantsAsync);
+        group.MapPost("/{fileId:guid}/apply-policy-template", ApplyPolicyTemplateAsync);
         group.MapPost("/{fileId:guid}/revoke", RevokeFileAsync);
 
         return endpoints;
@@ -290,6 +291,78 @@ public static class AdminFilesEndpoints
             .ToList());
     }
 
+    private static async Task<Results<Ok<FileResponse>, NotFound>> ApplyPolicyTemplateAsync(
+        Guid fileId,
+        ApplyPolicyTemplateRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var file = await dbContext.ProtectedFiles
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId,
+                cancellationToken);
+        var template = await dbContext.PolicyTemplates
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == request.TenantId && candidate.TemplateId == request.TemplateId,
+                cancellationToken);
+
+        if (file is null || template is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (!PermissionParser.TryParse(template.Permissions, out var permissions))
+        {
+            return TypedResults.NotFound();
+        }
+
+        file.Permissions = permissions;
+        file.WatermarkTemplate = template.WatermarkTemplate;
+        await UpsertOwnerGrantFromTemplateAsync(dbContext, file, permissions, cancellationToken);
+
+        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(
+            request.TenantId,
+            fileId,
+            request.AdminUserId,
+            "policy_template_applied"));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return TypedResults.Ok(FileResponse.From(file));
+    }
+
+    private static async Task UpsertOwnerGrantFromTemplateAsync(
+        AppDbContext dbContext,
+        ProtectedFileEntity file,
+        Permission permissions,
+        CancellationToken cancellationToken)
+    {
+        var subjectType = GrantSubjectType.User.ToString();
+        var grant = await dbContext.FileGrants.SingleOrDefaultAsync(
+            candidate =>
+                candidate.TenantId == file.TenantId &&
+                candidate.FileId == file.Id &&
+                candidate.SubjectType == subjectType &&
+                candidate.SubjectId == file.OwnerUserId,
+            cancellationToken);
+
+        if (grant is null)
+        {
+            dbContext.FileGrants.Add(new FileGrantEntity
+            {
+                TenantId = file.TenantId,
+                FileId = file.Id,
+                SubjectType = subjectType,
+                SubjectId = file.OwnerUserId,
+                Permissions = permissions.ToString(),
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+            return;
+        }
+
+        grant.Permissions = permissions.ToString();
+    }
+
     private static Task<FileGrantEntity?> FindGrantAsync(
         AppDbContext dbContext,
         Guid tenantId,
@@ -353,6 +426,8 @@ public static class AdminFilesEndpoints
     private sealed record ReplaceGrantsRequest(Guid TenantId, IReadOnlyList<ReplaceGrantItem?>? Grants);
 
     private sealed record ReplaceGrantItem(string SubjectType, Guid SubjectId, string Permissions);
+
+    private sealed record ApplyPolicyTemplateRequest(Guid TenantId, Guid TemplateId, Guid AdminUserId);
 
     private sealed record FileGrantResponse(
         Guid TenantId,
