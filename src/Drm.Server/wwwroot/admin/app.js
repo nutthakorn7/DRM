@@ -214,6 +214,12 @@ document.querySelector("#applyPolicyTemplateForm").addEventListener("submit", as
   event.target.reset();
 });
 
+document.querySelector("#deleteCopyForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await deleteProtectedCopy();
+  event.target.reset();
+});
+
 filesBody.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-revoke-file-id]");
   if (!button) {
@@ -376,6 +382,22 @@ async function applyPolicyTemplate() {
 
   await refreshFiles();
   setStatus("Policy template applied", "ok");
+}
+
+async function deleteProtectedCopy() {
+  const fileId = document.querySelector("#deleteCopyFileId").value.trim();
+  const body = {
+    tenantId: requireTenantId(),
+    deviceId: document.querySelector("#deleteCopyDeviceId").value.trim(),
+    adminUserId: requireAdminUserId()
+  };
+
+  await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/commands/delete-protected-copy`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  setStatus("Delete command queued", "ok");
 }
 
 async function disableDevice(deviceId) {

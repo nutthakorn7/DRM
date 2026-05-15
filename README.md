@@ -270,3 +270,7 @@ The management API now exposes `GET /api/admin/devices/health?tenantId=...&stale
 ## Phase 5P Template Offline Leases
 
 Files registered with a policy template now inherit the template's `offlineLeaseMinutes` value. Policy decisions and file-key unwrap responses return an offline lease expiry based on that stored duration; a zero-minute template still allows online access but returns no offline lease for offline fallback.
+
+## Phase 5Q Remote Delete Console
+
+The `/admin/` console now exposes the existing remote protected-copy delete command queue. Operators can enter a protected file ID and target device ID to enqueue `DeleteProtectedCopy` through `POST /api/admin/files/{fileId}/commands/delete-protected-copy`; endpoint agents still apply the safe inventory-and-container verification rule before deleting any local copy.

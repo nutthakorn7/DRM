@@ -52,6 +52,9 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Protected files");
         html.Should().Contain("Apply policy template");
         html.Should().Contain("Policy template ID");
+        html.Should().Contain("Delete protected copy");
+        html.Should().Contain("deleteCopyForm");
+        html.Should().Contain("Target device ID");
         html.Should().Contain("Policy templates");
         html.Should().Contain("Policy simulator");
         html.Should().Contain("Simulate access");
@@ -101,6 +104,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/files");
         js.Should().Contain("/apply-policy-template");
         js.Should().Contain("applyPolicyTemplateForm");
+        js.Should().Contain("/commands/delete-protected-copy");
+        js.Should().Contain("deleteProtectedCopy");
+        js.Should().Contain("deleteCopyForm");
         js.Should().Contain("/api/admin/policy-templates");
         js.Should().Contain("refreshPolicyTemplates");
         js.Should().Contain("createPolicyTemplateForm");

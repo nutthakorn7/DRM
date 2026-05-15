@@ -199,6 +199,12 @@ button.danger:hover {
   gap: 10px;
 }
 
+.delete-copy-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+}
+
 .button-row {
   display: flex;
   gap: 10px;
@@ -381,6 +387,7 @@ pre {
   .filter-row,
   .grant-row,
   .apply-template-row,
+  .delete-copy-row,
   .audit-filter-row,
   .device-filter-row,
   .device-health-head,
