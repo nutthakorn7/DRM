@@ -99,6 +99,49 @@ public sealed class ProtectPdfFileWorkflowTests
     }
 
     [Fact]
+    public async Task ProtectPdfFileWorkflow_passes_policy_options_to_server_registration()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
+        await File.WriteAllBytesAsync(sourcePath, "%PDF-1.7"u8.ToArray());
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var tenantId = TenantId.New();
+        var ownerUserId = UserId.New();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+        var server = new RecordingServerClient();
+        var templateId = Guid.NewGuid();
+        var recipientUserId = Guid.NewGuid();
+        var recipientGroupId = Guid.NewGuid();
+
+        await new ProtectPdfFileWorkflow(server, inventory)
+            .ProtectAsync(
+                tenantId,
+                ownerUserId,
+                sourcePath,
+                fileKey,
+                new ProtectPdfPolicyOptions(
+                    Permission.View,
+                    templateId,
+                    [
+                        new ProtectionRecipient("User", recipientUserId),
+                        new ProtectionRecipient("Group", recipientGroupId)
+                    ]),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        server.RegisteredFileRequests.Should().ContainSingle();
+        var request = server.RegisteredFileRequests.Single();
+        request.TenantId.Should().Be(tenantId.Value);
+        request.OwnerUserId.Should().Be(ownerUserId.Value);
+        request.Permissions.Should().Be(Permission.View);
+        request.PolicyTemplateId.Should().Be(templateId);
+        request.Recipients.Should().Equal([
+            new ProtectionRecipient("User", recipientUserId),
+            new ProtectionRecipient("Group", recipientGroupId)
+        ]);
+    }
+
+    [Fact]
     public async Task ProtectPdfFileWorkflow_leaves_original_and_no_output_when_key_wrap_fails()
     {
         var tempDirectory = Directory.CreateTempSubdirectory();
@@ -156,6 +199,8 @@ public sealed class ProtectPdfFileWorkflowTests
 
         public List<(Guid TenantId, Guid FileId, Guid OwnerUserId)> RegisteredFiles { get; } = [];
 
+        public List<ProtectedFileRegistration> RegisteredFileRequests { get; } = [];
+
         public List<(Guid TenantId, Guid FileId, byte[] FileKey)> WrappedKeys { get; } = [];
 
         public Task RegisterFileAsync(Guid tenantId, Guid fileId, Guid ownerUserId, string contentType, DateTimeOffset expiresAtUtc, Permission permissions, CancellationToken cancellationToken)
@@ -166,6 +211,18 @@ public sealed class ProtectPdfFileWorkflowTests
             }
 
             RegisteredFiles.Add((tenantId, fileId, ownerUserId));
+            return Task.CompletedTask;
+        }
+
+        public Task RegisterFileAsync(ProtectedFileRegistration registration, CancellationToken cancellationToken)
+        {
+            if (FailRegistration)
+            {
+                throw new HttpRequestException("registration failed");
+            }
+
+            RegisteredFiles.Add((registration.TenantId, registration.FileId, registration.OwnerUserId));
+            RegisteredFileRequests.Add(registration);
             return Task.CompletedTask;
         }
 

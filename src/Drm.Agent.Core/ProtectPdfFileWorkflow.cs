@@ -19,8 +19,28 @@ public sealed class ProtectPdfFileWorkflow(
         bool deleteOriginalAfterProtection,
         CancellationToken cancellationToken)
     {
+        return await ProtectAsync(
+            tenantId,
+            ownerUserId,
+            sourcePath,
+            fileKey,
+            ProtectPdfPolicyOptions.Default,
+            deleteOriginalAfterProtection,
+            cancellationToken);
+    }
+
+    public async Task<ProtectedPdfFileResult> ProtectAsync(
+        TenantId tenantId,
+        UserId ownerUserId,
+        string sourcePath,
+        byte[] fileKey,
+        ProtectPdfPolicyOptions policyOptions,
+        bool deleteOriginalAfterProtection,
+        CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentNullException.ThrowIfNull(fileKey);
+        ArgumentNullException.ThrowIfNull(policyOptions);
 
         if (!File.Exists(sourcePath))
         {
@@ -40,12 +60,15 @@ public sealed class ProtectPdfFileWorkflow(
         try
         {
             await serverClient.RegisterFileAsync(
-                tenantId.Value,
-                fileId.Value,
-                ownerUserId.Value,
-                PdfContentType,
-                DateTimeOffset.UtcNow.AddDays(7),
-                Permission.View | Permission.Print,
+                new ProtectedFileRegistration(
+                    tenantId.Value,
+                    fileId.Value,
+                    ownerUserId.Value,
+                    PdfContentType,
+                    DateTimeOffset.UtcNow.AddDays(7),
+                    policyOptions.Permissions,
+                    policyOptions.PolicyTemplateId,
+                    policyOptions.Recipients),
                 cancellationToken);
 
             await serverClient.WrapFileKeyAsync(
@@ -115,3 +138,14 @@ public sealed record ProtectedPdfFileResult(
     string SourcePath,
     string DestinationPath,
     bool OriginalDeleted);
+
+public sealed record ProtectPdfPolicyOptions(
+    Permission Permissions,
+    Guid? PolicyTemplateId,
+    IReadOnlyList<ProtectionRecipient> Recipients)
+{
+    public static ProtectPdfPolicyOptions Default { get; } = new(
+        Permission.View | Permission.Print,
+        PolicyTemplateId: null,
+        Recipients: []);
+}

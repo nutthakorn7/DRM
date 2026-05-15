@@ -174,6 +174,62 @@ public sealed class AgentClientTests
     }
 
     [Fact]
+    public async Task DrmServerClient_posts_template_and_recipients_when_registering_file()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent(
+                    """{"fileId":"de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f","tenantId":"4ec64ccb-5f84-4ff5-bcbc-54286b882f36","ownerUserId":"9a5b19a6-229f-4f4a-a4a7-47f01815cf2e","contentType":"application/pdf","expiresAtUtc":"2026-05-15T01:00:00Z","permissions":"View, Print","watermarkTemplate":"restricted:{userId}"}""",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        });
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        });
+        var tenantId = Guid.Parse("4ec64ccb-5f84-4ff5-bcbc-54286b882f36");
+        var fileId = Guid.Parse("de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f");
+        var ownerUserId = Guid.Parse("9a5b19a6-229f-4f4a-a4a7-47f01815cf2e");
+        var templateId = Guid.Parse("f588b47f-6fd0-4dd2-90c1-96cb09326ab1");
+        var recipientUserId = Guid.Parse("0f150205-1664-4c18-8c97-42f915185bb8");
+        var recipientGroupId = Guid.Parse("70ec3fc9-c78c-4632-b4bd-ec0edda0a636");
+
+        await client.RegisterFileAsync(
+            new ProtectedFileRegistration(
+                tenantId,
+                fileId,
+                ownerUserId,
+                "application/pdf",
+                DateTimeOffset.Parse("2026-05-15T01:00:00Z"),
+                Permission.View,
+                templateId,
+                [
+                    new ProtectionRecipient("User", recipientUserId),
+                    new ProtectionRecipient("Group", recipientGroupId)
+                ]),
+            CancellationToken.None);
+
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Method.Should().Be(HttpMethod.Post);
+        capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/files"));
+
+        var body = await capturedRequest.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("policyTemplateId").GetGuid().Should().Be(templateId);
+        var recipients = document.RootElement.GetProperty("recipients").EnumerateArray().ToList();
+        recipients.Should().HaveCount(2);
+        recipients[0].GetProperty("subjectType").GetString().Should().Be("User");
+        recipients[0].GetProperty("subjectId").GetGuid().Should().Be(recipientUserId);
+        recipients[1].GetProperty("subjectType").GetString().Should().Be("Group");
+        recipients[1].GetProperty("subjectId").GetGuid().Should().Be(recipientGroupId);
+    }
+
+    [Fact]
     public async Task DrmServerClient_gets_pending_agent_commands()
     {
         HttpRequestMessage? capturedRequest = null;

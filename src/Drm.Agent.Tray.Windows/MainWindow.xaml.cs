@@ -41,6 +41,8 @@ public partial class MainWindow : Window
             var serverUrl = ParseServerUrl();
             var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
             var userId = ParseRequiredGuid(UserIdBox.Text, "User ID");
+            var policyTemplateId = ParseOptionalGuid(PolicyTemplateIdBox.Text, "Policy template ID");
+            var recipients = ParseRecipients(RecipientUserIdsBox.Text, RecipientGroupIdsBox.Text);
             var sourcePath = SourcePathBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
@@ -59,6 +61,7 @@ public partial class MainWindow : Window
                 new UserId(userId),
                 sourcePath,
                 EnvelopeCrypto.GenerateKey(),
+                new ProtectPdfPolicyOptions(Permission.View | Permission.Print, policyTemplateId, recipients),
                 DeleteOriginalBox.IsChecked == true,
                 CancellationToken.None);
 
@@ -92,6 +95,39 @@ public partial class MainWindow : Window
         }
 
         return parsed;
+    }
+
+    private static Guid? ParseOptionalGuid(string value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return ParseRequiredGuid(value, fieldName);
+    }
+
+    private static IReadOnlyList<ProtectionRecipient> ParseRecipients(string userIds, string groupIds)
+    {
+        var recipients = new List<ProtectionRecipient>();
+        recipients.AddRange(ParseGuidList(userIds, "Recipient user IDs")
+            .Select(userId => new ProtectionRecipient("User", userId)));
+        recipients.AddRange(ParseGuidList(groupIds, "Recipient group IDs")
+            .Select(groupId => new ProtectionRecipient("Group", groupId)));
+        return recipients;
+    }
+
+    private static IEnumerable<Guid> ParseGuidList(string value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        return value
+            .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => ParseRequiredGuid(item, fieldName))
+            .ToList();
     }
 
     private static string ResolveDataPath(string fileName)

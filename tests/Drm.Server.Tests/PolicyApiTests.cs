@@ -104,6 +104,149 @@ public sealed class PolicyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Registering_file_with_policy_template_and_recipients_applies_template_policy()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var directRecipientUserId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var groupMemberUserId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createGroup = await client.PostAsJsonAsync("/api/admin/groups", new
+        {
+            tenantId,
+            groupId,
+            name = "Legal"
+        });
+        using var addMember = await client.PostAsJsonAsync($"/api/admin/groups/{groupId}/members", new
+        {
+            tenantId,
+            userId = groupMemberUserId
+        });
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "Restricted",
+            permissions = "View, Print",
+            watermarkTemplate = "restricted:{userId}:{fileId}",
+            offlineLeaseMinutes = 15,
+            allowPrint = true
+        });
+        createGroup.StatusCode.Should().Be(HttpStatusCode.Created);
+        addMember.StatusCode.Should().Be(HttpStatusCode.Created);
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var register = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            watermarkTemplate = "old:{userId}",
+            policyTemplateId = templateId,
+            recipients = new[]
+            {
+                new { subjectType = "User", subjectId = directRecipientUserId },
+                new { subjectType = "Group", subjectId = groupId }
+            }
+        });
+
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+        var registered = await register.Content.ReadFromJsonAsync<RegisterFileResponse>();
+        registered.Should().BeEquivalentTo(new
+        {
+            FileId = fileId,
+            TenantId = tenantId,
+            OwnerUserId = ownerUserId,
+            ContentType = "application/pdf",
+            Permissions = "View, Print",
+            WatermarkTemplate = "restricted:{userId}:{fileId}"
+        });
+
+        var ownerDecision = await DecideAsync(client, tenantId, fileId, ownerUserId, "Print");
+        var directRecipientDecision = await DecideAsync(client, tenantId, fileId, directRecipientUserId, "Print");
+        var groupMemberDecision = await DecideAsync(client, tenantId, fileId, groupMemberUserId, "Print");
+
+        ownerDecision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View, Print",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "restricted:{userId}:{fileId}"
+        });
+        directRecipientDecision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View, Print",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "restricted:{userId}:{fileId}"
+        });
+        groupMemberDecision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View, Print",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "restricted:{userId}:{fileId}"
+        });
+    }
+
+    [Fact]
+    public async Task Registering_file_with_missing_template_or_group_recipient_returns_not_found()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var missingTemplate = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId = Guid.NewGuid(),
+            ownerUserId = Guid.NewGuid(),
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = Guid.NewGuid()
+        });
+
+        missingTemplate.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var templateId = Guid.NewGuid();
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "Restricted",
+            permissions = "View, Print",
+            watermarkTemplate = "restricted:{userId}:{fileId}",
+            offlineLeaseMinutes = 15,
+            allowPrint = true
+        });
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var missingGroup = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId = Guid.NewGuid(),
+            ownerUserId = Guid.NewGuid(),
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = templateId,
+            recipients = new[]
+            {
+                new { subjectType = "Group", subjectId = Guid.NewGuid() }
+            }
+        });
+
+        missingGroup.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Existing_file_without_file_grant_still_allows_owner_from_legacy_file_policy()
     {
         using var client = factory.CreateClient();
@@ -570,7 +713,14 @@ public sealed class PolicyApiTests : IDisposable
         string Permissions,
         string WatermarkTemplate);
 
-    private sealed record RegisterFileResponse(Guid FileId);
+    private sealed record RegisterFileResponse(
+        Guid FileId,
+        Guid TenantId,
+        Guid OwnerUserId,
+        string ContentType,
+        DateTimeOffset ExpiresAtUtc,
+        string Permissions,
+        string WatermarkTemplate);
 
     private sealed record DecidePolicyRequest(
         Guid TenantId,
@@ -612,5 +762,25 @@ public sealed class PolicyApiTests : IDisposable
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    private static async Task<PolicyDecisionResponse> DecideAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        string requestedPermission)
+    {
+        using var response = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            userId,
+            Guid.NewGuid(),
+            requestedPermission,
+            DateTimeOffset.UtcNow));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return await response.Content.ReadFromJsonAsync<PolicyDecisionResponse>()
+            ?? throw new InvalidOperationException("Policy decision response was empty.");
     }
 }

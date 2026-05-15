@@ -242,3 +242,7 @@ Administrators can manage reusable watermark patterns with `POST /api/admin/wate
 ## Phase 5I Apply Policy Templates
 
 Administrators can apply an existing policy template to a protected file with `POST /api/admin/files/{fileId}/apply-policy-template`. Applying a template updates the file permissions and watermark template, synchronizes the owner grant with the template permissions, and records a `permission_changed/policy_template_applied` audit event. The `/admin/` console exposes this action from the Protected files section.
+
+## Phase 5J Desktop Template Recipients
+
+Client file registration now accepts optional `policyTemplateId` and user/group `recipients`. When a template is supplied, `/api/files` applies the template permissions and watermark to the protected file and grants those permissions to the owner plus requested recipients. The Windows tray protect form includes fields for policy template ID, recipient user IDs, and recipient group IDs so desktop protection can use managed policy templates directly.

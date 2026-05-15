@@ -4,6 +4,18 @@ using Drm.Domain;
 
 namespace Drm.Agent.Core;
 
+public sealed record ProtectedFileRegistration(
+    Guid TenantId,
+    Guid FileId,
+    Guid OwnerUserId,
+    string ContentType,
+    DateTimeOffset ExpiresAtUtc,
+    Permission Permissions,
+    Guid? PolicyTemplateId,
+    IReadOnlyList<ProtectionRecipient> Recipients);
+
+public sealed record ProtectionRecipient(string SubjectType, Guid SubjectId);
+
 public interface IDrmServerClient : IAgentAuditUploader
 {
     Task RegisterFileAsync(
@@ -14,6 +26,16 @@ public interface IDrmServerClient : IAgentAuditUploader
         DateTimeOffset expiresAtUtc,
         Permission permissions,
         CancellationToken cancellationToken);
+
+    Task RegisterFileAsync(ProtectedFileRegistration registration, CancellationToken cancellationToken)
+        => RegisterFileAsync(
+            registration.TenantId,
+            registration.FileId,
+            registration.OwnerUserId,
+            registration.ContentType,
+            registration.ExpiresAtUtc,
+            registration.Permissions,
+            cancellationToken);
 
     Task<OpenDecision> DecideAsync(
         Guid tenantId,
@@ -105,16 +127,35 @@ public sealed class DrmServerClient : IDrmServerClient
         Permission permissions,
         CancellationToken cancellationToken)
     {
-        var response = await httpClient.PostAsJsonAsync(
-            "/api/files",
-            new RegisterFileRequest(
+        await RegisterFileAsync(
+            new ProtectedFileRegistration(
                 tenantId,
                 fileId,
                 ownerUserId,
                 contentType,
                 expiresAtUtc,
-                permissions.ToString(),
-                null),
+                permissions,
+                PolicyTemplateId: null,
+                Recipients: []),
+            cancellationToken);
+    }
+
+    public async Task RegisterFileAsync(
+        ProtectedFileRegistration registration,
+        CancellationToken cancellationToken)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            "/api/files",
+            new RegisterFileRequest(
+                registration.TenantId,
+                registration.FileId,
+                registration.OwnerUserId,
+                registration.ContentType,
+                registration.ExpiresAtUtc,
+                registration.Permissions.ToString(),
+                null,
+                registration.PolicyTemplateId,
+                registration.Recipients),
             JsonOptions,
             cancellationToken);
 
@@ -306,7 +347,9 @@ public sealed class DrmServerClient : IDrmServerClient
         string ContentType,
         DateTimeOffset ExpiresAtUtc,
         string Permissions,
-        string? WatermarkTemplate);
+        string? WatermarkTemplate,
+        Guid? PolicyTemplateId,
+        IReadOnlyList<ProtectionRecipient> Recipients);
 
     private sealed record DecidePolicyRequest(
         Guid TenantId,
