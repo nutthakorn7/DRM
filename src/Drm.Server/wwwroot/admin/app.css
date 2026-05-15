@@ -193,6 +193,24 @@ button.danger:hover {
   gap: 10px;
 }
 
+.template-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 39px;
+}
+
+.check-row input {
+  width: auto;
+  min-height: auto;
+}
+
 .table-wrap {
   overflow-x: auto;
   border-top: 1px solid var(--line);
@@ -260,6 +278,7 @@ pre {
   .create-row,
   .filter-row,
   .grant-row,
+  .template-row,
   .topbar,
   .compact {
     grid-template-columns: 1fr;

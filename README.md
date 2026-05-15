@@ -194,3 +194,7 @@ The `/admin/` console now includes group creation, group membership management, 
 ## Phase 4E Admin File Revocation
 
 Management revocation is available at `POST /api/admin/files/{fileId}/revoke` with `tenantId` and `adminUserId`. Admin file search responses now include `revoked`, and the `/admin/` console shows active/revoked status with a revoke action for active files. Revoked files are denied by the existing policy evaluator and key unwrap flow.
+
+## Phase 4F Policy Template Console
+
+The `/admin/` console now creates and lists policy templates through `/api/admin/policy-templates`. Operators can set template name, permissions, watermark template, offline lease minutes, and print allowance from the management UI.

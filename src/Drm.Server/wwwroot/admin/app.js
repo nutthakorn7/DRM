@@ -10,6 +10,7 @@ const adminUserIdInput = document.querySelector("#adminUserId");
 const connectionState = document.querySelector("#connectionState");
 const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
+const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
 const filesBody = document.querySelector("#filesBody");
 const healthOutput = document.querySelector("#healthOutput");
 
@@ -91,6 +92,32 @@ document.querySelector("#listGroupMembers").addEventListener("click", () => {
   refreshGroupMembers(document.querySelector("#memberGroupId").value.trim());
 });
 
+document.querySelector("#refreshPolicyTemplates").addEventListener("click", () => {
+  refreshPolicyTemplates();
+});
+
+document.querySelector("#createPolicyTemplateForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const offlineLeaseValue = document.querySelector("#templateOfflineLease").value.trim();
+  const body = {
+    tenantId: requireTenantId(),
+    templateId: document.querySelector("#templateId").value.trim(),
+    name: document.querySelector("#templateName").value.trim(),
+    permissions: document.querySelector("#templatePermissions").value.trim(),
+    watermarkTemplate: document.querySelector("#templateWatermark").value.trim(),
+    offlineLeaseMinutes: offlineLeaseValue ? Number(offlineLeaseValue) : 0,
+    allowPrint: document.querySelector("#templateAllowPrint").checked
+  };
+
+  await apiFetch("/api/admin/policy-templates", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  event.target.reset();
+  await refreshPolicyTemplates();
+});
+
 document.querySelector("#refreshFiles").addEventListener("click", () => {
   refreshFiles();
 });
@@ -139,6 +166,13 @@ async function refreshGroupMembers(groupId) {
   const members = await apiFetch(`/api/admin/groups/${encodeURIComponent(groupId)}/members?tenantId=${encodeURIComponent(tenantId)}`);
   renderGroupMembers(members);
   setStatus(`${members.length} member${members.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshPolicyTemplates() {
+  const tenantId = requireTenantId();
+  const templates = await apiFetch(`/api/admin/policy-templates?tenantId=${encodeURIComponent(tenantId)}`);
+  renderPolicyTemplates(templates);
+  setStatus(`${templates.length} template${templates.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
 async function refreshFiles() {
@@ -213,6 +247,24 @@ function renderGroupMembers(members) {
     <tr>
       <td><code>${escapeHtml(member.groupId)}</code></td>
       <td><code>${escapeHtml(member.userId)}</code></td>
+    </tr>
+  `).join("");
+}
+
+function renderPolicyTemplates(templates) {
+  if (!templates.length) {
+    policyTemplatesBody.innerHTML = '<tr><td colspan="6" class="empty">No policy templates in this tenant.</td></tr>';
+    return;
+  }
+
+  policyTemplatesBody.innerHTML = templates.map((template) => `
+    <tr>
+      <td>${escapeHtml(template.name)}</td>
+      <td><code>${escapeHtml(template.templateId)}</code></td>
+      <td>${escapeHtml(template.permissions)}</td>
+      <td>${escapeHtml(template.watermarkTemplate)}</td>
+      <td>${escapeHtml(`${template.offlineLeaseMinutes} min`)}</td>
+      <td>${template.allowPrint ? "Yes" : "No"}</td>
     </tr>
   `).join("");
 }

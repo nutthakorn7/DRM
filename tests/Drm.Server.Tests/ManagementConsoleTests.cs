@@ -47,11 +47,16 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("DRM Management");
         html.Should().Contain("X-DRM-Admin-Key");
         html.Should().Contain("Tenant ID");
+        html.Should().Contain("rel=\"icon\"");
         html.Should().Contain("Groups");
         html.Should().Contain("Protected files");
+        html.Should().Contain("Policy templates");
         html.Should().Contain("Admin user ID");
         html.Should().Contain("Subject type");
         html.Should().Contain("Permissions");
+        html.Should().Contain("Watermark template");
+        html.Should().Contain("Offline lease");
+        html.Should().Contain("Allow print");
         html.Should().Contain("Revoke");
         html.Should().Contain("app.css");
         html.Should().Contain("app.js");
@@ -75,6 +80,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/users");
         js.Should().Contain("/api/admin/groups");
         js.Should().Contain("/api/admin/files");
+        js.Should().Contain("/api/admin/policy-templates");
+        js.Should().Contain("refreshPolicyTemplates");
+        js.Should().Contain("createPolicyTemplateForm");
         js.Should().Contain("/grants");
         js.Should().Contain("/revoke");
         js.Should().Contain("adminUserId");
