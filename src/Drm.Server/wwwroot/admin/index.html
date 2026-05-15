@@ -19,6 +19,7 @@
         <a href="#groups">Groups</a>
         <a href="#templates">Templates</a>
         <a href="#files">Files</a>
+        <a href="#siem">SIEM</a>
         <a href="#audit">Audit</a>
         <a href="#status">Status</a>
       </nav>
@@ -204,6 +205,44 @@
             <tbody id="filesBody">
               <tr>
                 <td colspan="7" class="empty">Refresh to load protected files.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="siem">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Integrations</p>
+            <h3>SIEM webhooks</h3>
+          </div>
+          <button id="refreshSiemWebhooks" type="button">Refresh webhooks</button>
+        </div>
+
+        <form class="webhook-row" id="createSiemWebhookForm">
+          <input id="siemWebhookId" autocomplete="off" placeholder="Webhook ID">
+          <input id="siemWebhookUrl" autocomplete="off" placeholder="Webhook URL">
+          <label class="check-row">
+            <input id="siemWebhookEnabled" type="checkbox" checked>
+            <span>Enabled</span>
+          </label>
+          <button type="submit">Create webhook</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Webhook ID</th>
+                <th>Webhook URL</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="siemWebhooksBody">
+              <tr>
+                <td colspan="4" class="empty">Refresh to load SIEM webhooks.</td>
               </tr>
             </tbody>
           </table>

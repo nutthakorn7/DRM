@@ -12,6 +12,7 @@ const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
 const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
 const filesBody = document.querySelector("#filesBody");
+const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
 const auditEventsBody = document.querySelector("#auditEventsBody");
 const healthOutput = document.querySelector("#healthOutput");
 
@@ -127,6 +128,29 @@ document.querySelector("#refreshAuditEvents").addEventListener("click", () => {
   refreshAuditEvents();
 });
 
+document.querySelector("#refreshSiemWebhooks").addEventListener("click", () => {
+  refreshSiemWebhooks();
+});
+
+document.querySelector("#createSiemWebhookForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    webhookId: document.querySelector("#siemWebhookId").value.trim(),
+    url: document.querySelector("#siemWebhookUrl").value.trim(),
+    enabled: document.querySelector("#siemWebhookEnabled").checked
+  };
+
+  await apiFetch("/api/admin/siem-webhooks", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  event.target.reset();
+  document.querySelector("#siemWebhookEnabled").checked = true;
+  await refreshSiemWebhooks();
+});
+
 document.querySelector("#downloadAuditCsv").addEventListener("click", () => {
   downloadAuditCsv();
 });
@@ -191,6 +215,13 @@ async function refreshFiles() {
   const files = await apiFetch(url);
   renderFiles(files);
   setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshSiemWebhooks() {
+  const tenantId = requireTenantId();
+  const webhooks = await apiFetch(`/api/admin/siem-webhooks?tenantId=${encodeURIComponent(tenantId)}`);
+  renderSiemWebhooks(webhooks);
+  setStatus(`${webhooks.length} SIEM webhook${webhooks.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
 async function refreshAuditEvents() {
@@ -316,6 +347,22 @@ function renderPolicyTemplates(templates) {
   `).join("");
 }
 
+function renderSiemWebhooks(webhooks) {
+  if (!webhooks.length) {
+    siemWebhooksBody.innerHTML = '<tr><td colspan="4" class="empty">No SIEM webhooks in this tenant.</td></tr>';
+    return;
+  }
+
+  siemWebhooksBody.innerHTML = webhooks.map((webhook) => `
+    <tr>
+      <td><code>${escapeHtml(webhook.webhookId)}</code></td>
+      <td>${escapeHtml(webhook.url)}</td>
+      <td>${renderEnabledBadge(webhook.enabled)}</td>
+      <td>${escapeHtml(formatDate(webhook.createdAtUtc))}</td>
+    </tr>
+  `).join("");
+}
+
 function renderAuditEvents(events) {
   if (!events.length) {
     auditEventsBody.innerHTML = '<tr><td colspan="5" class="empty">No audit events found.</td></tr>';
@@ -415,4 +462,10 @@ function renderRevokedBadge(revoked) {
   return revoked
     ? '<span class="badge revoked">Revoked</span>'
     : '<span class="badge">Active</span>';
+}
+
+function renderEnabledBadge(enabled) {
+  return enabled
+    ? '<span class="badge">Enabled</span>'
+    : '<span class="badge disabled">Disabled</span>';
 }

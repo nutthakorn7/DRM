@@ -61,6 +61,9 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Audit events");
         html.Should().Contain("Event type filter");
         html.Should().Contain("Export CSV");
+        html.Should().Contain("SIEM webhooks");
+        html.Should().Contain("Webhook URL");
+        html.Should().Contain("Enabled");
         html.Should().Contain("app.css");
         html.Should().Contain("app.js");
     }
@@ -92,6 +95,9 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/audit.csv");
         js.Should().Contain("refreshAuditEvents");
         js.Should().Contain("downloadAuditCsv");
+        js.Should().Contain("/api/admin/siem-webhooks");
+        js.Should().Contain("refreshSiemWebhooks");
+        js.Should().Contain("createSiemWebhookForm");
         js.Should().Contain("adminUserId");
         js.Should().Contain("revoked");
     }

@@ -211,6 +211,12 @@ button.danger:hover {
   gap: 10px;
 }
 
+.webhook-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.6fr) minmax(120px, 0.4fr) auto;
+  gap: 10px;
+}
+
 .check-row {
   display: flex;
   align-items: center;
@@ -269,6 +275,11 @@ th {
   background: var(--warning-bg);
 }
 
+.badge.disabled {
+  color: var(--muted);
+  background: #ededed;
+}
+
 pre {
   margin: 0;
   overflow: auto;
@@ -292,6 +303,7 @@ pre {
   .grant-row,
   .audit-filter-row,
   .template-row,
+  .webhook-row,
   .topbar,
   .compact {
     grid-template-columns: 1fr;

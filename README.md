@@ -202,3 +202,7 @@ The `/admin/` console now creates and lists policy templates through `/api/admin
 ## Phase 4G Audit Console
 
 The `/admin/` console now lists tenant audit events from `/api/admin/audit`, supports exact event-type filtering, and exports CSV through `/api/admin/audit.csv` while preserving the admin API key header.
+
+## Phase 4H SIEM Console
+
+The `/admin/` console now creates and lists SIEM webhook integrations through `/api/admin/siem-webhooks`. Operators can set webhook ID, HTTPS URL, and enabled state from the management UI.
