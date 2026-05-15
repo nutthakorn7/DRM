@@ -20,6 +20,7 @@ Required environment:
 
 ```bash
 export DRM_KEY_WRAPPING_MASTER_KEY_BASE64="<32-byte-base64-key>"
+export DRM_ADMIN_API_KEY="<long-random-admin-api-key>"
 ```
 
 Optional environment:
@@ -40,7 +41,13 @@ From the repository root:
 ./deploy/management/start-management.sh
 ```
 
-The script creates `DRM_DATA_DIR`, sets the SQLite database path, sets `Drm:Mode` to `OnPrem`, and refuses to start without `DRM_KEY_WRAPPING_MASTER_KEY_BASE64`.
+The script creates `DRM_DATA_DIR`, sets the SQLite database path, sets `Drm:Mode` to `OnPrem`, and refuses to start without `DRM_KEY_WRAPPING_MASTER_KEY_BASE64` and `DRM_ADMIN_API_KEY`.
+
+Admin API calls under `/api/admin/*` must include:
+
+```bash
+X-DRM-Admin-Key: <long-random-admin-api-key>
+```
 
 ## Check
 

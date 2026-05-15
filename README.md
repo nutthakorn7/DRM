@@ -176,3 +176,7 @@ This viewer path displays returned permissions but does not yet fully enforce co
 On-prem management server install assets are under `deploy/management/`. The baseline includes an example production config, `start-management.sh`, and operator notes for publishing, setting `DRM_KEY_WRAPPING_MASTER_KEY_BASE64`, choosing `DRM_DATA_DIR`, and checking `/healthz`.
 
 This is a runnable management install baseline, not final production hardening. Real deployment still needs TLS, API authentication, service supervision, backups, audit retention, key rotation, and host monitoring.
+
+## Phase 4B Admin API Key Auth
+
+When `Drm:Security:AdminApiKey` is configured, `/api/admin/*` endpoints require `X-DRM-Admin-Key`. Missing keys return 401 and wrong keys return 403. The on-prem management start script now requires `DRM_ADMIN_API_KEY` and exports it as server configuration.

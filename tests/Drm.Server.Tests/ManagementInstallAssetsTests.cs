@@ -21,6 +21,12 @@ public sealed class ManagementInstallAssetsTests
             .GetString()
             .Should()
             .Be("REPLACE_WITH_32_BYTE_BASE64_MASTER_KEY");
+        root.GetProperty("Drm")
+            .GetProperty("Security")
+            .GetProperty("AdminApiKey")
+            .GetString()
+            .Should()
+            .Be("REPLACE_WITH_ADMIN_API_KEY");
         root.GetProperty("ConnectionStrings")
             .GetProperty("DrmDb")
             .GetString()
@@ -48,7 +54,9 @@ public sealed class ManagementInstallAssetsTests
         script.Should().Contain("DRM_DATA_DIR");
         script.Should().Contain("mkdir -p");
         script.Should().Contain("DRM_KEY_WRAPPING_MASTER_KEY_BASE64");
+        script.Should().Contain("DRM_ADMIN_API_KEY");
         script.Should().Contain("Drm__KeyWrapping__MasterKeyBase64");
+        script.Should().Contain("Drm__Security__AdminApiKey");
         script.Should().Contain("exit 2");
         script.Should().Contain("Drm.Server.dll");
         script.Should().Contain("Drm.Server.csproj");

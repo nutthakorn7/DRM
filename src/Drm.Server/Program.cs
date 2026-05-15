@@ -35,6 +35,8 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.EnsureCreated();
 }
 
+app.UseAdminApiKeyAuthentication();
+
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapFilesEndpoints();
 app.MapFileKeyEndpoints();
