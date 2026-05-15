@@ -83,7 +83,7 @@
                         IsEnabled="False"
                         Click="ExportButton_Click" />
             </StackPanel>
-            <TextBlock Text="Protected PDF"
+            <TextBlock Text="Protected file"
                        DockPanel.Dock="Left"
                        Foreground="White"
                        FontWeight="SemiBold"

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Drm.Agent.Core;
+using Drm.Container;
 using Drm.Crypto;
 using Drm.Domain;
 using FluentAssertions;
@@ -10,6 +11,40 @@ namespace Drm.Agent.Core.Tests;
 
 public sealed class ProtectAndOpenWorkflowTests
 {
+    [Fact]
+    public async Task OpenProtectedFileWorkflow_byte_array_open_returns_header_content_type()
+    {
+        var server = new FakeDrmServerClient();
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        var fileId = ProtectedFileId.New();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+        using var output = new MemoryStream();
+        ProtectedFileWriter.Write(
+            output,
+            tenantId,
+            fileId,
+            "text/csv",
+            fileKey,
+            "a,b"u8.ToArray());
+
+        await server.RegisterFileAsync(
+            tenantId.Value,
+            fileId.Value,
+            userId.Value,
+            "text/csv",
+            DateTimeOffset.UtcNow.AddHours(1),
+            Permission.View,
+            CancellationToken.None);
+
+        var opened = await new OpenProtectedFileWorkflow(server)
+            .OpenAsync(output.ToArray(), userId, deviceId, fileKey, CancellationToken.None);
+
+        opened.ContentType.Should().Be("text/csv");
+        opened.Content.Should().Equal("a,b"u8.ToArray());
+    }
+
     [Fact]
     public async Task Protect_registers_file_and_open_decrypts_when_policy_allows()
     {

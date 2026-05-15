@@ -250,3 +250,7 @@ Client file registration now accepts optional `policyTemplateId` and user/group 
 ## Phase 5K Generic File Protection
 
 The agent core now includes `ProtectFileWorkflow` for protecting arbitrary file types into the existing `.drmx` container. The workflow stores the source content type in the protected-file header, supports common Office, ZIP, CAD, text, CSV, and PDF extensions, and falls back to `application/octet-stream` for unknown extensions. The tray protect form now accepts any source file while keeping the same policy template and recipient controls.
+
+## Phase 5L Generic File Open
+
+The agent core now includes `OpenProtectedFileWorkflow` for opening `.drmx` containers without assuming the payload is a PDF. It returns the protected header content type with the decrypted bytes, policy permissions, and watermark metadata. The Windows viewer still renders PDFs inline, and it can load non-PDF protected files for policy-gated original export when `ExportOriginal` is allowed.

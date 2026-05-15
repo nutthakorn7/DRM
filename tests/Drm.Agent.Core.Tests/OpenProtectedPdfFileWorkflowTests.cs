@@ -9,6 +9,38 @@ namespace Drm.Agent.Core.Tests;
 public sealed class OpenProtectedPdfFileWorkflowTests
 {
     [Fact]
+    public async Task OpenProtectedFileWorkflow_opens_non_pdf_file_and_returns_content_type()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "contract.docx");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var keyStore = new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "keys.json"));
+        var server = new AllowingServerClient();
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        await File.WriteAllBytesAsync(sourcePath, "office bytes"u8.ToArray());
+
+        var protectedFile = await new ProtectFileWorkflow(server, inventory, keyStore)
+            .ProtectAsync(
+                tenantId,
+                userId,
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                ProtectFilePolicyOptions.Default,
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        var opened = await new OpenProtectedFileWorkflow(server, keyStore)
+            .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
+
+        opened.ContentType.Should().Be("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        opened.Content.Should().Equal("office bytes"u8.ToArray());
+        opened.TenantId.Should().Be(tenantId.Value);
+        opened.FileId.Should().Be(protectedFile.FileId);
+    }
+
+    [Fact]
     public async Task OpenProtectedPdfFileWorkflow_loads_key_and_opens_protected_file()
     {
         var tempDirectory = Directory.CreateTempSubdirectory();

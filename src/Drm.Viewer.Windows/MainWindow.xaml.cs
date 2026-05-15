@@ -10,8 +10,23 @@ namespace Drm.Viewer.Windows;
 
 public partial class MainWindow : Window
 {
+    private const string PdfContentType = "application/pdf";
+
+    private static readonly IReadOnlyDictionary<string, string> ExportExtensions =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [PdfContentType] = ".pdf",
+            ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] = ".docx",
+            ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = ".xlsx",
+            ["application/vnd.openxmlformats-officedocument.presentationml.presentation"] = ".pptx",
+            ["application/zip"] = ".zip",
+            ["text/plain"] = ".txt",
+            ["text/csv"] = ".csv"
+        };
+
     private string? temporaryPdfPath;
     private byte[]? currentContent;
+    private string currentContentType = string.Empty;
     private Permission currentPermissions = Permission.None;
     private AgentIdentity? currentIdentity;
     private Guid? currentFileId;
@@ -64,12 +79,20 @@ public partial class MainWindow : Window
             var serverClient = new DrmServerClient(httpClient, clientApiKey);
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
             var decisionCache = new JsonPolicyDecisionCache(ResolveDataPath("policy-decisions.json"));
-            var opened = await new OpenProtectedPdfFileWorkflow(serverClient, keyStore, decisionCache)
+            var opened = await new OpenProtectedFileWorkflow(serverClient, keyStore, decisionCache)
                 .OpenAsync(protectedPath, userId, deviceId, CancellationToken.None);
 
-            var tempPath = Path.Combine(Path.GetTempPath(), $"drm-viewer-{Guid.NewGuid():N}.pdf");
-            await File.WriteAllBytesAsync(tempPath, opened.Content);
-            LoadPdfFromTemporaryFile(tempPath, opened.Watermark, opened.Permissions);
+            if (string.Equals(opened.ContentType, PdfContentType, StringComparison.OrdinalIgnoreCase))
+            {
+                var tempPath = Path.Combine(Path.GetTempPath(), $"drm-viewer-{Guid.NewGuid():N}.pdf");
+                await File.WriteAllBytesAsync(tempPath, opened.Content);
+                LoadPdfFromTemporaryFile(tempPath, opened.Watermark, opened.Permissions);
+            }
+            else
+            {
+                LoadGenericProtectedFile(opened.Content, opened.ContentType, opened.Watermark, opened.Permissions);
+            }
+
             currentIdentity = new AgentIdentity(opened.TenantId, userId.Value, deviceId.Value);
             currentFileId = opened.FileId;
             currentServerUrl = serverUrl;
@@ -95,11 +118,25 @@ public partial class MainWindow : Window
         DeleteTemporaryPdf();
         temporaryPdfPath = path;
         currentContent = File.ReadAllBytes(path);
+        currentContentType = PdfContentType;
         currentPermissions = permissions;
         ApplyPermissionState();
         WatermarkText.Text = watermark;
-        StatusText.Text = $"Loaded protected PDF: {Path.GetFileName(path)}";
+        StatusText.Text = $"Loaded protected PDF file: {Path.GetFileName(path)}";
         PdfHost.Navigate(path);
+    }
+
+    private void LoadGenericProtectedFile(byte[] content, string contentType, string watermark, Permission permissions)
+    {
+        DeleteTemporaryPdf();
+        temporaryPdfPath = null;
+        currentContent = content.ToArray();
+        currentContentType = contentType;
+        currentPermissions = permissions;
+        ApplyPermissionState();
+        WatermarkText.Text = watermark;
+        StatusText.Text = $"Loaded protected file: {contentType}";
+        PdfHost.Navigate("about:blank");
     }
 
     private async void CopyButton_Click(object sender, RoutedEventArgs e)
@@ -145,14 +182,15 @@ public partial class MainWindow : Window
             baseName = "protected";
         }
 
+        var exportExtension = GetExportExtension(currentContentType);
         var dialog = new SaveFileDialog
         {
             AddExtension = true,
-            DefaultExt = ".pdf",
-            FileName = $"{baseName}.pdf",
-            Filter = "PDF files (*.pdf)|*.pdf",
+            DefaultExt = exportExtension,
+            FileName = BuildExportFileName(baseName, exportExtension),
+            Filter = BuildExportFilter(currentContentType, exportExtension),
             OverwritePrompt = true,
-            Title = "Export original PDF"
+            Title = "Export original file"
         };
 
         if (dialog.ShowDialog(this) != true)
@@ -162,7 +200,7 @@ public partial class MainWindow : Window
 
         await File.WriteAllBytesAsync(dialog.FileName, currentContent!);
         await AuditViewerActionAsync(ViewerControlledAction.ExportOriginal, allowed: true);
-        StatusText.Text = $"Exported original PDF: {dialog.FileName}";
+        StatusText.Text = $"Exported original file: {dialog.FileName}";
     }
 
     private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -235,6 +273,7 @@ public partial class MainWindow : Window
         if (temporaryPdfPath is null || !File.Exists(temporaryPdfPath))
         {
             currentContent = null;
+            currentContentType = string.Empty;
             currentPermissions = Permission.None;
             currentIdentity = null;
             currentFileId = null;
@@ -256,6 +295,7 @@ public partial class MainWindow : Window
         {
             temporaryPdfPath = null;
             currentContent = null;
+            currentContentType = string.Empty;
             currentPermissions = Permission.None;
             currentIdentity = null;
             currentFileId = null;
@@ -267,9 +307,15 @@ public partial class MainWindow : Window
 
     private async Task<bool> RequireViewerActionAsync(ViewerControlledAction action, string label)
     {
-        if (temporaryPdfPath is null || currentContent is null)
+        if (currentContent is null)
         {
             StatusText.Text = "No document loaded.";
+            return false;
+        }
+
+        if ((action == ViewerControlledAction.Copy || action == ViewerControlledAction.Print) && !CurrentFileIsPdf())
+        {
+            StatusText.Text = $"{label} is unavailable for this file type.";
             return false;
         }
 
@@ -312,13 +358,47 @@ public partial class MainWindow : Window
     private void ApplyPermissionState()
     {
         var state = ViewerPermissionState.From(currentPermissions);
-        var hasDocument = temporaryPdfPath is not null && currentContent is not null;
+        var hasDocument = currentContent is not null;
+        var canRenderInline = hasDocument && CurrentFileIsPdf();
 
-        CopyButton.IsEnabled = hasDocument && state.CanCopy;
-        PrintButton.IsEnabled = hasDocument && state.CanPrint;
+        CopyButton.IsEnabled = canRenderInline && state.CanCopy;
+        PrintButton.IsEnabled = canRenderInline && state.CanPrint;
         ExportButton.IsEnabled = hasDocument && state.CanExportOriginal;
         PermissionText.Text = hasDocument
             ? $"Permissions: {currentPermissions}"
             : "Permissions: not loaded";
+    }
+
+    private bool CurrentFileIsPdf()
+    {
+        return string.Equals(currentContentType, PdfContentType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetExportExtension(string contentType)
+    {
+        return ExportExtensions.TryGetValue(contentType, out var extension)
+            ? extension
+            : ".bin";
+    }
+
+    private static string BuildExportFileName(string baseName, string extension)
+    {
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            return $"protected{extension}";
+        }
+
+        return baseName.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
+            ? baseName
+            : $"{baseName}{extension}";
+    }
+
+    private static string BuildExportFilter(string contentType, string extension)
+    {
+        var label = string.Equals(contentType, PdfContentType, StringComparison.OrdinalIgnoreCase)
+            ? "PDF files"
+            : "Original files";
+
+        return $"{label} (*{extension})|*{extension}|All files (*.*)|*.*";
     }
 }
