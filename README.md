@@ -230,3 +230,7 @@ The Windows protected viewer now gates its visible Copy, Print, and Export contr
 ## Phase 5F Viewer Action Audit
 
 Viewer-controlled Copy, Print, and Export actions now emit endpoint audit events through `/api/agent/audit` when the action is explicitly allowed or blocked by policy. Events use the existing accepted prefixes: `copy_allowed`, `copy_blocked`, `print_allowed`, `print_blocked`, `export_allowed`, and `export_blocked`.
+
+## Phase 5G Admin Policy Simulator
+
+Administrators can preview policy outcomes with `POST /api/admin/policy-simulator` without issuing file keys or writing endpoint access audit events. The `/admin/` console includes a Policy simulator section for tenant-scoped file, user, device, and permission checks.

@@ -60,6 +60,7 @@ app.MapAdminGroupsEndpoints();
 app.MapAdminDevicesEndpoints();
 app.MapAdminFilesEndpoints();
 app.MapAdminPolicyTemplatesEndpoints();
+app.MapAdminPolicySimulatorEndpoints();
 app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
 app.MapAgentEndpoints();

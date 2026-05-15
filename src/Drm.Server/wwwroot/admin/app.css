@@ -217,6 +217,20 @@ button.danger:hover {
   gap: 10px;
 }
 
+.simulator-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
+  gap: 10px;
+}
+
+.simulator-output {
+  min-height: 96px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 12px;
+}
+
 .webhook-row {
   display: grid;
   grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.6fr) minmax(120px, 0.4fr) auto;
@@ -310,6 +324,7 @@ pre {
   .audit-filter-row,
   .device-filter-row,
   .template-row,
+  .simulator-row,
   .webhook-row,
   .topbar,
   .compact {

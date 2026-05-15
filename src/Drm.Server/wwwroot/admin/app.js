@@ -12,6 +12,7 @@ const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
 const devicesBody = document.querySelector("#devicesBody");
 const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
+const simulatorOutput = document.querySelector("#simulatorOutput");
 const filesBody = document.querySelector("#filesBody");
 const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
 const auditEventsBody = document.querySelector("#auditEventsBody");
@@ -123,6 +124,11 @@ document.querySelector("#createPolicyTemplateForm").addEventListener("submit", a
 
   event.target.reset();
   await refreshPolicyTemplates();
+});
+
+document.querySelector("#simulatePolicyForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await simulatePolicy();
 });
 
 document.querySelector("#refreshFiles").addEventListener("click", () => {
@@ -238,6 +244,24 @@ async function refreshPolicyTemplates() {
   const templates = await apiFetch(`/api/admin/policy-templates?tenantId=${encodeURIComponent(tenantId)}`);
   renderPolicyTemplates(templates);
   setStatus(`${templates.length} template${templates.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function simulatePolicy() {
+  const body = {
+    tenantId: requireTenantId(),
+    fileId: document.querySelector("#simulateFileId").value.trim(),
+    userId: document.querySelector("#simulateUserId").value.trim(),
+    deviceId: document.querySelector("#simulateDeviceId").value.trim(),
+    requestedPermission: document.querySelector("#simulatePermission").value.trim()
+  };
+
+  const decision = await apiFetch("/api/admin/policy-simulator", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  renderSimulation(decision);
+  setStatus(`Simulation ${decision.allowed ? "allowed" : "denied"}: ${decision.reasonCode}`, decision.allowed ? "ok" : "error");
 }
 
 async function refreshFiles() {
@@ -413,6 +437,17 @@ function renderPolicyTemplates(templates) {
       <td>${template.allowPrint ? "Yes" : "No"}</td>
     </tr>
   `).join("");
+}
+
+function renderSimulation(decision) {
+  simulatorOutput.textContent = JSON.stringify({
+    allowed: decision.allowed,
+    allowedPermissions: decision.allowedPermissions,
+    reasonCode: decision.reasonCode,
+    watermarkTemplate: decision.watermarkTemplate,
+    offlineLeaseExpiresAtUtc: decision.offlineLeaseExpiresAtUtc,
+    simulated: decision.simulated
+  }, null, 2);
 }
 
 function renderSiemWebhooks(webhooks) {

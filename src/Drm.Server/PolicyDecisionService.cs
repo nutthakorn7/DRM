@@ -24,6 +24,43 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
         string requestedPermissionText,
         CancellationToken cancellationToken)
     {
+        return await DecideInternalAsync(
+            tenantId,
+            fileId,
+            userId,
+            deviceId,
+            requestedPermissionText,
+            writeAudit: true,
+            cancellationToken);
+    }
+
+    public async Task<ServerPolicyDecision> SimulateAsync(
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        Guid deviceId,
+        string requestedPermissionText,
+        CancellationToken cancellationToken)
+    {
+        return await DecideInternalAsync(
+            tenantId,
+            fileId,
+            userId,
+            deviceId,
+            requestedPermissionText,
+            writeAudit: false,
+            cancellationToken);
+    }
+
+    private async Task<ServerPolicyDecision> DecideInternalAsync(
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        Guid deviceId,
+        string requestedPermissionText,
+        bool writeAudit,
+        CancellationToken cancellationToken)
+    {
         if (!PermissionParser.TryParse(requestedPermissionText, out var requestedPermission))
         {
             return new ServerPolicyDecision(
@@ -42,16 +79,19 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
 
         if (file is null)
         {
-            dbContext.AuditEvents.Add(new AuditEventEntity
+            if (writeAudit)
             {
-                TenantId = tenantId,
-                FileId = fileId,
-                UserId = userId,
-                EventType = "access_denied",
-                ReasonCode = "file_not_found",
-                CreatedAtUtc = decisionTime
-            });
-            await dbContext.SaveChangesAsync(cancellationToken);
+                dbContext.AuditEvents.Add(new AuditEventEntity
+                {
+                    TenantId = tenantId,
+                    FileId = fileId,
+                    UserId = userId,
+                    EventType = "access_denied",
+                    ReasonCode = "file_not_found",
+                    CreatedAtUtc = decisionTime
+                });
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
 
             return new ServerPolicyDecision(
                 false,
@@ -73,16 +113,19 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
 
         if (deviceDisabled)
         {
-            dbContext.AuditEvents.Add(new AuditEventEntity
+            if (writeAudit)
             {
-                TenantId = tenantId,
-                FileId = fileId,
-                UserId = userId,
-                EventType = "access_denied",
-                ReasonCode = "device_disabled",
-                CreatedAtUtc = decisionTime
-            });
-            await dbContext.SaveChangesAsync(cancellationToken);
+                dbContext.AuditEvents.Add(new AuditEventEntity
+                {
+                    TenantId = tenantId,
+                    FileId = fileId,
+                    UserId = userId,
+                    EventType = "access_denied",
+                    ReasonCode = "device_disabled",
+                    CreatedAtUtc = decisionTime
+                });
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
 
             return new ServerPolicyDecision(
                 false,
@@ -146,16 +189,19 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
             requestedPermission,
             decisionTime));
 
-        dbContext.AuditEvents.Add(new AuditEventEntity
+        if (writeAudit)
         {
-            TenantId = tenantId,
-            FileId = fileId,
-            UserId = userId,
-            EventType = decision.Allowed ? "access_allowed" : "access_denied",
-            ReasonCode = decision.ReasonCode,
-            CreatedAtUtc = decisionTime
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.AuditEvents.Add(new AuditEventEntity
+            {
+                TenantId = tenantId,
+                FileId = fileId,
+                UserId = userId,
+                EventType = decision.Allowed ? "access_allowed" : "access_denied",
+                ReasonCode = decision.ReasonCode,
+                CreatedAtUtc = decisionTime
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return new ServerPolicyDecision(
             decision.Allowed,

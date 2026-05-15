@@ -19,6 +19,7 @@
         <a href="#groups">Groups</a>
         <a href="#devices">Devices</a>
         <a href="#templates">Templates</a>
+        <a href="#simulator">Simulator</a>
         <a href="#files">Files</a>
         <a href="#siem">SIEM</a>
         <a href="#audit">Audit</a>
@@ -201,6 +202,25 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panel" id="simulator">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Policy</p>
+            <h3>Policy simulator</h3>
+          </div>
+        </div>
+
+        <form class="simulator-row" id="simulatePolicyForm">
+          <input id="simulateFileId" autocomplete="off" placeholder="File ID">
+          <input id="simulateUserId" autocomplete="off" placeholder="User ID">
+          <input id="simulateDeviceId" autocomplete="off" placeholder="Device ID">
+          <input id="simulatePermission" autocomplete="off" placeholder="Permission, e.g. View">
+          <button type="submit">Simulate access</button>
+        </form>
+
+        <pre class="simulator-output" id="simulatorOutput">No simulation run.</pre>
       </section>
 
       <section class="panel" id="files">
