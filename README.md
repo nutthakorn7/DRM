@@ -206,3 +206,7 @@ The `/admin/` console now lists tenant audit events from `/api/admin/audit`, sup
 ## Phase 4H SIEM Console
 
 The `/admin/` console now creates and lists SIEM webhook integrations through `/api/admin/siem-webhooks`. Operators can set webhook ID, HTTPS URL, and enabled state from the management UI.
+
+## Phase 5A Client API Key Auth
+
+When `Drm:Security:ClientApiKey` is configured, non-admin `/api/*` endpoints require `X-DRM-Client-Key`. `/api/admin/*` remains protected separately by `X-DRM-Admin-Key`, and deployments with no client key configured keep the previous unauthenticated client API behavior.

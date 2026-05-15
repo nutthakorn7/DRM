@@ -36,6 +36,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseAdminApiKeyAuthentication();
+app.UseClientApiKeyAuthentication();
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.Equals("/admin", StringComparison.OrdinalIgnoreCase))

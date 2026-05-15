@@ -29,6 +29,7 @@ Optional environment:
 export DRM_SERVER_DIR="./artifacts/drm-management"
 export DRM_DATA_DIR="/var/lib/drm-management"
 export DRM_URL="http://0.0.0.0:5080"
+export DRM_CLIENT_API_KEY="<long-random-client-api-key>"
 ```
 
 `appsettings.onprem.example.json` shows the equivalent production shape. Do not deploy the placeholder key value.
@@ -47,6 +48,12 @@ Admin API calls under `/api/admin/*` must include:
 
 ```bash
 X-DRM-Admin-Key: <long-random-admin-api-key>
+```
+
+When `DRM_CLIENT_API_KEY` is set, non-admin `/api/*` calls must include:
+
+```bash
+X-DRM-Client-Key: <long-random-client-api-key>
 ```
 
 ## Check

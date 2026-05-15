@@ -27,6 +27,9 @@ export ConnectionStrings__DrmDb="${ConnectionStrings__DrmDb:-Data Source=$DRM_DA
 export Drm__Mode="${Drm__Mode:-OnPrem}"
 export Drm__KeyWrapping__MasterKeyBase64="$DRM_KEY_WRAPPING_MASTER_KEY_BASE64"
 export Drm__Security__AdminApiKey="$DRM_ADMIN_API_KEY"
+if [[ -n "${DRM_CLIENT_API_KEY:-}" ]]; then
+  export Drm__Security__ClientApiKey="$DRM_CLIENT_API_KEY"
+fi
 
 if [[ -f "$SERVER_DIR/Drm.Server.dll" ]]; then
   exec "$DOTNET" "$SERVER_DIR/Drm.Server.dll"
