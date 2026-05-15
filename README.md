@@ -226,3 +226,7 @@ Administrators can disable a registered device with `POST /api/admin/devices/{de
 ## Phase 5E Viewer Permission Controls
 
 The Windows protected viewer now gates its visible Copy, Print, and Export controls from the opened file's returned permissions. `Ctrl+C`, `Ctrl+P`, and `Ctrl+S` are blocked when the matching permission is missing, and original PDF export is only available when `ExportOriginal` is granted. These are viewer-level controls and do not claim to prevent out-of-band capture or endpoint tampering.
+
+## Phase 5F Viewer Action Audit
+
+Viewer-controlled Copy, Print, and Export actions now emit endpoint audit events through `/api/agent/audit` when the action is explicitly allowed or blocked by policy. Events use the existing accepted prefixes: `copy_allowed`, `copy_blocked`, `print_allowed`, `print_blocked`, `export_allowed`, and `export_blocked`.

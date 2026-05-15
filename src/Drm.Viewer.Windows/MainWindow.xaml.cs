@@ -13,6 +13,10 @@ public partial class MainWindow : Window
     private string? temporaryPdfPath;
     private byte[]? currentContent;
     private Permission currentPermissions = Permission.None;
+    private AgentIdentity? currentIdentity;
+    private Guid? currentFileId;
+    private Uri? currentServerUrl;
+    private string currentClientApiKey = string.Empty;
 
     public MainWindow()
     {
@@ -66,6 +70,10 @@ public partial class MainWindow : Window
             var tempPath = Path.Combine(Path.GetTempPath(), $"drm-viewer-{Guid.NewGuid():N}.pdf");
             await File.WriteAllBytesAsync(tempPath, opened.Content);
             LoadPdfFromTemporaryFile(tempPath, opened.Watermark, opened.Permissions);
+            currentIdentity = new AgentIdentity(opened.TenantId, userId.Value, deviceId.Value);
+            currentFileId = opened.FileId;
+            currentServerUrl = serverUrl;
+            currentClientApiKey = clientApiKey;
         }
         catch (Exception exception)
         {
@@ -94,19 +102,20 @@ public partial class MainWindow : Window
         PdfHost.Navigate(path);
     }
 
-    private void CopyButton_Click(object sender, RoutedEventArgs e)
+    private async void CopyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireViewerAction(ViewerControlledAction.Copy, "Copy"))
+        if (!await RequireViewerActionAsync(ViewerControlledAction.Copy, "Copy"))
         {
             return;
         }
 
+        await AuditViewerActionAsync(ViewerControlledAction.Copy, allowed: true);
         StatusText.Text = "Copy is allowed by policy; use text selection in the embedded PDF renderer when available.";
     }
 
-    private void PrintButton_Click(object sender, RoutedEventArgs e)
+    private async void PrintButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireViewerAction(ViewerControlledAction.Print, "Print"))
+        if (!await RequireViewerActionAsync(ViewerControlledAction.Print, "Print"))
         {
             return;
         }
@@ -114,6 +123,7 @@ public partial class MainWindow : Window
         try
         {
             PdfHost.InvokeScript("print");
+            await AuditViewerActionAsync(ViewerControlledAction.Print, allowed: true);
             StatusText.Text = "Print requested.";
         }
         catch (Exception exception)
@@ -124,7 +134,7 @@ public partial class MainWindow : Window
 
     private async void ExportButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireViewerAction(ViewerControlledAction.ExportOriginal, "Export"))
+        if (!await RequireViewerActionAsync(ViewerControlledAction.ExportOriginal, "Export"))
         {
             return;
         }
@@ -151,10 +161,11 @@ public partial class MainWindow : Window
         }
 
         await File.WriteAllBytesAsync(dialog.FileName, currentContent!);
+        await AuditViewerActionAsync(ViewerControlledAction.ExportOriginal, allowed: true);
         StatusText.Text = $"Exported original PDF: {dialog.FileName}";
     }
 
-    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if ((Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
         {
@@ -178,7 +189,7 @@ public partial class MainWindow : Window
         if (e.Key == Key.C && !ViewerPermissionState.From(currentPermissions).CanCopy)
         {
             e.Handled = true;
-            StatusText.Text = "Copy is blocked by policy.";
+            await RequireViewerActionAsync(ViewerControlledAction.Copy, "Copy");
         }
     }
 
@@ -225,6 +236,10 @@ public partial class MainWindow : Window
         {
             currentContent = null;
             currentPermissions = Permission.None;
+            currentIdentity = null;
+            currentFileId = null;
+            currentServerUrl = null;
+            currentClientApiKey = string.Empty;
             ApplyPermissionState();
             return;
         }
@@ -242,11 +257,15 @@ public partial class MainWindow : Window
             temporaryPdfPath = null;
             currentContent = null;
             currentPermissions = Permission.None;
+            currentIdentity = null;
+            currentFileId = null;
+            currentServerUrl = null;
+            currentClientApiKey = string.Empty;
             ApplyPermissionState();
         }
     }
 
-    private bool RequireViewerAction(ViewerControlledAction action, string label)
+    private async Task<bool> RequireViewerActionAsync(ViewerControlledAction action, string label)
     {
         if (temporaryPdfPath is null || currentContent is null)
         {
@@ -257,10 +276,37 @@ public partial class MainWindow : Window
         if (!ViewerPermissionState.From(currentPermissions).Allows(action))
         {
             StatusText.Text = $"{label} is blocked by policy.";
+            await AuditViewerActionAsync(action, allowed: false);
             return false;
         }
 
         return true;
+    }
+
+    private async Task AuditViewerActionAsync(ViewerControlledAction action, bool allowed)
+    {
+        if (currentIdentity is null || currentFileId is null || currentServerUrl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var httpClient = new HttpClient { BaseAddress = currentServerUrl };
+            var serverClient = new DrmServerClient(httpClient, currentClientApiKey);
+            var record = ViewerActionAudit.Create(
+                currentIdentity,
+                currentFileId.Value,
+                action,
+                allowed,
+                DateTimeOffset.UtcNow);
+
+            await serverClient.UploadAuditAsync(record, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = $"{StatusText.Text} Audit upload failed: {exception.Message}";
+        }
     }
 
     private void ApplyPermissionState()

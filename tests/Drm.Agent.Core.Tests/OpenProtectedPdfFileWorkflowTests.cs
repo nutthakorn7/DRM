@@ -33,6 +33,8 @@ public sealed class OpenProtectedPdfFileWorkflowTests
         var opened = await new OpenProtectedPdfFileWorkflow(server, keyStore)
             .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
 
+        opened.TenantId.Should().Be(tenantId.Value);
+        opened.FileId.Should().Be(protectedFile.FileId);
         opened.Content.Should().Equal("%PDF-1.7 open"u8.ToArray());
         opened.Watermark.Should().Contain(userId.Value.ToString("N"));
     }

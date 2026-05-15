@@ -76,6 +76,8 @@ public sealed class OpenProtectedPdfWorkflow(IDrmServerClient serverClient, IPol
         Permission allowedPermissions)
     {
         return new OpenedProtectedPdf(
+            package.Header.TenantId,
+            package.Header.FileId,
             package.Decrypt(fileKey),
             ApplyWatermark(watermarkTemplate, userId, package.Header.FileId),
             allowedPermissions);
@@ -95,4 +97,4 @@ public sealed class OpenProtectedPdfWorkflow(IDrmServerClient serverClient, IPol
     }
 }
 
-public sealed record OpenedProtectedPdf(byte[] Content, string Watermark, Permission Permissions);
+public sealed record OpenedProtectedPdf(Guid TenantId, Guid FileId, byte[] Content, string Watermark, Permission Permissions);
