@@ -332,3 +332,9 @@ The response is limited to viewer-safe metadata: IDs, guest email, content type,
 External guests can now use the public browser shell at `/share/` to complete the share verification flow and open a metadata-only viewer session. The page calls `POST /api/share-links/verification/start`, `POST /api/share-links/verification/confirm`, and `POST /api/share-links/viewer/session`, then displays safe file/session metadata with download, print, and export visibly disabled.
 
 This is still a locked viewer shell only. It keeps the verification session token in memory, clears it after opening the viewer session, and does not request file keys, wrapped keys, ciphertext, decrypted content, or rendered document bytes.
+
+## Phase 5AA External Share URL Launch Flow
+
+Admin share-link creation now returns a ready-to-open `shareUrl` alongside the one-time `accessToken`. The URL includes `tenantId`, `accessToken`, and `guestEmail` query parameters so recipients can open `/share/` with prefilled access details instead of manually copying values.
+
+The `/share/` shell reads those query parameters, prefills the verification-start form, and keeps the same security boundary: guests still must request and confirm a verification code before a viewer session opens, and no file keys or document bytes are released by this phase.

@@ -726,7 +726,8 @@ function renderCreatedShareLink(link) {
     shareLinkId: link.shareLinkId,
     guestEmail: link.guestEmail,
     expiresAtUtc: link.expiresAtUtc,
-    accessToken: link.accessToken
+    accessToken: link.accessToken,
+    shareUrl: link.shareUrl
   }, null, 2);
 }
 

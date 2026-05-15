@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -637,6 +638,13 @@ public sealed class AdminFilesApiTests : IDisposable
         created.Revoked.Should().BeFalse();
         created.AccessToken.Should().NotBeNullOrWhiteSpace();
         created.AccessToken.Length.Should().BeGreaterThan(30);
+        created.ShareUrl.Should().NotBeNullOrWhiteSpace();
+        var shareUri = new Uri(created.ShareUrl, UriKind.Absolute);
+        shareUri.AbsolutePath.Should().Be("/share/");
+        var shareQuery = QueryHelpers.ParseQuery(shareUri.Query);
+        shareQuery["tenantId"].ToString().Should().Be(tenantId.ToString());
+        shareQuery["accessToken"].ToString().Should().Be(created.AccessToken);
+        shareQuery["guestEmail"].ToString().Should().Be("external.user@example.com");
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -1029,7 +1037,8 @@ public sealed class AdminFilesApiTests : IDisposable
         bool Revoked,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset? RevokedAtUtc,
-        string AccessToken);
+        string AccessToken,
+        string ShareUrl);
 
     private sealed record ExternalShareLinkResponse(
         Guid TenantId,

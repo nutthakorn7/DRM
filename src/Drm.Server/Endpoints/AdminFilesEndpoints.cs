@@ -123,6 +123,7 @@ public static class AdminFilesEndpoints
     private static async Task<Results<Created<CreateExternalShareLinkResponse>, BadRequest<ErrorResponse>, NotFound>> CreateExternalShareLinkAsync(
         Guid fileId,
         CreateExternalShareLinkRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
@@ -169,9 +170,15 @@ public static class AdminFilesEndpoints
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        var shareUrl = BuildExternalShareUrl(
+            httpContext,
+            request.TenantId,
+            token.Plaintext,
+            shareLink.GuestEmail);
+
         return TypedResults.Created(
             $"/api/admin/files/{fileId}/share-links/{shareLink.ShareLinkId}",
-            CreateExternalShareLinkResponse.From(shareLink, token.Plaintext));
+            CreateExternalShareLinkResponse.From(shareLink, token.Plaintext, shareUrl));
     }
 
     private static async Task<Results<Ok<IReadOnlyList<ExternalShareLinkResponse>>, NotFound>> ListExternalShareLinksAsync(
@@ -631,6 +638,20 @@ public static class AdminFilesEndpoints
         };
     }
 
+    private static string BuildExternalShareUrl(
+        HttpContext httpContext,
+        Guid tenantId,
+        string accessToken,
+        string guestEmail)
+    {
+        var query = QueryString.Create([
+            new KeyValuePair<string, string?>("tenantId", tenantId.ToString()),
+            new KeyValuePair<string, string?>("accessToken", accessToken),
+            new KeyValuePair<string, string?>("guestEmail", guestEmail)
+        ]);
+        return $"{httpContext.Request.Scheme}://{httpContext.Request.Host}/share/{query}";
+    }
+
     private sealed record EnqueueDeleteProtectedCopyCommandRequest(Guid TenantId, Guid DeviceId, Guid AdminUserId);
 
     private sealed record RevokeFileRequest(Guid TenantId, Guid AdminUserId);
@@ -707,9 +728,10 @@ public static class AdminFilesEndpoints
         bool Revoked,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset? RevokedAtUtc,
-        string AccessToken)
+        string AccessToken,
+        string ShareUrl)
     {
-        public static CreateExternalShareLinkResponse From(ExternalShareLinkEntity link, string accessToken)
+        public static CreateExternalShareLinkResponse From(ExternalShareLinkEntity link, string accessToken, string shareUrl)
             => new(
                 link.TenantId,
                 link.ShareLinkId,
@@ -721,7 +743,8 @@ public static class AdminFilesEndpoints
                 link.Revoked,
                 link.CreatedAtUtc,
                 link.RevokedAtUtc,
-                accessToken);
+                accessToken,
+                shareUrl);
     }
 
     private sealed record ExternalShareLinkResponse(

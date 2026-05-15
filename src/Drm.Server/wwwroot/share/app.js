@@ -7,6 +7,7 @@
   const startStep = document.getElementById("startStep");
   const confirmStep = document.getElementById("confirmStep");
 
+  applyQueryPrefill();
   startForm.addEventListener("submit", startVerification);
   confirmForm.addEventListener("submit", confirmVerification);
 
@@ -140,6 +141,29 @@
   function setStatus(message, tone) {
     viewerStatus.textContent = message;
     viewerStatus.className = tone ? `status ${tone}` : "status";
+  }
+
+  function applyQueryPrefill() {
+    const query = new URLSearchParams(window.location.search);
+    const tenantId = (query.get("tenantId") || "").trim();
+    const accessToken = (query.get("accessToken") || "").trim();
+    const guestEmail = (query.get("guestEmail") || "").trim();
+
+    if (tenantId) {
+      setValue("tenantId", tenantId);
+    }
+
+    if (accessToken) {
+      setValue("accessToken", accessToken);
+    }
+
+    if (guestEmail) {
+      setValue("guestEmail", guestEmail);
+    }
+
+    if (tenantId || accessToken || guestEmail) {
+      setStatus("Share details loaded from link. Send verification code to continue.", "");
+    }
   }
 
   function formatDate(value) {

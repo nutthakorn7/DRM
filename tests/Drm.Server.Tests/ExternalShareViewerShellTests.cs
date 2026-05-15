@@ -86,6 +86,11 @@ public sealed class ExternalShareViewerShellTests : IDisposable
         js.Should().Contain("/api/share-links/verification/start");
         js.Should().Contain("/api/share-links/verification/confirm");
         js.Should().Contain("/api/share-links/viewer/session");
+        js.Should().Contain("URLSearchParams");
+        js.Should().Contain("window.location.search");
+        js.Should().Contain("tenantId");
+        js.Should().Contain("accessToken");
+        js.Should().Contain("guestEmail");
         js.Should().NotContain("localStorage");
         js.Should().NotContain("sessionStorage");
         js.Should().NotContain("wrappedKey");

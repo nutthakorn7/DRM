@@ -124,6 +124,7 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("renderShareLinks");
         js.Should().Contain("revokeShareLink");
         js.Should().Contain("shareLinksBody");
+        js.Should().Contain("shareUrl");
         js.Should().Contain("/api/admin/policy-templates");
         js.Should().Contain("refreshPolicyTemplates");
         js.Should().Contain("createPolicyTemplateForm");
