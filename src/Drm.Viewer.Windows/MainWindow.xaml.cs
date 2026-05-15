@@ -39,6 +39,7 @@ public partial class MainWindow : Window
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         WatermarkText.Text = "DRM Protected";
         StatusText.Text = "No document loaded.";
+        PrefillProtectedPathFromCommandLine();
         ApplyPermissionState();
     }
 
@@ -400,5 +401,41 @@ public partial class MainWindow : Window
             : "Original files";
 
         return $"{label} (*{extension})|*{extension}|All files (*.*)|*.*";
+    }
+
+    private void PrefillProtectedPathFromCommandLine()
+    {
+        var protectedPath = TryGetProtectedPathFromCommandLine(Environment.GetCommandLineArgs());
+        if (!string.IsNullOrWhiteSpace(protectedPath))
+        {
+            ProtectedPathBox.Text = protectedPath;
+        }
+    }
+
+    private static string? TryGetProtectedPathFromCommandLine(string[] args)
+    {
+        var explicitPath = TryGetCommandLineValue("--open", args);
+        if (!string.IsNullOrWhiteSpace(explicitPath))
+        {
+            return explicitPath;
+        }
+
+        return args
+            .Skip(1)
+            .FirstOrDefault(argument =>
+                argument.EndsWith(".drmx", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? TryGetCommandLineValue(string optionName, string[] args)
+    {
+        for (var index = 1; index < args.Length - 1; index++)
+        {
+            if (string.Equals(args[index], optionName, StringComparison.OrdinalIgnoreCase))
+            {
+                return args[index + 1];
+            }
+        }
+
+        return null;
     }
 }

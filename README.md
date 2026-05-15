@@ -254,3 +254,7 @@ The agent core now includes `ProtectFileWorkflow` for protecting arbitrary file 
 ## Phase 5L Generic File Open
 
 The agent core now includes `OpenProtectedFileWorkflow` for opening `.drmx` containers without assuming the payload is a PDF. It returns the protected header content type with the decrypted bytes, policy permissions, and watermark metadata. The Windows viewer still renders PDFs inline, and it can load non-PDF protected files for policy-gated original export when `ExportOriginal` is allowed.
+
+## Phase 5M Desktop Shell Integration
+
+Desktop shell integration assets are available under `deploy/desktop/`. The PowerShell registration script writes current-user `HKCU:\Software\Classes` entries for a `Protect with DRM` file context menu and `.drmx` viewer association. Shell commands prefill the tray/viewer file path with `--protect` or `--open`; users still review server, identity, policy, and recipient fields before running protect or open.

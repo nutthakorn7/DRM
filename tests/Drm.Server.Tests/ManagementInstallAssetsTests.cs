@@ -70,6 +70,39 @@ public sealed class ManagementInstallAssetsTests
         script.Should().Contain("Drm.Server.csproj");
     }
 
+    [Fact]
+    public void Desktop_shell_registration_script_contains_user_scope_associations()
+    {
+        var scriptPath = Path.Combine(FindRepositoryRoot(), "deploy", "desktop", "register-shell-integration.ps1");
+
+        File.Exists(scriptPath).Should().BeTrue();
+        var script = File.ReadAllText(scriptPath);
+
+        script.Should().Contain("HKCU:\\Software\\Classes");
+        script.Should().Contain(".drmx");
+        script.Should().Contain("EnterpriseDRM.ProtectedFile");
+        script.Should().Contain("Protect with DRM");
+        script.Should().Contain("--protect");
+        script.Should().Contain("--open");
+        script.Should().Contain("\"%1\"");
+        script.Should().Contain("Remove-Item");
+    }
+
+    [Fact]
+    public void Desktop_shell_integration_readme_documents_register_and_unregister()
+    {
+        var readmePath = Path.Combine(FindRepositoryRoot(), "deploy", "desktop", "README.md");
+
+        File.Exists(readmePath).Should().BeTrue();
+        var readme = File.ReadAllText(readmePath);
+
+        readme.Should().Contain("register-shell-integration.ps1");
+        readme.Should().Contain("-TrayPath");
+        readme.Should().Contain("-ViewerPath");
+        readme.Should().Contain("-Unregister");
+        readme.Should().Contain("current user");
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

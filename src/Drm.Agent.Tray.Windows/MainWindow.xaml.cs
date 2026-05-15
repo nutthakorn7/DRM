@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        PrefillSourcePathFromCommandLine();
     }
 
     private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -144,5 +145,27 @@ public partial class MainWindow : Window
     private void SetStatus(string message)
     {
         StatusText.Text = message;
+    }
+
+    private void PrefillSourcePathFromCommandLine()
+    {
+        var sourcePath = TryGetCommandLineValue("--protect", Environment.GetCommandLineArgs());
+        if (!string.IsNullOrWhiteSpace(sourcePath))
+        {
+            SourcePathBox.Text = sourcePath;
+        }
+    }
+
+    private static string? TryGetCommandLineValue(string optionName, string[] args)
+    {
+        for (var index = 1; index < args.Length - 1; index++)
+        {
+            if (string.Equals(args[index], optionName, StringComparison.OrdinalIgnoreCase))
+            {
+                return args[index + 1];
+            }
+        }
+
+        return null;
     }
 }
