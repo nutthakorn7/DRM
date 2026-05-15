@@ -132,9 +132,9 @@ Original PDF deletion is opt-in. When requested, the original is deleted only af
 
 ## Phase 3F Local Key Store
 
-Agent core includes a file-key store abstraction and JSON implementation so local desktop workflows can open protected files without passing raw keys through UI code. `ProtectPdfFileWorkflow` can persist the generated file key, and `OpenProtectedPdfFileWorkflow` reads the `.drmx` header, loads the matching key, performs the server policy decision, and decrypts the file.
+Agent core includes a file-key store abstraction and JSON implementation so local desktop workflows can keep an offline fallback without passing raw keys through UI code. `ProtectPdfFileWorkflow` can persist the generated file key locally after server wrapping succeeds.
 
-The JSON key store is a local MVP bridge for development and desktop integration work. Production deployments must replace it with server-side key wrapping, tenant keys, KMS/HSM integration, and unwrap authorization.
+The JSON key store is a local MVP bridge for development and offline desktop integration work. Production deployments must treat it as a controlled fallback and pair it with server-side key wrapping, tenant keys, KMS/HSM integration, endpoint authentication, and local secret protection.
 
 ## Phase 3I Server Key Wrapping
 
@@ -147,14 +147,20 @@ Wrap stores an AES-GCM wrapped file key for a registered protected file. Unwrap 
 
 The current implementation derives tenant wrapping keys from `Drm:KeyWrapping:MasterKeyBase64`; if omitted, it uses a development fallback key. Production deployments must configure a durable KMS/HSM-backed master key and migrate stored keys with operational key rotation procedures.
 
+## Phase 3J Desktop Server Key Flow
+
+Desktop protect/open now uses server key wrapping as the primary key path. `ProtectPdfFileWorkflow` registers the protected file, wraps the generated file key with the management server, then writes the `.drmx` output and optional local fallback key. If registration or key wrap fails, no protected output is committed and the original PDF remains in place.
+
+`OpenProtectedPdfFileWorkflow` reads the `.drmx` header and asks the server to unwrap the file key for `View` before using any local key. Server 403/404 unwrap responses are treated as access failures and do not fall back to local JSON keys. The local key store is used only when the unwrap call fails without an HTTP status, which represents transport/server unavailability; the normal policy decision path still runs and can use the offline policy cache.
+
 ## Phase 3G Tray Protect MVP
 
 The Windows tray app now provides a visible PDF protection form. Users enter the management server URL, tenant ID, user ID, select a PDF, choose whether to delete the original after successful protection, and run the same `ProtectPdfFileWorkflow` used by agent core tests.
 
-Protected output is written as `<source>.drmx`. The tray app stores local MVP metadata under `%ProgramData%\DRM`: `protected-inventory.json` for managed-copy inventory and `file-keys.json` for local file-key lookup.
+Protected output is written as `<source>.drmx`. The tray app stores local MVP metadata under `%ProgramData%\DRM`: `protected-inventory.json` for managed-copy inventory and `file-keys.json` for offline file-key fallback.
 
 ## Phase 3H Viewer Open MVP
 
-The Windows viewer can open `.drmx` files through `OpenProtectedPdfFileWorkflow`. Users enter the server URL, user ID, device ID, and protected-file path. The viewer loads the local file key from `%ProgramData%\DRM\file-keys.json`, requests a server policy decision, decrypts the PDF to a temporary local file, renders it, and overlays the returned dynamic watermark.
+The Windows viewer can open `.drmx` files through `OpenProtectedPdfFileWorkflow`. Users enter the server URL, user ID, device ID, and protected-file path. The viewer requests a server policy-gated key unwrap, requests the policy decision, decrypts the PDF to a temporary local file, renders it, and overlays the returned dynamic watermark. It stores fallback keys in `%ProgramData%\DRM\file-keys.json` and policy leases in `%ProgramData%\DRM\policy-decisions.json`.
 
 This viewer path displays returned permissions but does not yet fully enforce copy, print, and export controls.

@@ -1,3 +1,4 @@
+using System.Net;
 using Drm.Agent.Core;
 using Drm.Crypto;
 using Drm.Domain;
@@ -37,7 +38,7 @@ public sealed class OpenProtectedPdfFileWorkflowTests
     }
 
     [Fact]
-    public async Task OpenProtectedPdfFileWorkflow_denies_when_key_is_missing()
+    public async Task OpenProtectedPdfFileWorkflow_uses_server_unwrap_when_local_key_is_missing()
     {
         var tempDirectory = Directory.CreateTempSubdirectory();
         var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
@@ -56,6 +57,99 @@ public sealed class OpenProtectedPdfFileWorkflowTests
                 deleteOriginalAfterProtection: false,
                 CancellationToken.None);
 
+        var opened = await new OpenProtectedPdfFileWorkflow(
+                server,
+                new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "missing-keys.json")))
+            .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
+
+        opened.Content.Should().Equal("%PDF-1.7 open"u8.ToArray());
+        server.UnwrapRequests.Should().ContainSingle(request =>
+            request.TenantId == tenantId.Value &&
+            request.FileId == protectedFile.FileId &&
+            request.UserId == userId.Value &&
+            request.DeviceId == deviceId.Value &&
+            request.RequestedPermission == "View");
+    }
+
+    [Fact]
+    public async Task OpenProtectedPdfFileWorkflow_does_not_fallback_to_local_key_when_server_denies_unwrap()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var keyStore = new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "keys.json"));
+        var server = new AllowingServerClient();
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        await File.WriteAllBytesAsync(sourcePath, "%PDF-1.7 open"u8.ToArray());
+        var protectedFile = await new ProtectPdfFileWorkflow(server, inventory, keyStore)
+            .ProtectAsync(
+                tenantId,
+                userId,
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+        server.DenyUnwrap = true;
+
+        var act = () => new OpenProtectedPdfFileWorkflow(server, keyStore)
+            .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>()
+            .WithMessage("Access denied: file_key_denied");
+    }
+
+    [Fact]
+    public async Task OpenProtectedPdfFileWorkflow_falls_back_to_local_key_when_unwrap_transport_fails()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var keyStore = new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "keys.json"));
+        var server = new AllowingServerClient();
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        await File.WriteAllBytesAsync(sourcePath, "%PDF-1.7 fallback"u8.ToArray());
+        var protectedFile = await new ProtectPdfFileWorkflow(server, inventory, keyStore)
+            .ProtectAsync(
+                tenantId,
+                userId,
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+        server.FailUnwrapTransport = true;
+
+        var opened = await new OpenProtectedPdfFileWorkflow(server, keyStore)
+            .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
+
+        opened.Content.Should().Equal("%PDF-1.7 fallback"u8.ToArray());
+        server.UnwrapRequests.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task OpenProtectedPdfFileWorkflow_denies_when_server_unavailable_and_local_key_is_missing()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var server = new AllowingServerClient();
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        await File.WriteAllBytesAsync(sourcePath, "%PDF-1.7 open"u8.ToArray());
+        var protectedFile = await new ProtectPdfFileWorkflow(server, inventory)
+            .ProtectAsync(
+                tenantId,
+                userId,
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+        server.FailUnwrapTransport = true;
+
         var act = () => new OpenProtectedPdfFileWorkflow(
                 server,
                 new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "missing-keys.json")))
@@ -63,10 +157,19 @@ public sealed class OpenProtectedPdfFileWorkflowTests
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>()
             .WithMessage("Access denied: file_key_missing");
+        server.UnwrapRequests.Should().ContainSingle();
     }
 
     private sealed class AllowingServerClient : IDrmServerClient
     {
+        private readonly Dictionary<(Guid TenantId, Guid FileId), byte[]> fileKeys = [];
+
+        public bool DenyUnwrap { get; set; }
+
+        public bool FailUnwrapTransport { get; set; }
+
+        public List<(Guid TenantId, Guid FileId, Guid UserId, Guid DeviceId, string RequestedPermission)> UnwrapRequests { get; } = [];
+
         public Task RegisterFileAsync(Guid tenantId, Guid fileId, Guid ownerUserId, string contentType, DateTimeOffset expiresAtUtc, Permission permissions, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
@@ -109,12 +212,29 @@ public sealed class OpenProtectedPdfFileWorkflowTests
 
         public Task WrapFileKeyAsync(Guid tenantId, Guid fileId, byte[] fileKey, CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            fileKeys[(tenantId, fileId)] = fileKey.ToArray();
+            return Task.CompletedTask;
         }
 
         public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
         {
-            throw new NotSupportedException();
+            UnwrapRequests.Add((tenantId, fileId, userId, deviceId, requestedPermission));
+            if (DenyUnwrap)
+            {
+                throw new HttpRequestException("unwrap denied", null, HttpStatusCode.Forbidden);
+            }
+
+            if (FailUnwrapTransport)
+            {
+                throw new HttpRequestException("server unavailable");
+            }
+
+            if (!fileKeys.TryGetValue((tenantId, fileId), out var fileKey))
+            {
+                throw new HttpRequestException("file key missing", null, HttpStatusCode.NotFound);
+            }
+
+            return Task.FromResult(fileKey.ToArray());
         }
     }
 }

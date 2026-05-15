@@ -54,7 +54,8 @@ public partial class MainWindow : Window
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
             var serverClient = new DrmServerClient(httpClient);
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
-            var opened = await new OpenProtectedPdfFileWorkflow(serverClient, keyStore)
+            var decisionCache = new JsonPolicyDecisionCache(ResolveDataPath("policy-decisions.json"));
+            var opened = await new OpenProtectedPdfFileWorkflow(serverClient, keyStore, decisionCache)
                 .OpenAsync(protectedPath, userId, deviceId, CancellationToken.None);
 
             var tempPath = Path.Combine(Path.GetTempPath(), $"drm-viewer-{Guid.NewGuid():N}.pdf");

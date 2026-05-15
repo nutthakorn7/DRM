@@ -48,6 +48,12 @@ public sealed class ProtectPdfFileWorkflow(
                 Permission.View | Permission.Print,
                 cancellationToken);
 
+            await serverClient.WrapFileKeyAsync(
+                tenantId.Value,
+                fileId.Value,
+                fileKey,
+                cancellationToken);
+
             await using (var tempStream = File.Create(tempPath))
             {
                 ProtectedFileWriter.Write(tempStream, tenantId, fileId, PdfContentType, fileKey, pdfBytes);

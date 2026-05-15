@@ -1,3 +1,4 @@
+using System.Net;
 using Drm.Container;
 using Drm.Domain;
 
@@ -28,17 +29,49 @@ public sealed class OpenProtectedPdfFileWorkflow(
             package = ProtectedFileReader.Read(stream);
         }
 
-        var fileKey = await fileKeyStore.LoadAsync(
-            package.Header.TenantId,
-            package.Header.FileId,
-            cancellationToken);
-
-        if (fileKey is null)
-        {
-            throw new UnauthorizedAccessException("Access denied: file_key_missing");
-        }
+        var fileKey = await LoadFileKeyAsync(package, userId, deviceId, cancellationToken);
 
         return await new OpenProtectedPdfWorkflow(serverClient, decisionCache)
             .OpenAsync(protectedBytes, userId, deviceId, fileKey, cancellationToken);
+    }
+
+    private async Task<byte[]> LoadFileKeyAsync(
+        ProtectedFilePackage package,
+        UserId userId,
+        DeviceId deviceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await serverClient.UnwrapFileKeyAsync(
+                package.Header.TenantId,
+                package.Header.FileId,
+                userId.Value,
+                deviceId.Value,
+                Permission.View.ToString(),
+                cancellationToken);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new UnauthorizedAccessException("Access denied: file_key_denied", exception);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new UnauthorizedAccessException("Access denied: file_key_missing", exception);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode is null)
+        {
+            var localFileKey = await fileKeyStore.LoadAsync(
+                package.Header.TenantId,
+                package.Header.FileId,
+                cancellationToken);
+
+            if (localFileKey is null)
+            {
+                throw new UnauthorizedAccessException("Access denied: file_key_missing", exception);
+            }
+
+            return localFileKey;
+        }
     }
 }
