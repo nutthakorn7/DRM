@@ -52,6 +52,7 @@ app.UseStaticFiles();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapFilesEndpoints();
+app.MapExternalShareEndpoints();
 app.MapFileKeyEndpoints();
 app.MapPolicyEndpoints();
 app.MapAuditEndpoints();

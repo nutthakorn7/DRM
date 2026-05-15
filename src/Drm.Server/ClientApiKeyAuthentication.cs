@@ -13,7 +13,8 @@ public static class ClientApiKeyAuthentication
         return app.Use(async (context, next) =>
         {
             if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) ||
-                context.Request.Path.StartsWithSegments("/api/admin", StringComparison.OrdinalIgnoreCase))
+                context.Request.Path.StartsWithSegments("/api/admin", StringComparison.OrdinalIgnoreCase) ||
+                context.Request.Path.StartsWithSegments("/api/share-links/redeem", StringComparison.OrdinalIgnoreCase))
             {
                 await next(context);
                 return;

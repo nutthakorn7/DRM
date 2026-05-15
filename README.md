@@ -57,8 +57,9 @@ dotnet build src/Drm.Viewer.Windows/Drm.Viewer.Windows.csproj
 
 ## Phase 2A Admin and Audit APIs
 
-The server includes admin APIs for local enterprise administration:
+The server includes admin and external-sharing APIs for local enterprise administration:
 
+- `POST /api/share-links/redeem`
 - `POST /api/admin/users`
 - `GET /api/admin/users?tenantId=...`
 - `POST /api/admin/groups`
@@ -304,3 +305,9 @@ dotnet run --project src/Drm.Cli -- open --server-url https://drm.example --user
 Administrators can now create, list, and revoke external share links for protected files with `POST /api/admin/files/{fileId}/share-links`, `GET /api/admin/files/{fileId}/share-links?tenantId=...`, and `POST /api/admin/files/{fileId}/share-links/{shareLinkId}/revoke`. Create responses return a high-entropy access token once, while the server stores only its SHA-256 hash and list/revoke responses never expose token material.
 
 Share links are tenant- and file-scoped, require a guest email, expiry, and max-use limit, cannot outlive the protected file, and cannot be created for revoked files. This phase intentionally stops at enterprise link lifecycle management; guest identity verification, browser viewing, and public decrypt/file-key release remain future external-sharing work.
+
+## Phase 5W External Share Redemption Foundation
+
+Guests can now redeem an external share token with `POST /api/share-links/redeem` by submitting `tenantId`, `accessToken`, and `guestEmail`. This public endpoint is intentionally exempt from client API-key authentication so external recipients can reach it, but it only validates the token/email, consumes the link's max-use count, records an `external_share_accessed/external_share_link_redeemed` audit event, and returns safe file metadata.
+
+Redemption rejects wrong tokens or guest emails without revealing link state, and it blocks revoked links, expired links, exhausted max-use links, revoked files, and expired files with explicit reason codes. It still does not return wrapped keys, decrypted content, or browser-view data; those remain separate browser viewer and guest identity-verification work.
