@@ -278,3 +278,7 @@ The `/admin/` console now exposes the existing remote protected-copy delete comm
 ## Phase 5R Apply Template Lease Sync
 
 Applying a policy template to an existing protected file now updates the file's stored offline lease duration along with permissions and watermark. Future policy decisions and file-key unwrap responses therefore use the currently applied template lease instead of the file's previous lease.
+
+## Phase 5S Command Status Console
+
+The management API now exposes `GET /api/admin/files/{fileId}/commands?tenantId=...&deviceId=...` so admins can review pending, completed, and failed endpoint commands for a protected file. The `/admin/` console includes a Command status panel in Protected files to inspect remote delete command outcomes by file and optional device filter.

@@ -205,6 +205,17 @@ button.danger:hover {
   gap: 10px;
 }
 
+.compact-head h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.command-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 360px));
+  gap: 10px;
+}
+
 .button-row {
   display: flex;
   gap: 10px;
@@ -388,6 +399,7 @@ pre {
   .grant-row,
   .apply-template-row,
   .delete-copy-row,
+  .command-filter-row,
   .audit-filter-row,
   .device-filter-row,
   .device-health-head,

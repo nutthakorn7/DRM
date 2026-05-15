@@ -11,6 +11,7 @@ public static class AdminFilesEndpoints
         var group = endpoints.MapGroup("/api/admin/files");
 
         group.MapGet("/", ListFilesAsync);
+        group.MapGet("/{fileId:guid}/commands", ListFileCommandsAsync);
         group.MapPost("/{fileId:guid}/commands/delete-protected-copy", EnqueueDeleteProtectedCopyCommandAsync);
         group.MapPost("/{fileId:guid}/grants", UpsertGrantAsync);
         group.MapPut("/{fileId:guid}/grants", ReplaceGrantsAsync);
@@ -40,6 +41,37 @@ public static class AdminFilesEndpoints
             .Take(100)
             .Select(file => FileResponse.From(file))
             .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<AgentCommandResponse>>, NotFound>> ListFileCommandsAsync(
+        Guid fileId,
+        Guid tenantId,
+        Guid? deviceId,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!await FileExistsAsync(dbContext, tenantId, fileId, cancellationToken))
+        {
+            return TypedResults.NotFound();
+        }
+
+        var query = dbContext.AgentCommands
+            .AsNoTracking()
+            .Where(command => command.TenantId == tenantId && command.FileId == fileId);
+
+        if (deviceId is not null)
+        {
+            query = query.Where(command => command.DeviceId == deviceId.Value);
+        }
+
+        var commands = await query
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        return TypedResults.Ok<IReadOnlyList<AgentCommandResponse>>(commands
+            .OrderByDescending(command => command.CreatedAtUtc)
+            .Select(AgentCommandResponse.From)
+            .ToList());
     }
 
     private static async Task<Results<Created<AgentCommandResponse>, NotFound>> EnqueueDeleteProtectedCopyCommandAsync(

@@ -121,6 +121,79 @@ public sealed class AgentCommandApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_list_file_commands_with_completed_status_and_device_filter()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var firstDeviceId = Guid.NewGuid();
+        var secondDeviceId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        await RegisterDeviceAsync(client, tenantId, userId, firstDeviceId);
+        await RegisterDeviceAsync(client, tenantId, userId, secondDeviceId);
+        await RegisterFileAsync(client, tenantId, userId, fileId);
+
+        using var firstEnqueue = await EnqueueDeleteCommandAsync(client, tenantId, fileId, firstDeviceId, userId);
+        using var secondEnqueue = await EnqueueDeleteCommandAsync(client, tenantId, fileId, secondDeviceId, userId);
+        firstEnqueue.StatusCode.Should().Be(HttpStatusCode.Created);
+        secondEnqueue.StatusCode.Should().Be(HttpStatusCode.Created);
+        var firstCommand = await firstEnqueue.Content.ReadFromJsonAsync<AgentCommandResponse>();
+        var secondCommand = await secondEnqueue.Content.ReadFromJsonAsync<AgentCommandResponse>();
+
+        using var completeResponse = await client.PostAsJsonAsync(
+            $"/api/agent/devices/{firstDeviceId}/commands/{firstCommand!.CommandId}/complete",
+            new
+            {
+                tenantId,
+                status = "Completed",
+                reasonCode = "deleted"
+            });
+        completeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var allCommands = await client.GetFromJsonAsync<List<AgentCommandResponse>>(
+            $"/api/admin/files/{fileId}/commands?tenantId={tenantId}");
+        var firstDeviceCommands = await client.GetFromJsonAsync<List<AgentCommandResponse>>(
+            $"/api/admin/files/{fileId}/commands?tenantId={tenantId}&deviceId={firstDeviceId}");
+
+        allCommands.Should().NotBeNull();
+        allCommands!.Select(command => command.CommandId).Should().BeEquivalentTo([
+            firstCommand.CommandId,
+            secondCommand!.CommandId
+        ]);
+        allCommands.Should().Contain(command =>
+            command.CommandId == firstCommand.CommandId &&
+            command.Status == "Completed" &&
+            command.ReasonCode == "deleted" &&
+            command.CompletedAtUtc != null);
+        allCommands.Should().Contain(command =>
+            command.CommandId == secondCommand!.CommandId &&
+            command.Status == "Pending" &&
+            command.ReasonCode == "queued");
+
+        firstDeviceCommands.Should().ContainSingle(command =>
+            command.CommandId == firstCommand.CommandId &&
+            command.DeviceId == firstDeviceId);
+    }
+
+    [Fact]
+    public async Task Admin_list_file_commands_returns_not_found_for_wrong_tenant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        await RegisterDeviceAsync(client, tenantId, userId, deviceId);
+        await RegisterFileAsync(client, tenantId, userId, fileId);
+        using var enqueue = await EnqueueDeleteCommandAsync(client, tenantId, fileId, deviceId, userId);
+        enqueue.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var response = await client.GetAsync($"/api/admin/files/{fileId}/commands?tenantId={Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Completing_command_with_wrong_device_returns_not_found()
     {
         using var client = factory.CreateClient();
@@ -171,6 +244,23 @@ public sealed class AgentCommandApiTests : IDisposable
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    private static Task<HttpResponseMessage> EnqueueDeleteCommandAsync(
+        HttpClient client,
+        Guid tenantId,
+        Guid fileId,
+        Guid deviceId,
+        Guid adminUserId)
+    {
+        return client.PostAsJsonAsync(
+            $"/api/admin/files/{fileId}/commands/delete-protected-copy",
+            new
+            {
+                tenantId,
+                deviceId,
+                adminUserId
+            });
     }
 
     private static async Task RegisterFileAsync(HttpClient client, Guid tenantId, Guid userId, Guid fileId)

@@ -16,6 +16,7 @@ const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
 const watermarkTemplatesBody = document.querySelector("#watermarkTemplatesBody");
 const simulatorOutput = document.querySelector("#simulatorOutput");
 const filesBody = document.querySelector("#filesBody");
+const commandsBody = document.querySelector("#commandsBody");
 const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
 const auditEventsBody = document.querySelector("#auditEventsBody");
 const healthOutput = document.querySelector("#healthOutput");
@@ -157,6 +158,10 @@ document.querySelector("#simulatePolicyForm").addEventListener("submit", async (
 
 document.querySelector("#refreshFiles").addEventListener("click", () => {
   refreshFiles();
+});
+
+document.querySelector("#refreshCommands").addEventListener("click", () => {
+  refreshCommands();
 });
 
 document.querySelector("#refreshAuditEvents").addEventListener("click", () => {
@@ -323,6 +328,19 @@ async function refreshFiles() {
   const files = await apiFetch(url);
   renderFiles(files);
   setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshCommands() {
+  const fileId = document.querySelector("#commandFileId").value.trim();
+  const params = new URLSearchParams({ tenantId: requireTenantId() });
+  const deviceId = document.querySelector("#commandDeviceId").value.trim();
+  if (deviceId) {
+    params.set("deviceId", deviceId);
+  }
+
+  const commands = await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/commands?${params.toString()}`);
+  renderCommands(commands);
+  setStatus(`${commands.length} command${commands.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
 async function refreshSiemWebhooks() {
@@ -628,6 +646,25 @@ function renderFiles(files) {
       <td>${renderRevokedBadge(file.revoked)}</td>
       <td>${escapeHtml(formatDate(file.expiresAtUtc))}</td>
       <td>${file.revoked ? "" : `<button class="danger" type="button" data-revoke-file-id="${escapeHtml(file.fileId)}">Revoke</button>`}</td>
+    </tr>
+  `).join("");
+}
+
+function renderCommands(commands) {
+  if (!commands.length) {
+    commandsBody.innerHTML = '<tr><td colspan="7" class="empty">No commands found for this file.</td></tr>';
+    return;
+  }
+
+  commandsBody.innerHTML = commands.map((command) => `
+    <tr>
+      <td><code>${escapeHtml(command.commandId)}</code></td>
+      <td><code>${escapeHtml(command.deviceId)}</code></td>
+      <td>${escapeHtml(command.commandType)}</td>
+      <td>${escapeHtml(command.status)}</td>
+      <td>${escapeHtml(command.reasonCode)}</td>
+      <td>${escapeHtml(formatDate(command.createdAtUtc))}</td>
+      <td>${escapeHtml(formatDate(command.completedAtUtc) || "-")}</td>
     </tr>
   `).join("");
 }

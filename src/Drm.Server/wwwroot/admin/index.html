@@ -328,6 +328,19 @@
           <button class="danger" type="submit">Delete protected copy</button>
         </form>
 
+        <div class="section-head compact-head">
+          <div>
+            <p class="eyebrow">Command status</p>
+            <h4>Remote delete commands</h4>
+          </div>
+          <button id="refreshCommands" type="button">Refresh commands</button>
+        </div>
+
+        <div class="command-filter-row">
+          <input id="commandFileId" autocomplete="off" placeholder="File ID">
+          <input id="commandDeviceId" autocomplete="off" placeholder="Device ID filter">
+        </div>
+
         <div class="table-wrap">
           <table>
             <thead>
@@ -344,6 +357,27 @@
             <tbody id="filesBody">
               <tr>
                 <td colspan="7" class="empty">Refresh to load protected files.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Command ID</th>
+                <th>Device ID</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Reason</th>
+                <th>Created</th>
+                <th>Completed</th>
+              </tr>
+            </thead>
+            <tbody id="commandsBody">
+              <tr>
+                <td colspan="7" class="empty">Enter a file ID and refresh commands.</td>
               </tr>
             </tbody>
           </table>
