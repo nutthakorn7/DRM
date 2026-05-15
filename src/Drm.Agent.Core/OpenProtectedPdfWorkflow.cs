@@ -68,7 +68,7 @@ public sealed class OpenProtectedPdfWorkflow(IDrmServerClient serverClient, IPol
         return OpenWithDecision(package, fileKey, userId.Value, decision.WatermarkTemplate, decision.AllowedPermissions);
     }
 
-    private static OpenedProtectedPdf OpenWithDecision(
+    internal static OpenedProtectedPdf OpenWithDecision(
         ProtectedFilePackage package,
         byte[] fileKey,
         Guid userId,

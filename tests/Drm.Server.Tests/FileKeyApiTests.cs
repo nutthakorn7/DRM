@@ -42,6 +42,7 @@ public sealed class FileKeyApiTests : IDisposable
 
         wrapResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
+        var requestedAt = DateTimeOffset.UtcNow;
         using var unwrapResponse = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
         {
             tenantId,
@@ -53,6 +54,9 @@ public sealed class FileKeyApiTests : IDisposable
         unwrapResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var unwrapped = await unwrapResponse.Content.ReadFromJsonAsync<UnwrapFileKeyResponse>();
         Convert.FromBase64String(unwrapped!.FileKeyBase64).Should().Equal(fileKey);
+        unwrapped.AllowedPermissions.Should().Be("View");
+        unwrapped.WatermarkTemplate.Should().Be("user:{userId}");
+        unwrapped.OfflineLeaseExpiresAtUtc.Should().BeAfter(requestedAt);
     }
 
     [Fact]
@@ -166,5 +170,11 @@ public sealed class FileKeyApiTests : IDisposable
         }
     }
 
-    private sealed record UnwrapFileKeyResponse(Guid TenantId, Guid FileId, string FileKeyBase64);
+    private sealed record UnwrapFileKeyResponse(
+        Guid TenantId,
+        Guid FileId,
+        string FileKeyBase64,
+        string AllowedPermissions,
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 }

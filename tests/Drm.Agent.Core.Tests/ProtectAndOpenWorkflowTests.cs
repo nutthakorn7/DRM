@@ -295,7 +295,7 @@ public sealed class ProtectAndOpenWorkflowTests
             throw new NotSupportedException();
         }
 
-        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
+        public Task<UnwrappedFileKey> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }
@@ -343,7 +343,7 @@ public sealed class ProtectAndOpenWorkflowTests
             throw new HttpRequestException("server unavailable");
         }
 
-        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
+        public Task<UnwrappedFileKey> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
         {
             throw new HttpRequestException("server unavailable");
         }

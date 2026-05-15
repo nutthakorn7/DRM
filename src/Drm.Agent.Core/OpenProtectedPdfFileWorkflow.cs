@@ -29,13 +29,25 @@ public sealed class OpenProtectedPdfFileWorkflow(
             package = ProtectedFileReader.Read(stream);
         }
 
-        var fileKey = await LoadFileKeyAsync(package, userId, deviceId, cancellationToken);
+        var unwrapped = await TryUnwrapFileKeyAsync(package, userId, deviceId, cancellationToken);
+        if (unwrapped is not null)
+        {
+            await StoreDecisionAsync(package, userId, deviceId, unwrapped, cancellationToken);
+            return OpenProtectedPdfWorkflow.OpenWithDecision(
+                package,
+                unwrapped.FileKey,
+                userId.Value,
+                unwrapped.WatermarkTemplate,
+                unwrapped.AllowedPermissions);
+        }
+
+        var fileKey = await LoadLocalFileKeyAsync(package, cancellationToken);
 
         return await new OpenProtectedPdfWorkflow(serverClient, decisionCache)
             .OpenAsync(protectedBytes, userId, deviceId, fileKey, cancellationToken);
     }
 
-    private async Task<byte[]> LoadFileKeyAsync(
+    private async Task<UnwrappedFileKey?> TryUnwrapFileKeyAsync(
         ProtectedFilePackage package,
         UserId userId,
         DeviceId deviceId,
@@ -61,17 +73,50 @@ public sealed class OpenProtectedPdfFileWorkflow(
         }
         catch (HttpRequestException exception) when (exception.StatusCode is null)
         {
-            var localFileKey = await fileKeyStore.LoadAsync(
-                package.Header.TenantId,
-                package.Header.FileId,
-                cancellationToken);
-
-            if (localFileKey is null)
-            {
-                throw new UnauthorizedAccessException("Access denied: file_key_missing", exception);
-            }
-
-            return localFileKey;
+            return null;
         }
+    }
+
+    private async Task<byte[]> LoadLocalFileKeyAsync(
+        ProtectedFilePackage package,
+        CancellationToken cancellationToken)
+    {
+        var localFileKey = await fileKeyStore.LoadAsync(
+            package.Header.TenantId,
+            package.Header.FileId,
+            cancellationToken);
+
+        if (localFileKey is null)
+        {
+            throw new UnauthorizedAccessException("Access denied: file_key_missing");
+        }
+
+        return localFileKey;
+    }
+
+    private async Task StoreDecisionAsync(
+        ProtectedFilePackage package,
+        UserId userId,
+        DeviceId deviceId,
+        UnwrappedFileKey unwrapped,
+        CancellationToken cancellationToken)
+    {
+        if (decisionCache is null || unwrapped.OfflineLeaseExpiresAtUtc is null)
+        {
+            return;
+        }
+
+        await decisionCache.StoreAsync(
+            new CachedPolicyDecision(
+                new PolicyDecisionCacheKey(
+                    package.Header.TenantId,
+                    package.Header.FileId,
+                    userId.Value,
+                    deviceId.Value,
+                    Permission.View),
+                unwrapped.WatermarkTemplate,
+                unwrapped.AllowedPermissions,
+                unwrapped.OfflineLeaseExpiresAtUtc.Value),
+            cancellationToken);
     }
 }

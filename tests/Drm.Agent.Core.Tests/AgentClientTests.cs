@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Drm.Agent.Core;
+using Drm.Domain;
 using FluentAssertions;
 
 namespace Drm.Agent.Core.Tests;
@@ -292,7 +293,10 @@ public sealed class AgentClientTests
                 {
                   "tenantId": "4ec64ccb-5f84-4ff5-bcbc-54286b882f36",
                   "fileId": "de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f",
-                  "fileKeyBase64": "{{Convert.ToBase64String(fileKey)}}"
+                  "fileKeyBase64": "{{Convert.ToBase64String(fileKey)}}",
+                  "allowedPermissions": "View, Print",
+                  "watermarkTemplate": "{user} {file}",
+                  "offlineLeaseExpiresAtUtc": "2026-05-15T01:00:00Z"
                 }
                 """;
 
@@ -314,7 +318,10 @@ public sealed class AgentClientTests
             "View",
             CancellationToken.None);
 
-        unwrapped.Should().Equal(fileKey);
+        unwrapped.FileKey.Should().Equal(fileKey);
+        unwrapped.AllowedPermissions.Should().Be(Permission.View | Permission.Print);
+        unwrapped.WatermarkTemplate.Should().Be("{user} {file}");
+        unwrapped.OfflineLeaseExpiresAtUtc.Should().Be(DateTimeOffset.Parse("2026-05-15T01:00:00Z"));
         capturedRequest.Should().NotBeNull();
         capturedRequest!.Method.Should().Be(HttpMethod.Post);
         capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/files/de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f/keys/unwrap"));

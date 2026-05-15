@@ -52,7 +52,7 @@ public interface IDrmServerClient : IAgentAuditUploader
         byte[] fileKey,
         CancellationToken cancellationToken);
 
-    Task<byte[]> UnwrapFileKeyAsync(
+    Task<UnwrappedFileKey> UnwrapFileKeyAsync(
         Guid tenantId,
         Guid fileId,
         Guid userId,
@@ -66,6 +66,12 @@ public sealed record OpenDecision(
     string ReasonCode,
     string? WatermarkTemplate,
     Permission AllowedPermissions,
+    DateTimeOffset? OfflineLeaseExpiresAtUtc);
+
+public sealed record UnwrappedFileKey(
+    byte[] FileKey,
+    Permission AllowedPermissions,
+    string? WatermarkTemplate,
     DateTimeOffset? OfflineLeaseExpiresAtUtc);
 
 public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
@@ -237,7 +243,7 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<byte[]> UnwrapFileKeyAsync(
+    public async Task<UnwrappedFileKey> UnwrapFileKeyAsync(
         Guid tenantId,
         Guid fileId,
         Guid userId,
@@ -256,7 +262,11 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         var unwrapped = await response.Content.ReadFromJsonAsync<UnwrapFileKeyResponse>(JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("File key unwrap response was empty.");
 
-        return Convert.FromBase64String(unwrapped.FileKeyBase64);
+        return new UnwrappedFileKey(
+            Convert.FromBase64String(unwrapped.FileKeyBase64),
+            ParsePermissionsOrNone(unwrapped.AllowedPermissions),
+            unwrapped.WatermarkTemplate,
+            unwrapped.OfflineLeaseExpiresAtUtc);
     }
 
     private static Permission ParsePermissionsOrNone(string? permissions)
@@ -316,7 +326,13 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         Guid DeviceId,
         string RequestedPermission);
 
-    private sealed record UnwrapFileKeyResponse(Guid TenantId, Guid FileId, string FileKeyBase64);
+    private sealed record UnwrapFileKeyResponse(
+        Guid TenantId,
+        Guid FileId,
+        string FileKeyBase64,
+        string? AllowedPermissions,
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,

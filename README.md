@@ -153,6 +153,12 @@ Desktop protect/open now uses server key wrapping as the primary key path. `Prot
 
 `OpenProtectedPdfFileWorkflow` reads the `.drmx` header and asks the server to unwrap the file key for `View` before using any local key. Server 403/404 unwrap responses are treated as access failures and do not fall back to local JSON keys. The local key store is used only when the unwrap call fails without an HTTP status, which represents transport/server unavailability; the normal policy decision path still runs and can use the offline policy cache.
 
+## Phase 3K Unwrap Decision Metadata
+
+Successful server unwrap responses now include the decision metadata needed by desktop open: allowed permissions, watermark template, and offline lease expiry. `DrmServerClient.UnwrapFileKeyAsync` returns a typed `UnwrappedFileKey` result instead of only raw key bytes.
+
+The viewer file-open workflow uses that unwrap metadata directly to decrypt, watermark, and cache offline lease decisions without making a second `/api/policy/decide` call. Local-key fallback still uses the policy decision path so offline access remains policy-gated.
+
 ## Phase 3G Tray Protect MVP
 
 The Windows tray app now provides a visible PDF protection form. Users enter the management server URL, tenant ID, user ID, select a PDF, choose whether to delete the original after successful protection, and run the same `ProtectPdfFileWorkflow` used by agent core tests.
@@ -161,6 +167,6 @@ Protected output is written as `<source>.drmx`. The tray app stores local MVP me
 
 ## Phase 3H Viewer Open MVP
 
-The Windows viewer can open `.drmx` files through `OpenProtectedPdfFileWorkflow`. Users enter the server URL, user ID, device ID, and protected-file path. The viewer requests a server policy-gated key unwrap, requests the policy decision, decrypts the PDF to a temporary local file, renders it, and overlays the returned dynamic watermark. It stores fallback keys in `%ProgramData%\DRM\file-keys.json` and policy leases in `%ProgramData%\DRM\policy-decisions.json`.
+The Windows viewer can open `.drmx` files through `OpenProtectedPdfFileWorkflow`. Users enter the server URL, user ID, device ID, and protected-file path. The viewer requests a server policy-gated key unwrap, decrypts the PDF to a temporary local file from the unwrap decision metadata, renders it, and overlays the returned dynamic watermark. It stores fallback keys in `%ProgramData%\DRM\file-keys.json` and policy leases in `%ProgramData%\DRM\policy-decisions.json`.
 
 This viewer path displays returned permissions but does not yet fully enforce copy, print, and export controls.

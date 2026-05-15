@@ -125,7 +125,10 @@ public static class FileKeyEndpoints
         return Results.Ok(new UnwrapFileKeyResponse(
             request.TenantId,
             fileId,
-            Convert.ToBase64String(fileKey)));
+            Convert.ToBase64String(fileKey),
+            decision.AllowedPermissions.ToString(),
+            decision.WatermarkTemplate,
+            decision.OfflineLeaseExpiresAtUtc));
     }
 
     private sealed record WrapFileKeyRequest(Guid TenantId, string FileKeyBase64);
@@ -138,7 +141,13 @@ public static class FileKeyEndpoints
         Guid DeviceId,
         string RequestedPermission);
 
-    private sealed record UnwrapFileKeyResponse(Guid TenantId, Guid FileId, string FileKeyBase64);
+    private sealed record UnwrapFileKeyResponse(
+        Guid TenantId,
+        Guid FileId,
+        string FileKeyBase64,
+        string AllowedPermissions,
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 
     private sealed record ErrorResponse(string ReasonCode);
 }

@@ -160,6 +160,45 @@ public sealed class OpenProtectedPdfFileWorkflowTests
         server.UnwrapRequests.Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task OpenProtectedPdfFileWorkflow_uses_unwrap_decision_without_second_policy_call()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var cache = new RecordingPolicyDecisionCache();
+        var server = new AllowingServerClient { FailDecision = true };
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        await File.WriteAllBytesAsync(sourcePath, "%PDF-1.7 metadata"u8.ToArray());
+        var protectedFile = await new ProtectPdfFileWorkflow(server, inventory)
+            .ProtectAsync(
+                tenantId,
+                userId,
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        var opened = await new OpenProtectedPdfFileWorkflow(
+                server,
+                new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "missing-keys.json")),
+                cache)
+            .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
+
+        opened.Content.Should().Equal("%PDF-1.7 metadata"u8.ToArray());
+        opened.Watermark.Should().Contain(userId.Value.ToString("N"));
+        server.DecisionRequests.Should().BeEmpty();
+        cache.StoredEntries.Should().ContainSingle(entry =>
+            entry.Key.TenantId == tenantId.Value &&
+            entry.Key.FileId == protectedFile.FileId &&
+            entry.Key.UserId == userId.Value &&
+            entry.Key.DeviceId == deviceId.Value &&
+            entry.AllowedPermissions == Permission.View &&
+            entry.OfflineLeaseExpiresAtUtc > DateTimeOffset.UtcNow);
+    }
+
     private sealed class AllowingServerClient : IDrmServerClient
     {
         private readonly Dictionary<(Guid TenantId, Guid FileId), byte[]> fileKeys = [];
@@ -168,7 +207,11 @@ public sealed class OpenProtectedPdfFileWorkflowTests
 
         public bool FailUnwrapTransport { get; set; }
 
+        public bool FailDecision { get; init; }
+
         public List<(Guid TenantId, Guid FileId, Guid UserId, Guid DeviceId, string RequestedPermission)> UnwrapRequests { get; } = [];
+
+        public List<(Guid TenantId, Guid FileId, Guid UserId, Guid DeviceId, Permission Permission)> DecisionRequests { get; } = [];
 
         public Task RegisterFileAsync(Guid tenantId, Guid fileId, Guid ownerUserId, string contentType, DateTimeOffset expiresAtUtc, Permission permissions, CancellationToken cancellationToken)
         {
@@ -177,6 +220,12 @@ public sealed class OpenProtectedPdfFileWorkflowTests
 
         public Task<OpenDecision> DecideAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, Permission permission, CancellationToken cancellationToken)
         {
+            DecisionRequests.Add((tenantId, fileId, userId, deviceId, permission));
+            if (FailDecision)
+            {
+                throw new InvalidOperationException("decision should not be called");
+            }
+
             return Task.FromResult(new OpenDecision(
                 true,
                 "allowed",
@@ -216,7 +265,7 @@ public sealed class OpenProtectedPdfFileWorkflowTests
             return Task.CompletedTask;
         }
 
-        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
+        public Task<UnwrappedFileKey> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
         {
             UnwrapRequests.Add((tenantId, fileId, userId, deviceId, requestedPermission));
             if (DenyUnwrap)
@@ -234,7 +283,27 @@ public sealed class OpenProtectedPdfFileWorkflowTests
                 throw new HttpRequestException("file key missing", null, HttpStatusCode.NotFound);
             }
 
-            return Task.FromResult(fileKey.ToArray());
+            return Task.FromResult(new UnwrappedFileKey(
+                fileKey.ToArray(),
+                Permission.View,
+                "{user} {file}",
+                DateTimeOffset.UtcNow.AddMinutes(5)));
+        }
+    }
+
+    private sealed class RecordingPolicyDecisionCache : IPolicyDecisionCache
+    {
+        public List<CachedPolicyDecision> StoredEntries { get; } = [];
+
+        public Task StoreAsync(CachedPolicyDecision decision, CancellationToken cancellationToken)
+        {
+            StoredEntries.Add(decision);
+            return Task.CompletedTask;
+        }
+
+        public Task<CachedPolicyDecision?> TryGetAllowedAsync(PolicyDecisionCacheKey key, DateTimeOffset atUtc, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<CachedPolicyDecision?>(null);
         }
     }
 }

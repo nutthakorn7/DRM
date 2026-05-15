@@ -210,7 +210,7 @@ public sealed class ProtectPdfFileWorkflowTests
             return Task.CompletedTask;
         }
 
-        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
+        public Task<UnwrappedFileKey> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
         }
