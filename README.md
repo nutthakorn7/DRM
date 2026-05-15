@@ -218,3 +218,7 @@ Desktop clients can now send `X-DRM-Client-Key`. The Windows service reads `DrmA
 ## Phase 5C Admin Device Inventory
 
 The management API now exposes `GET /api/admin/devices?tenantId=...&userId=...&status=...` for tenant-scoped desktop agent inventory. The `/admin/` console includes an Agent devices section with status and user filters.
+
+## Phase 5D Device Disable Enforcement
+
+Administrators can disable a registered device with `POST /api/admin/devices/{deviceId}/disable`. Disabled devices keep their inventory record with `status = disabled`, cannot re-register or heartbeat back online, and receive `device_disabled` denials for future policy decisions and file-key unwrap attempts. The `/admin/` console exposes this as a Disable action in the Agent devices table.

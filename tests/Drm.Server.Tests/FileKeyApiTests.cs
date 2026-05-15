@@ -81,6 +81,30 @@ public sealed class FileKeyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Unwrap_denies_disabled_device_even_when_user_has_policy_grant()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        await RegisterFileAsync(client, tenantId, ownerUserId, fileId);
+        await WrapKeyAsync(client, tenantId, fileId, EnvelopeCrypto.GenerateKey());
+        await RegisterDeviceAsync(client, tenantId, ownerUserId, deviceId);
+        await DisableDeviceAsync(client, tenantId, deviceId);
+
+        using var unwrapResponse = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId = ownerUserId,
+            deviceId,
+            requestedPermission = "View"
+        });
+
+        unwrapResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Unwrap_missing_wrapped_key_returns_not_found()
     {
         using var client = factory.CreateClient();
@@ -157,6 +181,33 @@ public sealed class FileKeyApiTests : IDisposable
         });
 
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.OK);
+    }
+
+    private static async Task RegisterDeviceAsync(HttpClient client, Guid tenantId, Guid userId, Guid deviceId)
+    {
+        using var response = await client.PostAsJsonAsync("/api/agent/devices/register", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            hostname = "WIN-001",
+            operatingSystem = "Windows 11",
+            agentVersion = "0.1.0"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    private static async Task DisableDeviceAsync(HttpClient client, Guid tenantId, Guid deviceId)
+    {
+        using var response = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/disable", new
+        {
+            tenantId,
+            adminUserId = Guid.NewGuid(),
+            reason = "admin_disabled"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private static void DeleteDatabaseFiles(string path)

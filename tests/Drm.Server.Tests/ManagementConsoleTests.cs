@@ -54,6 +54,7 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Agent devices");
         html.Should().Contain("Filter by status");
         html.Should().Contain("Filter by user ID");
+        html.Should().Contain("Disable");
         html.Should().Contain("Admin user ID");
         html.Should().Contain("Subject type");
         html.Should().Contain("Permissions");
@@ -95,6 +96,7 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("/api/admin/devices");
         js.Should().Contain("refreshDevices");
         js.Should().Contain("devicesBody");
+        js.Should().Contain("disableDevice");
         js.Should().Contain("/grants");
         js.Should().Contain("/revoke");
         js.Should().Contain("/api/admin/audit");

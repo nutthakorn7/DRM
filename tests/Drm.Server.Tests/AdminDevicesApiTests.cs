@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Drm.Server.Tests;
 
@@ -70,6 +72,59 @@ public sealed class AdminDevicesApiTests : IDisposable
         devices[0].LastHeartbeatAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
     }
 
+    [Fact]
+    public async Task Admin_can_disable_device_and_disable_is_tenant_scoped_and_audited()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        using var register = await RegisterDeviceAsync(client, tenantId, userId, deviceId, "WIN-LOST");
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var wrongTenantDisable = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/disable", new
+        {
+            tenantId = otherTenantId,
+            adminUserId,
+            reason = "lost_device"
+        });
+        wrongTenantDisable.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var disable = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/disable", new
+        {
+            tenantId,
+            adminUserId,
+            reason = " lost_device "
+        });
+
+        disable.StatusCode.Should().Be(HttpStatusCode.OK);
+        var disabled = await disable.Content.ReadFromJsonAsync<DeviceResponse>();
+        disabled.Should().NotBeNull();
+        disabled!.TenantId.Should().Be(tenantId);
+        disabled.DeviceId.Should().Be(deviceId);
+        disabled.UserId.Should().Be(userId);
+        disabled.Status.Should().Be("disabled");
+        disabled.DisabledReason.Should().Be("lost_device");
+        disabled.DisabledAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+        disabled.UpdatedAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var device = await dbContext.AgentDevices.AsNoTracking().SingleAsync();
+        device.Status.Should().Be("disabled");
+        device.DisabledReason.Should().Be("lost_device");
+        device.DisabledAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+
+        var audit = await dbContext.AuditEvents.AsNoTracking()
+            .SingleAsync(auditEvent => auditEvent.EventType == "device_disabled");
+        audit.TenantId.Should().Be(tenantId);
+        audit.UserId.Should().Be(adminUserId);
+        audit.ReasonCode.Should().Be("lost_device");
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -115,5 +170,7 @@ public sealed class AdminDevicesApiTests : IDisposable
         string Status,
         DateTimeOffset RegisteredAtUtc,
         DateTimeOffset UpdatedAtUtc,
-        DateTimeOffset? LastHeartbeatAtUtc);
+        DateTimeOffset? LastHeartbeatAtUtc,
+        DateTimeOffset? DisabledAtUtc,
+        string? DisabledReason);
 }

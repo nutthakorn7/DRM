@@ -63,6 +63,37 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
                 InvalidPermission: false);
         }
 
+        var deviceDisabled = await dbContext.AgentDevices
+            .AsNoTracking()
+            .AnyAsync(candidate =>
+                candidate.TenantId == tenantId &&
+                candidate.DeviceId == deviceId &&
+                candidate.DisabledAtUtc != null,
+                cancellationToken);
+
+        if (deviceDisabled)
+        {
+            dbContext.AuditEvents.Add(new AuditEventEntity
+            {
+                TenantId = tenantId,
+                FileId = fileId,
+                UserId = userId,
+                EventType = "access_denied",
+                ReasonCode = "device_disabled",
+                CreatedAtUtc = decisionTime
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return new ServerPolicyDecision(
+                false,
+                Permission.None,
+                "device_disabled",
+                null,
+                null,
+                FileFound: true,
+                InvalidPermission: false);
+        }
+
         var groupIds = await dbContext.GroupMembers
             .AsNoTracking()
             .Where(member => member.TenantId == tenantId && member.UserId == userId)

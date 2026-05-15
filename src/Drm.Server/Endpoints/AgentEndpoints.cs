@@ -28,14 +28,14 @@ public static class AgentEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<RegisterDeviceResponse>, Ok<RegisterDeviceResponse>, BadRequest<ErrorResponse>>> RegisterDeviceAsync(
+    private static async Task<IResult> RegisterDeviceAsync(
         RegisterDeviceRequest request,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
         if (IsBlank(request.Hostname) || IsBlank(request.OperatingSystem) || IsBlank(request.AgentVersion))
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_device_metadata"));
+            return Results.BadRequest(new ErrorResponse("invalid_device_metadata"));
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -47,6 +47,11 @@ public static class AgentEndpoints
 
         if (device is not null)
         {
+            if (device.DisabledAtUtc is not null)
+            {
+                return Results.Json(new ErrorResponse("device_disabled"), statusCode: StatusCodes.Status403Forbidden);
+            }
+
             device.UserId = request.UserId;
             device.Hostname = request.Hostname.Trim();
             device.OperatingSystem = request.OperatingSystem.Trim();
@@ -56,7 +61,7 @@ public static class AgentEndpoints
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            return TypedResults.Ok(ToRegisterResponse(device));
+            return Results.Ok(ToRegisterResponse(device));
         }
 
         device = new AgentDeviceEntity
@@ -84,10 +89,10 @@ public static class AgentEndpoints
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Created($"/api/agent/devices/{device.DeviceId}", ToRegisterResponse(device));
+        return Results.Created($"/api/agent/devices/{device.DeviceId}", ToRegisterResponse(device));
     }
 
-    private static async Task<Results<Ok<HeartbeatResponse>, NotFound, BadRequest<ErrorResponse>>> RecordHeartbeatAsync(
+    private static async Task<IResult> RecordHeartbeatAsync(
         Guid deviceId,
         HeartbeatRequest request,
         AppDbContext dbContext,
@@ -95,7 +100,7 @@ public static class AgentEndpoints
     {
         if (IsBlank(request.Status) || IsBlank(request.AgentVersion))
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_heartbeat"));
+            return Results.BadRequest(new ErrorResponse("invalid_heartbeat"));
         }
 
         var device = await dbContext.AgentDevices
@@ -106,7 +111,12 @@ public static class AgentEndpoints
 
         if (device is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
+        }
+
+        if (device.DisabledAtUtc is not null)
+        {
+            return Results.Json(new ErrorResponse("device_disabled"), statusCode: StatusCodes.Status403Forbidden);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -127,7 +137,7 @@ public static class AgentEndpoints
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Ok(new HeartbeatResponse(device.DeviceId, device.Status, now));
+        return Results.Ok(new HeartbeatResponse(device.DeviceId, device.Status, now));
     }
 
     private static async Task<IReadOnlyList<AgentCommandResponse>> ListPendingCommandsAsync(

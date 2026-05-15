@@ -141,6 +141,10 @@ public sealed class AgentDeviceEntity
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     public DateTimeOffset? LastHeartbeatAtUtc { get; set; }
+
+    public DateTimeOffset? DisabledAtUtc { get; set; }
+
+    public string? DisabledReason { get; set; }
 }
 
 public sealed class AgentCommandEntity

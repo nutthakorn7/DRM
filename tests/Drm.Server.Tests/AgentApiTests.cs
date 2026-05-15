@@ -104,6 +104,33 @@ public sealed class AgentApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Agent_registration_rejects_disabled_existing_device()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        using var createResponse = await RegisterDeviceAsync(client, tenantId, userId, deviceId, "WIN-001");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        await DisableDeviceAsync(client, tenantId, deviceId);
+
+        using var updateResponse = await client.PostAsJsonAsync("/api/agent/devices/register", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            hostname = "WIN-RENAMED",
+            operatingSystem = "Windows 11 24H2",
+            agentVersion = "0.1.1"
+        });
+
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await updateResponse.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_disabled" });
+    }
+
+    [Fact]
     public async Task Agent_can_send_heartbeat_for_registered_device()
     {
         using var client = factory.CreateClient();
@@ -138,6 +165,36 @@ public sealed class AgentApiTests : IDisposable
 
         var auditEvents = await dbContext.AuditEvents.AsNoTracking().OrderBy(audit => audit.Id).ToListAsync();
         auditEvents.Should().Contain(audit => audit.EventType == "agent_heartbeat" && audit.ReasonCode == "online");
+    }
+
+    [Fact]
+    public async Task Heartbeat_for_disabled_device_returns_forbidden_and_does_not_reenable_device()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        using var registerResponse = await RegisterDeviceAsync(client, tenantId, userId, deviceId, "WIN-001");
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        await DisableDeviceAsync(client, tenantId, deviceId);
+
+        using var heartbeatResponse = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.1.1"
+        });
+
+        heartbeatResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await heartbeatResponse.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_disabled" });
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var device = await dbContext.AgentDevices.AsNoTracking().SingleAsync();
+        device.Status.Should().Be("disabled");
+        device.LastHeartbeatAtUtc.Should().BeNull();
     }
 
     [Fact]
@@ -231,6 +288,18 @@ public sealed class AgentApiTests : IDisposable
         });
     }
 
+    private static async Task DisableDeviceAsync(HttpClient client, Guid tenantId, Guid deviceId)
+    {
+        using var response = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/disable", new
+        {
+            tenantId,
+            adminUserId = Guid.NewGuid(),
+            reason = "admin_disabled"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     private static void DeleteDatabaseFiles(string path)
     {
         foreach (var candidate in new[] { path, $"{path}-wal", $"{path}-shm" })
@@ -254,4 +323,6 @@ public sealed class AgentApiTests : IDisposable
         DateTimeOffset? LastHeartbeatAtUtc);
 
     private sealed record HeartbeatResponse(Guid DeviceId, string Status, DateTimeOffset LastHeartbeatAtUtc);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

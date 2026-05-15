@@ -510,6 +510,48 @@ public sealed class PolicyApiTests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task Deciding_policy_for_disabled_device_denies_with_device_disabled_reason()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+
+        using var registerFileResponse = await client.PostAsJsonAsync("/api/files", new RegisterFileRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            "application/pdf",
+            DateTimeOffset.UtcNow.AddHours(1),
+            "View",
+            "user:{userId}"));
+        registerFileResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        await RegisterDeviceAsync(client, tenantId, ownerUserId, deviceId);
+        await DisableDeviceAsync(client, tenantId, deviceId);
+
+        using var decideResponse = await client.PostAsJsonAsync("/api/policy/decide", new DecidePolicyRequest(
+            tenantId,
+            fileId,
+            ownerUserId,
+            deviceId,
+            "View",
+            DateTimeOffset.UtcNow));
+
+        decideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var decision = await decideResponse.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = false,
+            AllowedPermissions = "None",
+            ReasonCode = "device_disabled",
+            WatermarkTemplate = (string?)null,
+            OfflineLeaseExpiresAtUtc = (DateTimeOffset?)null
+        });
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -544,4 +586,31 @@ public sealed class PolicyApiTests : IDisposable
         string ReasonCode,
         string? WatermarkTemplate,
         DateTimeOffset? OfflineLeaseExpiresAtUtc);
+
+    private static async Task RegisterDeviceAsync(HttpClient client, Guid tenantId, Guid userId, Guid deviceId)
+    {
+        using var response = await client.PostAsJsonAsync("/api/agent/devices/register", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            hostname = "WIN-001",
+            operatingSystem = "Windows 11",
+            agentVersion = "0.1.0"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    private static async Task DisableDeviceAsync(HttpClient client, Guid tenantId, Guid deviceId)
+    {
+        using var response = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/disable", new
+        {
+            tenantId,
+            adminUserId = Guid.NewGuid(),
+            reason = "admin_disabled"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }

@@ -92,6 +92,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(device => device.OperatingSystem).HasMaxLength(256);
             entity.Property(device => device.AgentVersion).HasMaxLength(64);
             entity.Property(device => device.Status).HasMaxLength(64);
+            entity.Property(device => device.DisabledReason).HasMaxLength(128);
         });
 
         modelBuilder.Entity<AgentCommandEntity>(entity =>

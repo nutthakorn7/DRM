@@ -187,6 +187,15 @@ filesBody.addEventListener("click", async (event) => {
   await revokeFile(button.dataset.revokeFileId);
 });
 
+devicesBody.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-disable-device-id]");
+  if (!button) {
+    return;
+  }
+
+  await disableDevice(button.dataset.disableDeviceId);
+});
+
 async function refreshUsers() {
   const tenantId = requireTenantId();
   const users = await apiFetch(`/api/admin/users?tenantId=${encodeURIComponent(tenantId)}`);
@@ -282,6 +291,22 @@ async function revokeFile(fileId) {
   setStatus("File revoked", "ok");
 }
 
+async function disableDevice(deviceId) {
+  const body = {
+    tenantId: requireTenantId(),
+    adminUserId: requireAdminUserId(),
+    reason: "admin_disabled"
+  };
+
+  await apiFetch(`/api/admin/devices/${encodeURIComponent(deviceId)}/disable`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  await refreshDevices();
+  setStatus("Device disabled", "ok");
+}
+
 async function apiFetch(url, options = {}) {
   const adminKey = requireAdminKey();
   const response = await fetch(url, {
@@ -354,7 +379,7 @@ function renderGroupMembers(members) {
 
 function renderDevices(devices) {
   if (!devices.length) {
-    devicesBody.innerHTML = '<tr><td colspan="7" class="empty">No agent devices found.</td></tr>';
+    devicesBody.innerHTML = '<tr><td colspan="8" class="empty">No agent devices found.</td></tr>';
     return;
   }
 
@@ -367,6 +392,7 @@ function renderDevices(devices) {
       <td>${escapeHtml(device.agentVersion)}</td>
       <td>${escapeHtml(device.status)}</td>
       <td>${escapeHtml(formatDate(device.lastHeartbeatAtUtc))}</td>
+      <td>${isDeviceDisabled(device) ? "" : `<button class="danger" type="button" data-disable-device-id="${escapeHtml(device.deviceId)}">Disable</button>`}</td>
     </tr>
   `).join("");
 }
@@ -510,4 +536,8 @@ function renderEnabledBadge(enabled) {
   return enabled
     ? '<span class="badge">Enabled</span>'
     : '<span class="badge disabled">Disabled</span>';
+}
+
+function isDeviceDisabled(device) {
+  return device.status === "disabled" || Boolean(device.disabledAtUtc);
 }
