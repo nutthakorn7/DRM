@@ -141,3 +141,9 @@ The JSON key store is a local MVP bridge for development and desktop integration
 The Windows tray app now provides a visible PDF protection form. Users enter the management server URL, tenant ID, user ID, select a PDF, choose whether to delete the original after successful protection, and run the same `ProtectPdfFileWorkflow` used by agent core tests.
 
 Protected output is written as `<source>.drmx`. The tray app stores local MVP metadata under `%ProgramData%\DRM`: `protected-inventory.json` for managed-copy inventory and `file-keys.json` for local file-key lookup.
+
+## Phase 3H Viewer Open MVP
+
+The Windows viewer can open `.drmx` files through `OpenProtectedPdfFileWorkflow`. Users enter the server URL, user ID, device ID, and protected-file path. The viewer loads the local file key from `%ProgramData%\DRM\file-keys.json`, requests a server policy decision, decrypts the PDF to a temporary local file, renders it, and overlays the returned dynamic watermark.
+
+This viewer path displays returned permissions but does not yet fully enforce copy, print, and export controls.
