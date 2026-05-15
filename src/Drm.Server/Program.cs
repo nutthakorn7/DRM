@@ -24,6 +24,8 @@ builder.Services
     .AddHttpClient<ISiemEventSink, HttpSiemEventSink>()
     .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
+builder.Services.AddScoped<PolicyDecisionService>();
+builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
 
 var app = builder.Build();
 
@@ -35,6 +37,7 @@ using (var scope = app.Services.CreateScope())
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapFilesEndpoints();
+app.MapFileKeyEndpoints();
 app.MapPolicyEndpoints();
 app.MapAuditEndpoints();
 app.MapAdminUsersEndpoints();

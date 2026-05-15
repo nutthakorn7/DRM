@@ -1,13 +1,9 @@
-using Drm.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.EntityFrameworkCore;
 
 namespace Drm.Server.Endpoints;
 
 public static class PolicyEndpoints
 {
-    private static readonly TimeSpan DefaultOfflineLeaseDuration = TimeSpan.FromMinutes(15);
-
     public static IEndpointRouteBuilder MapPolicyEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/policy/decide", DecideAsync);
@@ -17,113 +13,35 @@ public static class PolicyEndpoints
 
     private static async Task<Results<Ok<PolicyDecisionResponse>, NotFound<PolicyDecisionResponse>, BadRequest<PolicyDecisionResponse>>> DecideAsync(
         DecidePolicyRequest request,
-        AppDbContext dbContext,
+        PolicyDecisionService policyDecisionService,
         CancellationToken cancellationToken)
     {
-        if (!PermissionParser.TryParse(request.RequestedPermission, out var requestedPermission))
-        {
-            return TypedResults.BadRequest(new PolicyDecisionResponse(
-                false,
-                Permission.None.ToString(),
-                "invalid_permissions",
-                null,
-                null));
-        }
+        var decision = await policyDecisionService.DecideAsync(
+            request.TenantId,
+            request.FileId,
+            request.UserId,
+            request.DeviceId,
+            request.RequestedPermission,
+            cancellationToken);
 
-        var decisionTime = DateTimeOffset.UtcNow;
-        var file = await dbContext.ProtectedFiles
-            .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == request.FileId, cancellationToken);
-
-        if (file is null)
-        {
-            dbContext.AuditEvents.Add(new AuditEventEntity
-            {
-                TenantId = request.TenantId,
-                FileId = request.FileId,
-                UserId = request.UserId,
-                EventType = "access_denied",
-                ReasonCode = "file_not_found",
-                CreatedAtUtc = decisionTime
-            });
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            return TypedResults.NotFound(new PolicyDecisionResponse(
-                false,
-                Permission.None.ToString(),
-                "file_not_found",
-                null,
-                null));
-        }
-
-        var groupIds = await dbContext.GroupMembers
-            .AsNoTracking()
-            .Where(member => member.TenantId == request.TenantId && member.UserId == request.UserId)
-            .Select(member => member.GroupId)
-            .ToListAsync(cancellationToken);
-
-        var grantRows = await dbContext.FileGrants
-            .AsNoTracking()
-            .Where(grant =>
-                grant.TenantId == request.TenantId &&
-                grant.FileId == request.FileId &&
-                ((grant.SubjectType == GrantSubjectType.User.ToString() && grant.SubjectId == request.UserId) ||
-                    (grant.SubjectType == GrantSubjectType.Group.ToString() && groupIds.Contains(grant.SubjectId))))
-            .ToListAsync(cancellationToken);
-
-        var effectivePermissions = Permission.None;
-        foreach (var grant in grantRows)
-        {
-            if (PermissionParser.TryParse(grant.Permissions, out var grantPermissions))
-            {
-                effectivePermissions |= grantPermissions;
-            }
-        }
-
-        var hasUserGrant = grantRows.Any(grant => grant.SubjectType == GrantSubjectType.User.ToString());
-        if (!hasUserGrant && file.OwnerUserId == request.UserId && file.Permissions != Permission.None)
-        {
-            effectivePermissions |= file.Permissions;
-        }
-
-        var grants = new List<FileGrant>();
-        if (effectivePermissions != Permission.None)
-        {
-            grants.Add(new FileGrant(new UserId(request.UserId), effectivePermissions));
-        }
-
-        var policy = new FilePolicy(
-            new TenantId(file.TenantId),
-            new ProtectedFileId(file.Id),
-            file.ExpiresAtUtc,
-            file.Revoked,
-            grants,
-            file.WatermarkTemplate);
-
-        var decision = PolicyEvaluator.Evaluate(policy, new PolicyRequest(
-            new TenantId(request.TenantId),
-            new ProtectedFileId(request.FileId),
-            new UserId(request.UserId),
-            new DeviceId(request.DeviceId),
-            requestedPermission,
-            decisionTime));
-
-        dbContext.AuditEvents.Add(new AuditEventEntity
-        {
-            TenantId = request.TenantId,
-            FileId = request.FileId,
-            UserId = request.UserId,
-            EventType = decision.Allowed ? "access_allowed" : "access_denied",
-            ReasonCode = decision.ReasonCode,
-            CreatedAtUtc = decisionTime
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return TypedResults.Ok(new PolicyDecisionResponse(
+        var response = new PolicyDecisionResponse(
             decision.Allowed,
             decision.AllowedPermissions.ToString(),
             decision.ReasonCode,
             decision.WatermarkTemplate,
-            decision.Allowed ? decisionTime.Add(DefaultOfflineLeaseDuration) : null));
+            decision.OfflineLeaseExpiresAtUtc);
+
+        if (decision.InvalidPermission)
+        {
+            return TypedResults.BadRequest(response);
+        }
+
+        if (!decision.FileFound)
+        {
+            return TypedResults.NotFound(response);
+        }
+
+        return TypedResults.Ok(response);
     }
 
     private sealed record DecidePolicyRequest(

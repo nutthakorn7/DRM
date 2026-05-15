@@ -136,6 +136,17 @@ Agent core includes a file-key store abstraction and JSON implementation so loca
 
 The JSON key store is a local MVP bridge for development and desktop integration work. Production deployments must replace it with server-side key wrapping, tenant keys, KMS/HSM integration, and unwrap authorization.
 
+## Phase 3I Server Key Wrapping
+
+The server now exposes file-key wrapping APIs:
+
+- `POST /api/files/{fileId}/keys/wrap`
+- `POST /api/files/{fileId}/keys/unwrap`
+
+Wrap stores an AES-GCM wrapped file key for a registered protected file. Unwrap first evaluates policy for the requested permission and returns the file key only when access is allowed. This moves the product toward server-authorized key release instead of relying only on local key files.
+
+The current implementation derives tenant wrapping keys from `Drm:KeyWrapping:MasterKeyBase64`; if omitted, it uses a development fallback key. Production deployments must configure a durable KMS/HSM-backed master key and migrate stored keys with operational key rotation procedures.
+
 ## Phase 3G Tray Protect MVP
 
 The Windows tray app now provides a visible PDF protection form. Users enter the management server URL, tenant ID, user ID, select a PDF, choose whether to delete the original after successful protection, and run the same `ProtectPdfFileWorkflow` used by agent core tests.

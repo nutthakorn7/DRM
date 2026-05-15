@@ -106,5 +106,15 @@ public sealed class OpenProtectedPdfFileWorkflowTests
         {
             throw new NotSupportedException();
         }
+
+        public Task WrapFileKeyAsync(Guid tenantId, Guid fileId, byte[] fileKey, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

@@ -24,6 +24,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<AgentCommandEntity> AgentCommands => Set<AgentCommandEntity>();
 
+    public DbSet<FileKeyEntity> FileKeys => Set<FileKeyEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -99,6 +101,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(command => command.CommandType).HasMaxLength(64);
             entity.Property(command => command.Status).HasMaxLength(64);
             entity.Property(command => command.ReasonCode).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<FileKeyEntity>(entity =>
+        {
+            entity.HasKey(fileKey => new { fileKey.TenantId, fileKey.FileId });
+            entity.Property(fileKey => fileKey.WrappedKeyNonceBase64).HasMaxLength(64);
+            entity.Property(fileKey => fileKey.WrappedKeyCiphertextBase64).HasMaxLength(256);
+            entity.Property(fileKey => fileKey.WrappedKeyTagBase64).HasMaxLength(64);
         });
     }
 }

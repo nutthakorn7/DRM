@@ -242,6 +242,88 @@ public sealed class AgentClientTests
         document.RootElement.GetProperty("reasonCode").GetString().Should().Be("deleted");
     }
 
+    [Fact]
+    public async Task FileKeyClient_wraps_file_key()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var fileId = Guid.Parse("de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f");
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            return new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent(
+                    """{"tenantId":"4ec64ccb-5f84-4ff5-bcbc-54286b882f36","fileId":"de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f","status":"wrapped"}""",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        });
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        });
+        var fileKey = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
+
+        await client.WrapFileKeyAsync(
+            Guid.Parse("4ec64ccb-5f84-4ff5-bcbc-54286b882f36"),
+            fileId,
+            fileKey,
+            CancellationToken.None);
+
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Method.Should().Be(HttpMethod.Post);
+        capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/files/de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f/keys/wrap"));
+
+        var body = await capturedRequest.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("tenantId").GetGuid().Should().Be(Guid.Parse("4ec64ccb-5f84-4ff5-bcbc-54286b882f36"));
+        document.RootElement.GetProperty("fileKeyBase64").GetString().Should().Be(Convert.ToBase64String(fileKey));
+    }
+
+    [Fact]
+    public async Task FileKeyClient_unwraps_file_key()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var fileKey = Enumerable.Range(0, 32).Select(value => (byte)(255 - value)).ToArray();
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            var json = $$"""
+                {
+                  "tenantId": "4ec64ccb-5f84-4ff5-bcbc-54286b882f36",
+                  "fileId": "de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f",
+                  "fileKeyBase64": "{{Convert.ToBase64String(fileKey)}}"
+                }
+                """;
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        });
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        });
+
+        var unwrapped = await client.UnwrapFileKeyAsync(
+            Guid.Parse("4ec64ccb-5f84-4ff5-bcbc-54286b882f36"),
+            Guid.Parse("de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f"),
+            Guid.NewGuid(),
+            Guid.Parse("e1ec77f7-3377-410b-baad-61f6466b1107"),
+            "View",
+            CancellationToken.None);
+
+        unwrapped.Should().Equal(fileKey);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Method.Should().Be(HttpMethod.Post);
+        capturedRequest.RequestUri.Should().Be(new Uri("https://drm.example/api/files/de470ac0-d8fe-47bb-a1d0-f951a2ef3b2f/keys/unwrap"));
+
+        var body = await capturedRequest.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("requestedPermission").GetString().Should().Be("View");
+    }
+
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handle) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

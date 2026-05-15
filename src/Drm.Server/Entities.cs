@@ -163,3 +163,20 @@ public sealed class AgentCommandEntity
 
     public DateTimeOffset? CompletedAtUtc { get; set; }
 }
+
+public sealed class FileKeyEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string WrappedKeyNonceBase64 { get; set; } = string.Empty;
+
+    public string WrappedKeyCiphertextBase64 { get; set; } = string.Empty;
+
+    public string WrappedKeyTagBase64 { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}

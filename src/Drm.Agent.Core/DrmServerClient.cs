@@ -45,6 +45,20 @@ public interface IDrmServerClient : IAgentAuditUploader
         Guid commandId,
         AgentCommandCompletion completion,
         CancellationToken cancellationToken);
+
+    Task WrapFileKeyAsync(
+        Guid tenantId,
+        Guid fileId,
+        byte[] fileKey,
+        CancellationToken cancellationToken);
+
+    Task<byte[]> UnwrapFileKeyAsync(
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        Guid deviceId,
+        string requestedPermission,
+        CancellationToken cancellationToken);
 }
 
 public sealed record OpenDecision(
@@ -208,6 +222,43 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
             ?? throw new InvalidOperationException("Agent command completion response was empty.");
     }
 
+    public async Task WrapFileKeyAsync(
+        Guid tenantId,
+        Guid fileId,
+        byte[] fileKey,
+        CancellationToken cancellationToken)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/files/{fileId}/keys/wrap",
+            new WrapFileKeyRequest(tenantId, Convert.ToBase64String(fileKey)),
+            JsonOptions,
+            cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<byte[]> UnwrapFileKeyAsync(
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        Guid deviceId,
+        string requestedPermission,
+        CancellationToken cancellationToken)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/files/{fileId}/keys/unwrap",
+            new UnwrapFileKeyRequest(tenantId, userId, deviceId, requestedPermission),
+            JsonOptions,
+            cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        var unwrapped = await response.Content.ReadFromJsonAsync<UnwrapFileKeyResponse>(JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("File key unwrap response was empty.");
+
+        return Convert.FromBase64String(unwrapped.FileKeyBase64);
+    }
+
     private static Permission ParsePermissionsOrNone(string? permissions)
     {
         if (string.IsNullOrWhiteSpace(permissions))
@@ -256,6 +307,16 @@ public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
         string AgentVersion);
 
     private sealed record CompleteCommandRequest(Guid TenantId, string Status, string ReasonCode);
+
+    private sealed record WrapFileKeyRequest(Guid TenantId, string FileKeyBase64);
+
+    private sealed record UnwrapFileKeyRequest(
+        Guid TenantId,
+        Guid UserId,
+        Guid DeviceId,
+        string RequestedPermission);
+
+    private sealed record UnwrapFileKeyResponse(Guid TenantId, Guid FileId, string FileKeyBase64);
 
     private sealed record PolicyDecisionResponse(
         bool Allowed,

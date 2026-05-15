@@ -289,6 +289,16 @@ public sealed class ProtectAndOpenWorkflowTests
         {
             throw new NotSupportedException();
         }
+
+        public Task WrapFileKeyAsync(Guid tenantId, Guid fileId, byte[] fileKey, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class OfflineDrmServerClient : IDrmServerClient
@@ -324,6 +334,16 @@ public sealed class ProtectAndOpenWorkflowTests
         }
 
         public Task<AgentCommand> CompleteCommandAsync(AgentIdentity identity, Guid commandId, AgentCommandCompletion completion, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task WrapFileKeyAsync(Guid tenantId, Guid fileId, byte[] fileKey, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("server unavailable");
+        }
+
+        public Task<byte[]> UnwrapFileKeyAsync(Guid tenantId, Guid fileId, Guid userId, Guid deviceId, string requestedPermission, CancellationToken cancellationToken)
         {
             throw new HttpRequestException("server unavailable");
         }
