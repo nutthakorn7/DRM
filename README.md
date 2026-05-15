@@ -286,3 +286,12 @@ The management API now exposes `GET /api/admin/files/{fileId}/commands?tenantId=
 ## Phase 5T Watermark Alias Rendering
 
 Desktop open workflows now render `{userId}` and `{fileId}` watermark placeholders as aliases for `{user}` and `{file}`. Policy templates and admin-entered watermark patterns that use explicit ID placeholder names display concrete user/file IDs in the viewer instead of raw template text.
+
+## Phase 5U Integration CLI
+
+`src/Drm.Cli` adds an automation-oriented CLI for workflow integrations. `protect` registers, wraps, and writes `.drmx` output through `ProtectFileWorkflow`; `open` unwraps a `.drmx` container through `OpenProtectedFileWorkflow` and writes decrypted bytes to an output path.
+
+```bash
+dotnet run --project src/Drm.Cli -- protect --server-url https://drm.example --tenant-id <tenant-guid> --user-id <user-guid> --file ./contract.docx --policy-template-id <template-guid>
+dotnet run --project src/Drm.Cli -- open --server-url https://drm.example --user-id <user-guid> --device-id <device-guid> --file ./contract.docx.drmx --output ./contract.docx
+```
