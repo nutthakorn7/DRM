@@ -60,6 +60,55 @@ public sealed class FileKeyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Template_offline_lease_minutes_flow_to_unwrap_response()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "Offline 30",
+            permissions = "View",
+            watermarkTemplate = "user:{userId}",
+            offlineLeaseMinutes = 30,
+            allowPrint = false
+        });
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = templateId
+        });
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        await WrapKeyAsync(client, tenantId, fileId, fileKey);
+
+        var requestedAt = DateTimeOffset.UtcNow;
+        using var unwrapResponse = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId = ownerUserId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "View"
+        });
+
+        unwrapResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var unwrapped = await unwrapResponse.Content.ReadFromJsonAsync<UnwrapFileKeyResponse>();
+        unwrapped!.OfflineLeaseExpiresAtUtc.Should().BeCloseTo(requestedAt.AddMinutes(30), TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
     public async Task Unwrap_denies_user_without_policy_grant()
     {
         using var client = factory.CreateClient();

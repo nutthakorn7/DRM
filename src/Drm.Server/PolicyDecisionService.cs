@@ -14,8 +14,6 @@ public sealed record ServerPolicyDecision(
 
 public sealed class PolicyDecisionService(AppDbContext dbContext)
 {
-    private static readonly TimeSpan DefaultOfflineLeaseDuration = TimeSpan.FromMinutes(15);
-
     public async Task<ServerPolicyDecision> DecideAsync(
         Guid tenantId,
         Guid fileId,
@@ -203,12 +201,16 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        var offlineLeaseExpiresAtUtc = decision.Allowed && file.OfflineLeaseMinutes > 0
+            ? decisionTime.AddMinutes(file.OfflineLeaseMinutes)
+            : (DateTimeOffset?)null;
+
         return new ServerPolicyDecision(
             decision.Allowed,
             decision.AllowedPermissions,
             decision.ReasonCode,
             decision.WatermarkTemplate,
-            decision.Allowed ? decisionTime.Add(DefaultOfflineLeaseDuration) : null,
+            offlineLeaseExpiresAtUtc,
             FileFound: true,
             InvalidPermission: false);
     }

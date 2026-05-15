@@ -7,6 +7,7 @@ namespace Drm.Server.Endpoints;
 public static class FilesEndpoints
 {
     private const string DefaultWatermarkTemplate = "{user} {time} {file}";
+    private const int DefaultOfflineLeaseMinutes = 15;
 
     public static IEndpointRouteBuilder MapFilesEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -72,7 +73,8 @@ public static class FilesEndpoints
             ExpiresAtUtc = request.ExpiresAtUtc,
             Revoked = false,
             Permissions = permissions,
-            WatermarkTemplate = watermarkTemplate
+            WatermarkTemplate = watermarkTemplate,
+            OfflineLeaseMinutes = effectivePolicy.OfflineLeaseMinutes
         };
 
         dbContext.ProtectedFiles.Add(file);
@@ -124,7 +126,8 @@ public static class FilesEndpoints
         {
             return new EffectiveRegistrationPolicy(
                 fallbackPermissions,
-                request.WatermarkTemplate ?? DefaultWatermarkTemplate);
+                request.WatermarkTemplate ?? DefaultWatermarkTemplate,
+                DefaultOfflineLeaseMinutes);
         }
 
         var template = await dbContext.PolicyTemplates
@@ -143,7 +146,7 @@ public static class FilesEndpoints
             return null;
         }
 
-        return new EffectiveRegistrationPolicy(templatePermissions, template.WatermarkTemplate);
+        return new EffectiveRegistrationPolicy(templatePermissions, template.WatermarkTemplate, template.OfflineLeaseMinutes);
     }
 
     private static async Task<RecipientBuildError?> BuildFileGrantsAsync(
@@ -279,7 +282,10 @@ public static class FilesEndpoints
 
     private sealed record RegisterFileRecipientRequest(string SubjectType, Guid SubjectId);
 
-    private sealed record EffectiveRegistrationPolicy(Permission Permissions, string WatermarkTemplate);
+    private sealed record EffectiveRegistrationPolicy(
+        Permission Permissions,
+        string WatermarkTemplate,
+        int OfflineLeaseMinutes);
 
     private sealed record RegisterFileResponse(
         Guid FileId,

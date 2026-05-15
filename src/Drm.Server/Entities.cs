@@ -19,6 +19,8 @@ public sealed class ProtectedFileEntity
     public Permission Permissions { get; set; }
 
     public string WatermarkTemplate { get; set; } = string.Empty;
+
+    public int OfflineLeaseMinutes { get; set; } = 15;
 }
 
 public sealed class AuditEventEntity

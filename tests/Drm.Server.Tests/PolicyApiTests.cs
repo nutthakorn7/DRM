@@ -197,6 +197,85 @@ public sealed class PolicyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Template_offline_lease_minutes_controls_allowed_decision_lease()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "Offline 45",
+            permissions = "View",
+            watermarkTemplate = "offline:{userId}",
+            offlineLeaseMinutes = 45,
+            allowPrint = false
+        });
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var register = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = templateId
+        });
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var requestedAt = DateTimeOffset.UtcNow;
+        var decision = await DecideAsync(client, tenantId, fileId, ownerUserId, "View");
+
+        decision.Allowed.Should().BeTrue();
+        decision.OfflineLeaseExpiresAtUtc.Should().BeCloseTo(requestedAt.AddMinutes(45), TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Template_offline_lease_zero_disables_allowed_decision_offline_lease()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "Online only",
+            permissions = "View",
+            watermarkTemplate = "online:{userId}",
+            offlineLeaseMinutes = 0,
+            allowPrint = false
+        });
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var register = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = templateId
+        });
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var decision = await DecideAsync(client, tenantId, fileId, ownerUserId, "View");
+
+        decision.Allowed.Should().BeTrue();
+        decision.OfflineLeaseExpiresAtUtc.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Registering_file_with_missing_template_or_group_recipient_returns_not_found()
     {
         using var client = factory.CreateClient();

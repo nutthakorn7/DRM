@@ -266,3 +266,7 @@ New local agent audit queue entries are written as hash-chained JSONL envelopes 
 ## Phase 5O Agent Health Dashboard
 
 The management API now exposes `GET /api/admin/devices/health?tenantId=...&staleAfterMinutes=...` for tenant-scoped endpoint fleet health counts: total, online, stale, never seen, and disabled. The `/admin/` console shows the summary above the Agent devices table using the same tenant/admin-key context as the device inventory.
+
+## Phase 5P Template Offline Leases
+
+Files registered with a policy template now inherit the template's `offlineLeaseMinutes` value. Policy decisions and file-key unwrap responses return an offline lease expiry based on that stored duration; a zero-minute template still allows online access but returns no offline lease for offline fallback.
