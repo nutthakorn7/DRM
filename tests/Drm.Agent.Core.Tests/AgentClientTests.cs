@@ -140,6 +140,40 @@ public sealed class AgentClientTests
     }
 
     [Fact]
+    public async Task DrmServerClient_sends_client_api_key_header_when_configured()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequest = request;
+            return new HttpResponseMessage(HttpStatusCode.Accepted);
+        });
+
+        var client = new DrmServerClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://drm.example")
+        }, "client-key");
+        var record = new AgentAuditRecord(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "agent_heartbeat",
+            "online",
+            DateTimeOffset.UtcNow);
+
+        await client.UploadAuditAsync(record, CancellationToken.None);
+
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Headers.GetValues(DrmServerClient.ClientApiKeyHeaderName)
+            .Should()
+            .ContainSingle()
+            .Which
+            .Should()
+            .Be("client-key");
+    }
+
+    [Fact]
     public async Task DrmServerClient_gets_pending_agent_commands()
     {
         HttpRequestMessage? capturedRequest = null;

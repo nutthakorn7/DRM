@@ -12,6 +12,8 @@ public sealed class AgentServiceOptions
 
     public Guid DeviceId { get; set; }
 
+    public string? ClientApiKey { get; set; }
+
     public string AuditQueuePath { get; set; } = "%ProgramData%\\DRM\\agent-audit.jsonl";
 
     public string InventoryPath { get; set; } = "%ProgramData%\\DRM\\protected-inventory.json";

@@ -51,8 +51,9 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("Select a protected file before opening.");
             }
 
+            var clientApiKey = ClientApiKeyBox.Password.Trim();
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
-            var serverClient = new DrmServerClient(httpClient);
+            var serverClient = new DrmServerClient(httpClient, clientApiKey);
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
             var decisionCache = new JsonPolicyDecisionCache(ResolveDataPath("policy-decisions.json"));
             var opened = await new OpenProtectedPdfFileWorkflow(serverClient, keyStore, decisionCache)

@@ -74,13 +74,27 @@ public sealed record UnwrappedFileKey(
     string? WatermarkTemplate,
     DateTimeOffset? OfflineLeaseExpiresAtUtc);
 
-public sealed class DrmServerClient(HttpClient httpClient) : IDrmServerClient
+public sealed class DrmServerClient : IDrmServerClient
 {
+    public const string ClientApiKeyHeaderName = "X-DRM-Client-Key";
+
     private const Permission DefinedPermissions =
         Permission.View | Permission.Print | Permission.Copy |
         Permission.ExportOriginal | Permission.Edit | Permission.DeleteProtectedCopy;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private readonly HttpClient httpClient;
+
+    public DrmServerClient(HttpClient httpClient, string? clientApiKey = null)
+    {
+        this.httpClient = httpClient;
+        if (!string.IsNullOrWhiteSpace(clientApiKey))
+        {
+            httpClient.DefaultRequestHeaders.Remove(ClientApiKeyHeaderName);
+            httpClient.DefaultRequestHeaders.Add(ClientApiKeyHeaderName, clientApiKey.Trim());
+        }
+    }
 
     public async Task RegisterFileAsync(
         Guid tenantId,

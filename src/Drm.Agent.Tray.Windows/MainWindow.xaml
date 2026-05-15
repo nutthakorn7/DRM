@@ -34,6 +34,8 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="14" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="14" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -41,23 +43,27 @@
             <TextBox x:Name="ServerUrlBox" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Height="32"
                      VerticalContentAlignment="Center" Text="http://localhost:5188" />
 
-            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Tenant ID" Foreground="#374151" />
-            <TextBox x:Name="TenantIdBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Height="32"
+            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Client API Key" Foreground="#374151" />
+            <PasswordBox x:Name="ClientApiKeyBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Height="32"
+                         VerticalContentAlignment="Center" />
+
+            <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Tenant ID" Foreground="#374151" />
+            <TextBox x:Name="TenantIdBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Height="32"
                      VerticalContentAlignment="Center" />
 
-            <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="User ID" Foreground="#374151" />
-            <TextBox x:Name="UserIdBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Height="32"
+            <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="User ID" Foreground="#374151" />
+            <TextBox x:Name="UserIdBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Height="32"
                      VerticalContentAlignment="Center" />
 
-            <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="PDF File" Foreground="#374151" />
-            <TextBox x:Name="SourcePathBox" Grid.Row="6" Grid.Column="1" Height="32" Margin="0,0,8,0"
+            <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="PDF File" Foreground="#374151" />
+            <TextBox x:Name="SourcePathBox" Grid.Row="8" Grid.Column="1" Height="32" Margin="0,0,8,0"
                      VerticalContentAlignment="Center" />
-            <Button Grid.Row="6" Grid.Column="2" Width="92" Height="32" Content="Browse" Click="BrowseButton_Click" />
+            <Button Grid.Row="8" Grid.Column="2" Width="92" Height="32" Content="Browse" Click="BrowseButton_Click" />
 
-            <CheckBox x:Name="DeleteOriginalBox" Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2"
+            <CheckBox x:Name="DeleteOriginalBox" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2"
                       Content="Delete original PDF after successful protection" Foreground="#374151" />
 
-            <Button x:Name="ProtectButton" Grid.Row="10" Grid.Column="1" Width="128" Height="36"
+            <Button x:Name="ProtectButton" Grid.Row="12" Grid.Column="1" Width="128" Height="36"
                     HorizontalAlignment="Left" Content="Protect PDF" Click="ProtectButton_Click" />
         </Grid>
 

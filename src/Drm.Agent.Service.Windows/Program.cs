@@ -17,6 +17,10 @@ builder.Services.AddHttpClient<IDrmServerClient, DrmServerClient>((serviceProvid
     }
 
     client.BaseAddress = serverUri;
+    if (!string.IsNullOrWhiteSpace(options.ClientApiKey))
+    {
+        client.DefaultRequestHeaders.Add(DrmServerClient.ClientApiKeyHeaderName, options.ClientApiKey.Trim());
+    }
 });
 builder.Services.AddSingleton<IAgentAuditQueue>(serviceProvider =>
 {

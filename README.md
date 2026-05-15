@@ -210,3 +210,7 @@ The `/admin/` console now creates and lists SIEM webhook integrations through `/
 ## Phase 5A Client API Key Auth
 
 When `Drm:Security:ClientApiKey` is configured, non-admin `/api/*` endpoints require `X-DRM-Client-Key`. `/api/admin/*` remains protected separately by `X-DRM-Admin-Key`, and deployments with no client key configured keep the previous unauthenticated client API behavior.
+
+## Phase 5B Desktop Client API Key
+
+Desktop clients can now send `X-DRM-Client-Key`. The Windows service reads `DrmAgent:ClientApiKey`, and the tray protector/viewer include Client API key fields for manual workflows.

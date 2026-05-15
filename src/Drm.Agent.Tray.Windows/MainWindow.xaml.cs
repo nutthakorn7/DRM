@@ -47,8 +47,9 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("Select a PDF file before protecting.");
             }
 
+            var clientApiKey = ClientApiKeyBox.Password.Trim();
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
-            var serverClient = new DrmServerClient(httpClient);
+            var serverClient = new DrmServerClient(httpClient, clientApiKey);
             var inventory = new JsonProtectedFileInventory(ResolveDataPath("protected-inventory.json"));
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
             var workflow = new ProtectPdfFileWorkflow(serverClient, inventory, keyStore);
