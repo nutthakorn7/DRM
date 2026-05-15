@@ -58,6 +58,9 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Offline lease");
         html.Should().Contain("Allow print");
         html.Should().Contain("Revoke");
+        html.Should().Contain("Audit events");
+        html.Should().Contain("Event type filter");
+        html.Should().Contain("Export CSV");
         html.Should().Contain("app.css");
         html.Should().Contain("app.js");
     }
@@ -85,6 +88,10 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("createPolicyTemplateForm");
         js.Should().Contain("/grants");
         js.Should().Contain("/revoke");
+        js.Should().Contain("/api/admin/audit");
+        js.Should().Contain("/api/admin/audit.csv");
+        js.Should().Contain("refreshAuditEvents");
+        js.Should().Contain("downloadAuditCsv");
         js.Should().Contain("adminUserId");
         js.Should().Contain("revoked");
     }

@@ -19,6 +19,7 @@
         <a href="#groups">Groups</a>
         <a href="#templates">Templates</a>
         <a href="#files">Files</a>
+        <a href="#audit">Audit</a>
         <a href="#status">Status</a>
       </nav>
     </aside>
@@ -203,6 +204,42 @@
             <tbody id="filesBody">
               <tr>
                 <td colspan="7" class="empty">Refresh to load protected files.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="audit">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Activity</p>
+            <h3>Audit events</h3>
+          </div>
+          <div class="button-row">
+            <button id="refreshAuditEvents" type="button">Refresh audit</button>
+            <button id="downloadAuditCsv" type="button">Export CSV</button>
+          </div>
+        </div>
+
+        <div class="audit-filter-row">
+          <input id="auditEventType" autocomplete="off" placeholder="Event type filter">
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event type</th>
+                <th>Reason</th>
+                <th>File ID</th>
+                <th>User ID</th>
+              </tr>
+            </thead>
+            <tbody id="auditEventsBody">
+              <tr>
+                <td colspan="5" class="empty">Refresh to load audit events.</td>
               </tr>
             </tbody>
           </table>

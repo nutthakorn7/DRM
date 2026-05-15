@@ -193,6 +193,18 @@ button.danger:hover {
   gap: 10px;
 }
 
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.audit-filter-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px);
+}
+
 .template-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -278,6 +290,7 @@ pre {
   .create-row,
   .filter-row,
   .grant-row,
+  .audit-filter-row,
   .template-row,
   .topbar,
   .compact {
@@ -287,5 +300,13 @@ pre {
 
   .status-line {
     text-align: left;
+  }
+
+  .button-row {
+    justify-content: stretch;
+  }
+
+  .button-row button {
+    flex: 1;
   }
 }

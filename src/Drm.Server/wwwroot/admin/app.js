@@ -12,6 +12,7 @@ const usersBody = document.querySelector("#usersBody");
 const groupMembersBody = document.querySelector("#groupMembersBody");
 const policyTemplatesBody = document.querySelector("#policyTemplatesBody");
 const filesBody = document.querySelector("#filesBody");
+const auditEventsBody = document.querySelector("#auditEventsBody");
 const healthOutput = document.querySelector("#healthOutput");
 
 tenantIdInput.value = state.tenantId;
@@ -122,6 +123,14 @@ document.querySelector("#refreshFiles").addEventListener("click", () => {
   refreshFiles();
 });
 
+document.querySelector("#refreshAuditEvents").addEventListener("click", () => {
+  refreshAuditEvents();
+});
+
+document.querySelector("#downloadAuditCsv").addEventListener("click", () => {
+  downloadAuditCsv();
+});
+
 document.querySelector("#grantForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const fileId = document.querySelector("#grantFileId").value.trim();
@@ -184,6 +193,26 @@ async function refreshFiles() {
   setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
+async function refreshAuditEvents() {
+  const events = await apiFetch(buildAuditUrl("/api/admin/audit"));
+  renderAuditEvents(events);
+  setStatus(`${events.length} audit event${events.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function downloadAuditCsv() {
+  const tenantId = requireTenantId();
+  const blob = await apiFetchBlob(buildAuditUrl("/api/admin/audit.csv"));
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = `drm-audit-${tenantId}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+  setStatus("Audit CSV exported", "ok");
+}
+
 async function revokeFile(fileId) {
   const body = {
     tenantId: requireTenantId(),
@@ -220,6 +249,24 @@ async function apiFetch(url, options = {}) {
   }
 
   return response.json();
+}
+
+async function apiFetchBlob(url, options = {}) {
+  const adminKey = requireAdminKey();
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "X-DRM-Admin-Key": adminKey,
+      ...(options.headers || {})
+    }
+  });
+
+  if (!response.ok) {
+    setStatus(`Request failed: ${response.status}`, "error");
+    throw new Error(`Request failed with HTTP ${response.status}`);
+  }
+
+  return response.blob();
 }
 
 function renderUsers(users) {
@@ -265,6 +312,23 @@ function renderPolicyTemplates(templates) {
       <td>${escapeHtml(template.watermarkTemplate)}</td>
       <td>${escapeHtml(`${template.offlineLeaseMinutes} min`)}</td>
       <td>${template.allowPrint ? "Yes" : "No"}</td>
+    </tr>
+  `).join("");
+}
+
+function renderAuditEvents(events) {
+  if (!events.length) {
+    auditEventsBody.innerHTML = '<tr><td colspan="5" class="empty">No audit events found.</td></tr>';
+    return;
+  }
+
+  auditEventsBody.innerHTML = events.map((auditEvent) => `
+    <tr>
+      <td>${escapeHtml(formatDate(auditEvent.createdAtUtc))}</td>
+      <td>${escapeHtml(auditEvent.eventType)}</td>
+      <td>${escapeHtml(auditEvent.reasonCode)}</td>
+      <td><code>${escapeHtml(auditEvent.fileId)}</code></td>
+      <td><code>${escapeHtml(auditEvent.userId)}</code></td>
     </tr>
   `).join("");
 }
@@ -316,6 +380,13 @@ function requireAdminUserId() {
   }
 
   return adminUserId;
+}
+
+function buildAuditUrl(path) {
+  const tenantId = requireTenantId();
+  const eventType = document.querySelector("#auditEventType").value.trim();
+  const params = new URLSearchParams({ tenantId, eventType });
+  return `${path}?${params.toString()}`;
 }
 
 function setStatus(message, mode) {

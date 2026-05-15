@@ -198,3 +198,7 @@ Management revocation is available at `POST /api/admin/files/{fileId}/revoke` wi
 ## Phase 4F Policy Template Console
 
 The `/admin/` console now creates and lists policy templates through `/api/admin/policy-templates`. Operators can set template name, permissions, watermark template, offline lease minutes, and print allowance from the management UI.
+
+## Phase 4G Audit Console
+
+The `/admin/` console now lists tenant audit events from `/api/admin/audit`, supports exact event-type filtering, and exports CSV through `/api/admin/audit.csv` while preserving the admin API key header.
