@@ -54,11 +54,13 @@ public sealed class AdminFilesApiTests : IDisposable
 
         decide.StatusCode.Should().Be(HttpStatusCode.OK);
         var decision = await decide.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
-        decision.Should().BeEquivalentTo(new PolicyDecisionResponse(
-            true,
-            "View",
-            "allowed",
-            "user:{userId}"));
+        decision.Should().BeEquivalentTo(new
+        {
+            Allowed = true,
+            AllowedPermissions = "View",
+            ReasonCode = "allowed",
+            WatermarkTemplate = "user:{userId}"
+        });
     }
 
     [Fact]
@@ -273,6 +275,48 @@ public sealed class AdminFilesApiTests : IDisposable
             auditEvent.ReasonCode == "policy_template_applied" &&
             auditEvent.FileId == fileId &&
             auditEvent.UserId == adminUserId);
+    }
+
+    [Fact]
+    public async Task Apply_policy_template_updates_offline_lease_duration()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, ownerUserId, permissions: "View");
+        using var createTemplate = await CreatePolicyTemplateAsync(
+            client,
+            tenantId,
+            templateId,
+            "Extended offline",
+            "View",
+            "extended:{userId}",
+            offlineLeaseMinutes: 45);
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var apply = await ApplyPolicyTemplateAsync(client, tenantId, fileId, templateId, Guid.NewGuid());
+        apply.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var requestedAt = DateTimeOffset.UtcNow;
+        using var decide = await client.PostAsJsonAsync("/api/policy/decide", new
+        {
+            tenantId,
+            fileId,
+            userId = ownerUserId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "View"
+        });
+
+        decide.StatusCode.Should().Be(HttpStatusCode.OK);
+        var policyDecision = await decide.Content.ReadFromJsonAsync<PolicyDecisionResponse>();
+        policyDecision!.Allowed.Should().BeTrue();
+        policyDecision.OfflineLeaseExpiresAtUtc.Should().BeCloseTo(
+            requestedAt.AddMinutes(45),
+            TimeSpan.FromMinutes(1));
     }
 
     [Fact]
@@ -650,7 +694,8 @@ public sealed class AdminFilesApiTests : IDisposable
         Guid templateId,
         string name,
         string permissions,
-        string watermarkTemplate)
+        string watermarkTemplate,
+        int offlineLeaseMinutes = 15)
     {
         return client.PostAsJsonAsync("/api/admin/policy-templates", new
         {
@@ -659,7 +704,7 @@ public sealed class AdminFilesApiTests : IDisposable
             name,
             permissions,
             watermarkTemplate,
-            offlineLeaseMinutes = 15,
+            offlineLeaseMinutes,
             allowPrint = true
         });
     }
@@ -715,5 +760,6 @@ public sealed class AdminFilesApiTests : IDisposable
         bool Allowed,
         string AllowedPermissions,
         string ReasonCode,
-        string? WatermarkTemplate);
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc = null);
 }

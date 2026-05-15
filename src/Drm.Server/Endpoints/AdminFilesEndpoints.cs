@@ -319,6 +319,7 @@ public static class AdminFilesEndpoints
 
         file.Permissions = permissions;
         file.WatermarkTemplate = template.WatermarkTemplate;
+        file.OfflineLeaseMinutes = template.OfflineLeaseMinutes;
         await UpsertOwnerGrantFromTemplateAsync(dbContext, file, permissions, cancellationToken);
 
         dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(

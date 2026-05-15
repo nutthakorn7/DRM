@@ -274,3 +274,7 @@ Files registered with a policy template now inherit the template's `offlineLease
 ## Phase 5Q Remote Delete Console
 
 The `/admin/` console now exposes the existing remote protected-copy delete command queue. Operators can enter a protected file ID and target device ID to enqueue `DeleteProtectedCopy` through `POST /api/admin/files/{fileId}/commands/delete-protected-copy`; endpoint agents still apply the safe inventory-and-container verification rule before deleting any local copy.
+
+## Phase 5R Apply Template Lease Sync
+
+Applying a policy template to an existing protected file now updates the file's stored offline lease duration along with permissions and watermark. Future policy decisions and file-key unwrap responses therefore use the currently applied template lease instead of the file's previous lease.
