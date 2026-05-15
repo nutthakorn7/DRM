@@ -135,3 +135,9 @@ Original PDF deletion is opt-in. When requested, the original is deleted only af
 Agent core includes a file-key store abstraction and JSON implementation so local desktop workflows can open protected files without passing raw keys through UI code. `ProtectPdfFileWorkflow` can persist the generated file key, and `OpenProtectedPdfFileWorkflow` reads the `.drmx` header, loads the matching key, performs the server policy decision, and decrypts the file.
 
 The JSON key store is a local MVP bridge for development and desktop integration work. Production deployments must replace it with server-side key wrapping, tenant keys, KMS/HSM integration, and unwrap authorization.
+
+## Phase 3G Tray Protect MVP
+
+The Windows tray app now provides a visible PDF protection form. Users enter the management server URL, tenant ID, user ID, select a PDF, choose whether to delete the original after successful protection, and run the same `ProtectPdfFileWorkflow` used by agent core tests.
+
+Protected output is written as `<source>.drmx`. The tray app stores local MVP metadata under `%ProgramData%\DRM`: `protected-inventory.json` for managed-copy inventory and `file-keys.json` for local file-key lookup.
