@@ -19,10 +19,10 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "PDF files (*.pdf)|*.pdf",
+            Filter = "All files (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false,
-            Title = "Select PDF to protect"
+            Title = "Select file to protect"
         };
 
         if (dialog.ShowDialog(this) == true)
@@ -34,7 +34,7 @@ public partial class MainWindow : Window
     private async void ProtectButton_Click(object sender, RoutedEventArgs e)
     {
         ProtectButton.IsEnabled = false;
-        SetStatus("Protecting PDF...");
+        SetStatus("Protecting file...");
 
         try
         {
@@ -46,7 +46,7 @@ public partial class MainWindow : Window
             var sourcePath = SourcePathBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
-                throw new InvalidOperationException("Select a PDF file before protecting.");
+                throw new InvalidOperationException("Select a file before protecting.");
             }
 
             var clientApiKey = ClientApiKeyBox.Password.Trim();
@@ -54,14 +54,14 @@ public partial class MainWindow : Window
             var serverClient = new DrmServerClient(httpClient, clientApiKey);
             var inventory = new JsonProtectedFileInventory(ResolveDataPath("protected-inventory.json"));
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
-            var workflow = new ProtectPdfFileWorkflow(serverClient, inventory, keyStore);
+            var workflow = new ProtectFileWorkflow(serverClient, inventory, keyStore);
 
             var result = await workflow.ProtectAsync(
                 new TenantId(tenantId),
                 new UserId(userId),
                 sourcePath,
                 EnvelopeCrypto.GenerateKey(),
-                new ProtectPdfPolicyOptions(Permission.View | Permission.Print, policyTemplateId, recipients),
+                new ProtectFilePolicyOptions(Permission.View | Permission.Print, policyTemplateId, recipients),
                 DeleteOriginalBox.IsChecked == true,
                 CancellationToken.None);
 

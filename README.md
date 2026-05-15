@@ -246,3 +246,7 @@ Administrators can apply an existing policy template to a protected file with `P
 ## Phase 5J Desktop Template Recipients
 
 Client file registration now accepts optional `policyTemplateId` and user/group `recipients`. When a template is supplied, `/api/files` applies the template permissions and watermark to the protected file and grants those permissions to the owner plus requested recipients. The Windows tray protect form includes fields for policy template ID, recipient user IDs, and recipient group IDs so desktop protection can use managed policy templates directly.
+
+## Phase 5K Generic File Protection
+
+The agent core now includes `ProtectFileWorkflow` for protecting arbitrary file types into the existing `.drmx` container. The workflow stores the source content type in the protected-file header, supports common Office, ZIP, CAD, text, CSV, and PDF extensions, and falls back to `application/octet-stream` for unknown extensions. The tray protect form now accepts any source file while keeping the same policy template and recipient controls.

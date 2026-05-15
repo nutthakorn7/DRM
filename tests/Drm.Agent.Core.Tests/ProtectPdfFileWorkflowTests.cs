@@ -9,6 +9,88 @@ namespace Drm.Agent.Core.Tests;
 public sealed class ProtectPdfFileWorkflowTests
 {
     [Fact]
+    public async Task ProtectFileWorkflow_protects_non_pdf_file_with_inferred_content_type()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "contract.docx");
+        await File.WriteAllBytesAsync(sourcePath, "office bytes"u8.ToArray());
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var tenantId = TenantId.New();
+        var ownerUserId = UserId.New();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+        var server = new RecordingServerClient();
+
+        var result = await new ProtectFileWorkflow(server, inventory)
+            .ProtectAsync(
+                tenantId,
+                ownerUserId,
+                sourcePath,
+                fileKey,
+                ProtectFilePolicyOptions.Default,
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        result.DestinationPath.Should().Be($"{sourcePath}.drmx");
+        result.ContentType.Should().Be("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        File.Exists(sourcePath).Should().BeTrue();
+        File.Exists(result.DestinationPath).Should().BeTrue();
+
+        await using var output = File.OpenRead(result.DestinationPath);
+        var package = ProtectedFileReader.Read(output);
+        package.Header.ContentType.Should().Be("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        package.Decrypt(fileKey).Should().Equal("office bytes"u8.ToArray());
+        server.RegisteredFileRequests.Should().ContainSingle(request =>
+            request.ContentType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+            request.FileId == result.FileId);
+    }
+
+    [Fact]
+    public async Task ProtectFileWorkflow_defaults_unknown_extension_to_octet_stream()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "model.cadbin");
+        await File.WriteAllBytesAsync(sourcePath, "cad bytes"u8.ToArray());
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var server = new RecordingServerClient();
+
+        var result = await new ProtectFileWorkflow(server, inventory)
+            .ProtectAsync(
+                TenantId.New(),
+                UserId.New(),
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                ProtectFilePolicyOptions.Default,
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        result.ContentType.Should().Be("application/octet-stream");
+        server.RegisteredFileRequests.Should().ContainSingle(request =>
+            request.ContentType == "application/octet-stream");
+    }
+
+    [Fact]
+    public async Task ProtectPdfFileWorkflow_rejects_non_pdf_file()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "notes.txt");
+        await File.WriteAllTextAsync(sourcePath, "plain text");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+
+        var act = () => new ProtectPdfFileWorkflow(new RecordingServerClient(), inventory)
+            .ProtectAsync(
+                TenantId.New(),
+                UserId.New(),
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Only PDF files can be protected by this workflow.");
+        File.Exists($"{sourcePath}.drmx").Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ProtectPdfFileWorkflow_writes_protected_output_and_records_inventory()
     {
         var tempDirectory = Directory.CreateTempSubdirectory();
