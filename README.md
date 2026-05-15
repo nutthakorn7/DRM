@@ -282,3 +282,7 @@ Applying a policy template to an existing protected file now updates the file's 
 ## Phase 5S Command Status Console
 
 The management API now exposes `GET /api/admin/files/{fileId}/commands?tenantId=...&deviceId=...` so admins can review pending, completed, and failed endpoint commands for a protected file. The `/admin/` console includes a Command status panel in Protected files to inspect remote delete command outcomes by file and optional device filter.
+
+## Phase 5T Watermark Alias Rendering
+
+Desktop open workflows now render `{userId}` and `{fileId}` watermark placeholders as aliases for `{user}` and `{file}`. Policy templates and admin-entered watermark patterns that use explicit ID placeholder names display concrete user/file IDs in the viewer instead of raw template text.

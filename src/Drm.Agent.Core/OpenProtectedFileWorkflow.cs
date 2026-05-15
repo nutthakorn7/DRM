@@ -212,7 +212,9 @@ public sealed class OpenProtectedFileWorkflow(
 
         return template
             .Replace("{user}", userId.ToString("N"), StringComparison.Ordinal)
+            .Replace("{userId}", userId.ToString("N"), StringComparison.Ordinal)
             .Replace("{file}", fileId.ToString("N"), StringComparison.Ordinal)
+            .Replace("{fileId}", fileId.ToString("N"), StringComparison.Ordinal)
             .Replace("{time}", DateTimeOffset.UtcNow.ToString("O"), StringComparison.Ordinal);
     }
 }

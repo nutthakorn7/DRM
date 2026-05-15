@@ -233,9 +233,46 @@ public sealed class OpenProtectedPdfFileWorkflowTests
             entry.OfflineLeaseExpiresAtUtc > DateTimeOffset.UtcNow);
     }
 
+    [Fact]
+    public async Task OpenProtectedPdfFileWorkflow_renders_watermark_alias_placeholders()
+    {
+        var tempDirectory = Directory.CreateTempSubdirectory();
+        var sourcePath = Path.Combine(tempDirectory.FullName, "report.pdf");
+        var inventory = new JsonProtectedFileInventory(Path.Combine(tempDirectory.FullName, "inventory.json"));
+        var server = new AllowingServerClient
+        {
+            WatermarkTemplate = "user:{userId} file:{fileId} time:{time}"
+        };
+        var tenantId = TenantId.New();
+        var userId = UserId.New();
+        var deviceId = DeviceId.New();
+        await File.WriteAllBytesAsync(sourcePath, "%PDF-1.7 watermark"u8.ToArray());
+        var protectedFile = await new ProtectPdfFileWorkflow(server, inventory)
+            .ProtectAsync(
+                tenantId,
+                userId,
+                sourcePath,
+                EnvelopeCrypto.GenerateKey(),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None);
+
+        var opened = await new OpenProtectedPdfFileWorkflow(
+                server,
+                new JsonFileKeyStore(Path.Combine(tempDirectory.FullName, "missing-keys.json")))
+            .OpenAsync(protectedFile.DestinationPath, userId, deviceId, CancellationToken.None);
+
+        opened.Watermark.Should().Contain(userId.Value.ToString("N"));
+        opened.Watermark.Should().Contain(protectedFile.FileId.ToString("N"));
+        opened.Watermark.Should().NotContain("{userId}");
+        opened.Watermark.Should().NotContain("{fileId}");
+        opened.Watermark.Should().NotContain("{time}");
+    }
+
     private sealed class AllowingServerClient : IDrmServerClient
     {
         private readonly Dictionary<(Guid TenantId, Guid FileId), byte[]> fileKeys = [];
+
+        public string WatermarkTemplate { get; init; } = "{user} {file}";
 
         public bool DenyUnwrap { get; set; }
 
@@ -263,7 +300,7 @@ public sealed class OpenProtectedPdfFileWorkflowTests
             return Task.FromResult(new OpenDecision(
                 true,
                 "allowed",
-                "{user} {file}",
+                WatermarkTemplate,
                 Permission.View,
                 DateTimeOffset.UtcNow.AddMinutes(5)));
         }
@@ -320,7 +357,7 @@ public sealed class OpenProtectedPdfFileWorkflowTests
             return Task.FromResult(new UnwrappedFileKey(
                 fileKey.ToArray(),
                 Permission.View,
-                "{user} {file}",
+                WatermarkTemplate,
                 DateTimeOffset.UtcNow.AddMinutes(5)));
         }
     }
