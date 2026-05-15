@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>External Share Viewer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/share/app.css">
+</head>
+<body>
+  <main class="viewer-shell">
+    <section class="workflow" aria-label="External share verification">
+      <header class="viewer-header">
+        <p class="eyebrow">DRM</p>
+        <h1>External Share Viewer</h1>
+        <p class="lead">Verify your guest access before opening this protected document session.</p>
+      </header>
+
+      <section class="step active" id="startStep" aria-labelledby="startTitle">
+        <div class="step-head">
+          <span class="step-number">1</span>
+          <div>
+            <p class="eyebrow">Share access</p>
+            <h2 id="startTitle">Start verification</h2>
+          </div>
+        </div>
+        <form id="verificationStartForm">
+          <label>
+            <span>Tenant ID</span>
+            <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" required>
+          </label>
+          <label>
+            <span>Access token</span>
+            <input id="accessToken" autocomplete="off" placeholder="Paste the share token" required>
+          </label>
+          <label>
+            <span>Guest email</span>
+            <input id="guestEmail" type="email" autocomplete="email" placeholder="guest@example.com" required>
+          </label>
+          <button type="submit">Send verification code</button>
+        </form>
+      </section>
+
+      <section class="step" id="confirmStep" aria-labelledby="confirmTitle">
+        <div class="step-head">
+          <span class="step-number">2</span>
+          <div>
+            <p class="eyebrow">Identity check</p>
+            <h2 id="confirmTitle">Confirm code</h2>
+          </div>
+        </div>
+        <form id="verificationConfirmForm">
+          <label>
+            <span>Verification ID</span>
+            <input id="verificationId" autocomplete="off" placeholder="Returned after code send" required>
+          </label>
+          <label>
+            <span>Verification code</span>
+            <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" required>
+          </label>
+          <button type="submit">Open viewer session</button>
+        </form>
+      </section>
+
+      <div class="status" id="viewerStatus" role="status" aria-live="polite">
+        Enter your share details to start.
+      </div>
+    </section>
+
+    <section class="locked-preview" aria-label="Locked viewer preview">
+      <div class="document-visual" aria-hidden="true">
+        <div class="page-mark"></div>
+        <div class="page-line long"></div>
+        <div class="page-line"></div>
+        <div class="page-line short"></div>
+        <div class="watermark-stamp" id="previewWatermark">Verified viewer only</div>
+      </div>
+
+      <div class="preview-details">
+        <p class="eyebrow">Viewer session</p>
+        <h2 id="documentTitle">Waiting for verification</h2>
+        <dl>
+          <div>
+            <dt>File ID</dt>
+            <dd id="fileIdValue">-</dd>
+          </div>
+          <div>
+            <dt>Content type</dt>
+            <dd id="contentTypeValue">-</dd>
+          </div>
+          <div>
+            <dt>Guest</dt>
+            <dd id="guestEmailValue">-</dd>
+          </div>
+          <div>
+            <dt>Session expires</dt>
+            <dd id="sessionExpiresValue">-</dd>
+          </div>
+          <div>
+            <dt>Share expires</dt>
+            <dd id="shareExpiresValue">-</dd>
+          </div>
+          <div>
+            <dt>Watermark</dt>
+            <dd id="watermarkValue">-</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="viewer-actions" aria-label="Document actions">
+        <button type="button" disabled>Download disabled</button>
+        <button type="button" disabled>Print disabled</button>
+        <button type="button" disabled>Export disabled</button>
+      </div>
+    </section>
+  </main>
+  <script src="/share/app.js"></script>
+</body>
+</html>

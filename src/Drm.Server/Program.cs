@@ -46,6 +46,12 @@ app.Use(async (context, next) =>
         return;
     }
 
+    if (context.Request.Path.Equals("/share", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/share/");
+        return;
+    }
+
     await next(context);
 });
 app.UseDefaultFiles();

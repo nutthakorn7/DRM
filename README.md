@@ -326,3 +326,9 @@ Confirm validates the code, tracks failed attempts, blocks expired or exhausted 
 Verified external guests can now open a viewer session with `POST /api/share-links/viewer/session` by submitting `tenantId` and the one-time verification session token from Phase 5X. The endpoint hashes the submitted token, rechecks session expiry plus active share-link and file state, consumes the share link's max-use count only once per verification session, and records an `external_share_viewer/external_share_viewer_opened` audit event.
 
 The response is limited to viewer-safe metadata: IDs, guest email, content type, file/link/session expiry, watermark template, and fixed disabled-action flags for download, print, and export. It still does not return file keys, wrapped keys, ciphertext, decrypted content, or browser-rendered document bytes.
+
+## Phase 5Z External Browser Viewer Shell
+
+External guests can now use the public browser shell at `/share/` to complete the share verification flow and open a metadata-only viewer session. The page calls `POST /api/share-links/verification/start`, `POST /api/share-links/verification/confirm`, and `POST /api/share-links/viewer/session`, then displays safe file/session metadata with download, print, and export visibly disabled.
+
+This is still a locked viewer shell only. It keeps the verification session token in memory, clears it after opening the viewer session, and does not request file keys, wrapped keys, ciphertext, decrypted content, or rendered document bytes.
