@@ -170,3 +170,9 @@ Protected output is written as `<source>.drmx`. The tray app stores local MVP me
 The Windows viewer can open `.drmx` files through `OpenProtectedPdfFileWorkflow`. Users enter the server URL, user ID, device ID, and protected-file path. The viewer requests a server policy-gated key unwrap, decrypts the PDF to a temporary local file from the unwrap decision metadata, renders it, and overlays the returned dynamic watermark. It stores fallback keys in `%ProgramData%\DRM\file-keys.json` and policy leases in `%ProgramData%\DRM\policy-decisions.json`.
 
 This viewer path displays returned permissions but does not yet fully enforce copy, print, and export controls.
+
+## Phase 4A Management Install Baseline
+
+On-prem management server install assets are under `deploy/management/`. The baseline includes an example production config, `start-management.sh`, and operator notes for publishing, setting `DRM_KEY_WRAPPING_MASTER_KEY_BASE64`, choosing `DRM_DATA_DIR`, and checking `/healthz`.
+
+This is a runnable management install baseline, not final production hardening. Real deployment still needs TLS, API authentication, service supervision, backups, audit retention, key rotation, and host monitoring.
