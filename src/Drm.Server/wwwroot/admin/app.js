@@ -154,6 +154,36 @@ document.querySelector("#createWatermarkTemplateForm").addEventListener("submit"
   await refreshWatermarkTemplates();
 });
 
+document.querySelector("#updateWatermarkTemplateForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const templateId = document.querySelector("#acTemplateId").value.trim();
+  if (!templateId) {
+    setStatus("Anti-capture update requires template ID", "err");
+    return;
+  }
+  const body = {
+    tenantId: requireTenantId(),
+    name: document.querySelector("#acName").value.trim(),
+    pattern: document.querySelector("#acPattern").value.trim(),
+    opacityPercent: Number(document.querySelector("#acOpacity").value),
+    densityTiles: Number(document.querySelector("#acDensity").value),
+    diagonalAngleDegrees: Number(document.querySelector("#acAngle").value),
+    includeUserId: document.querySelector("#acIncludeUser").checked,
+    includeTimestamp: document.querySelector("#acIncludeTimestamp").checked,
+    includeIpAddress: document.querySelector("#acIncludeIp").checked,
+    includeSessionId: document.querySelector("#acIncludeSession").checked,
+    rollingEnabled: document.querySelector("#acRolling").checked
+  };
+
+  await apiFetch(`/api/admin/watermark-templates/${encodeURIComponent(templateId)}`, {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+
+  setStatus("Anti-capture settings updated", "ok");
+  await refreshWatermarkTemplates();
+});
+
 document.querySelector("#simulatePolicyForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   await simulatePolicy();
@@ -700,7 +730,7 @@ function renderPolicyTemplates(templates) {
 
 function renderWatermarkTemplates(templates) {
   if (!templates.length) {
-    watermarkTemplatesBody.innerHTML = '<tr><td colspan="4" class="empty">No watermark templates in this tenant.</td></tr>';
+    watermarkTemplatesBody.innerHTML = '<tr><td colspan="5" class="empty">No watermark templates in this tenant.</td></tr>';
     return;
   }
 
@@ -709,9 +739,26 @@ function renderWatermarkTemplates(templates) {
       <td>${escapeHtml(template.name)}</td>
       <td><code>${escapeHtml(template.watermarkTemplateId)}</code></td>
       <td>${escapeHtml(template.pattern)}</td>
+      <td>${escapeHtml(formatAntiCapture(template))}</td>
       <td>${escapeHtml(formatDate(template.createdAtUtc))}</td>
     </tr>
   `).join("");
+}
+
+function formatAntiCapture(template) {
+  const parts = [
+    `op ${template.opacityPercent}%`,
+    `tiles ${template.densityTiles}`,
+    `${template.diagonalAngleDegrees}°`
+  ];
+  const flags = [];
+  if (template.includeUserId) flags.push("user");
+  if (template.includeTimestamp) flags.push("ts");
+  if (template.includeIpAddress) flags.push("ip");
+  if (template.includeSessionId) flags.push("sid");
+  if (template.rollingEnabled) flags.push("rolling");
+  if (flags.length) parts.push(flags.join("+"));
+  return parts.join(" · ");
 }
 
 function renderSimulation(decision) {

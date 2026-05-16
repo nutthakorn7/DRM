@@ -49,12 +49,19 @@ public sealed class AdminWatermarkTemplatesApiTests : IDisposable
         create.Headers.Location.Should().NotBeNull();
 
         var created = await create.Content.ReadFromJsonAsync<WatermarkTemplateResponse>();
-        created.Should().BeEquivalentTo(new WatermarkTemplateResponse(
-            tenantId,
-            templateId,
-            "Confidential diagonal",
-            "user:{user} file:{file} time:{time}",
-            created!.CreatedAtUtc));
+        created.Should().NotBeNull();
+        created!.TenantId.Should().Be(tenantId);
+        created.WatermarkTemplateId.Should().Be(templateId);
+        created.Name.Should().Be("Confidential diagonal");
+        created.Pattern.Should().Be("user:{user} file:{file} time:{time}");
+        created.OpacityPercent.Should().Be(33);
+        created.DensityTiles.Should().Be(4);
+        created.DiagonalAngleDegrees.Should().Be(-28);
+        created.IncludeUserId.Should().BeTrue();
+        created.IncludeTimestamp.Should().BeTrue();
+        created.IncludeIpAddress.Should().BeFalse();
+        created.IncludeSessionId.Should().BeFalse();
+        created.RollingEnabled.Should().BeFalse();
         created.CreatedAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
 
         using var getCreated = await client.GetAsync(create.Headers.Location);
@@ -150,6 +157,80 @@ public sealed class AdminWatermarkTemplatesApiTests : IDisposable
             "invalid_pattern");
     }
 
+    [Fact]
+    public async Task Admin_can_update_anti_capture_settings_on_existing_watermark_template()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createResponse = await CreateWatermarkTemplateAsync(
+            client, tenantId, templateId, "Confidential", "user:{user}");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var update = new
+        {
+            tenantId,
+            name = "Confidential v2",
+            pattern = "user:{user} time:{time}",
+            opacityPercent = 50,
+            densityTiles = 8,
+            diagonalAngleDegrees = -45,
+            includeUserId = true,
+            includeTimestamp = true,
+            includeIpAddress = true,
+            includeSessionId = true,
+            rollingEnabled = true
+        };
+
+        using var updateResponse = await client.PutAsJsonAsync(
+            $"/api/admin/watermark-templates/{templateId}", update);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var updated = await updateResponse.Content.ReadFromJsonAsync<WatermarkTemplateResponse>();
+        updated.Should().NotBeNull();
+        updated!.Name.Should().Be("Confidential v2");
+        updated.OpacityPercent.Should().Be(50);
+        updated.DensityTiles.Should().Be(8);
+        updated.DiagonalAngleDegrees.Should().Be(-45);
+        updated.IncludeIpAddress.Should().BeTrue();
+        updated.IncludeSessionId.Should().BeTrue();
+        updated.RollingEnabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Admin_update_rejects_out_of_range_anti_capture_values()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createResponse = await CreateWatermarkTemplateAsync(
+            client, tenantId, templateId, "Confidential", "user:{user}");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var invalid = new
+        {
+            tenantId,
+            name = "Confidential",
+            pattern = "user:{user}",
+            opacityPercent = 200,
+            densityTiles = 4,
+            diagonalAngleDegrees = 0,
+            includeUserId = true,
+            includeTimestamp = true,
+            includeIpAddress = false,
+            includeSessionId = false,
+            rollingEnabled = false
+        };
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/admin/watermark-templates/{templateId}", invalid);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new ErrorResponse("invalid_opacity_percent"));
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -197,6 +278,14 @@ public sealed class AdminWatermarkTemplatesApiTests : IDisposable
         Guid WatermarkTemplateId,
         string Name,
         string Pattern,
+        int OpacityPercent,
+        int DensityTiles,
+        int DiagonalAngleDegrees,
+        bool IncludeUserId,
+        bool IncludeTimestamp,
+        bool IncludeIpAddress,
+        bool IncludeSessionId,
+        bool RollingEnabled,
         DateTimeOffset CreatedAtUtc);
 
     private sealed record AuditEventResponse(

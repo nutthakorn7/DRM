@@ -235,6 +235,37 @@ using (var scope = app.Services.CreateScope())
                 """);
         }
 
+        var watermarkColumns = new HashSet<string>(StringComparer.Ordinal);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"WatermarkTemplates\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                watermarkColumns.Add(reader.GetString(1));
+            }
+        }
+
+        var watermarkColumnDdl = new (string Name, string Ddl)[]
+        {
+            ("OpacityPercent", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"OpacityPercent\" INTEGER NOT NULL DEFAULT 33;"),
+            ("DensityTiles", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"DensityTiles\" INTEGER NOT NULL DEFAULT 4;"),
+            ("DiagonalAngleDegrees", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"DiagonalAngleDegrees\" INTEGER NOT NULL DEFAULT -28;"),
+            ("IncludeUserId", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"IncludeUserId\" INTEGER NOT NULL DEFAULT 1;"),
+            ("IncludeTimestamp", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"IncludeTimestamp\" INTEGER NOT NULL DEFAULT 1;"),
+            ("IncludeIpAddress", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"IncludeIpAddress\" INTEGER NOT NULL DEFAULT 0;"),
+            ("IncludeSessionId", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"IncludeSessionId\" INTEGER NOT NULL DEFAULT 0;"),
+            ("RollingEnabled", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"RollingEnabled\" INTEGER NOT NULL DEFAULT 0;"),
+        };
+
+        foreach (var (name, ddl) in watermarkColumnDdl)
+        {
+            if (!watermarkColumns.Contains(name))
+            {
+                dbContext.Database.ExecuteSqlRaw(ddl);
+            }
+        }
+
         if (openedHere)
         {
             connection.Close();

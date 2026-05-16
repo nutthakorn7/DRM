@@ -456,3 +456,39 @@ Group PUT replaces the entire membership list. Members not present in the reques
 Configure the SCIM provisioning app in your IdP with:
 - **Tenant URL:** `https://your-server/scim/v2/{tenantId}`
 - **Secret Token:** value of `Drm:Security:AdminApiKey`
+
+## Phase 5AI Anti-Camera Capture Watermark
+
+The Windows viewer renders a **tiled, rolling, time-stamped watermark** across the document viewport to deter and forensically trace camera-based screen capture. Each `WatermarkTemplateEntity` now persists anti-capture configuration that admins can manage via console; the viewer continuously refreshes the watermark text and applies a jitter offset every second so that any photo captures unique identifying information.
+
+### Anti-capture fields on `WatermarkTemplateEntity`
+
+| Field | Range | Default | Purpose |
+|-------|-------|---------|---------|
+| `OpacityPercent` | 5–100 | 33 | Watermark transparency |
+| `DensityTiles` | 1–12 | 4 | Tile repetitions (rows × cols target) |
+| `DiagonalAngleDegrees` | -90–90 | -28 | Rotation angle for each tile |
+| `IncludeUserId` | bool | true | Render viewing user identity |
+| `IncludeTimestamp` | bool | true | Render live UTC timestamp |
+| `IncludeIpAddress` | bool | false | Render client IP |
+| `IncludeSessionId` | bool | false | Render viewer session ID |
+| `RollingEnabled` | bool | false | Subtle position jitter (camera defeat) |
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/watermark-templates` | Create template (anti-capture fields optional, defaults applied) |
+| `PUT` | `/api/admin/watermark-templates/{id}` | Update template incl. anti-capture settings |
+| `GET` | `/api/admin/watermark-templates` | List templates (returns anti-capture fields) |
+| `GET` | `/api/admin/watermark-templates/{id}` | Get template |
+
+Validation returns `invalid_opacity_percent`, `invalid_density_tiles`, or `invalid_diagonal_angle_degrees` for out-of-range values.
+
+### Admin console
+
+The **Watermarks** panel now includes an expandable **Anti-camera capture settings** form to update an existing template by ID. The templates table shows a compact summary column (e.g. `op 33% · tiles 4 · -28° · user+ts`).
+
+### Windows viewer
+
+Replaces the single centered text overlay with a 4×4 `UniformGrid` of tiled diagonal watermarks plus a `DispatcherTimer` that refreshes the rendered timestamp and applies a random ±6 px offset each second, making a photographic capture identify both the user and the exact moment of the capture.

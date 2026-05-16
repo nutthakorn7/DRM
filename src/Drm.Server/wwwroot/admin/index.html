@@ -295,9 +295,39 @@
         <form class="watermark-row" id="createWatermarkTemplateForm">
           <input id="watermarkTemplateId" autocomplete="off" placeholder="Watermark template ID">
           <input id="watermarkTemplateName" autocomplete="off" placeholder="Name">
-          <input id="watermarkTemplatePattern" autocomplete="off" placeholder="Watermark pattern">
+          <input id="watermarkTemplatePattern" autocomplete="off" placeholder="Watermark pattern (e.g. {user} • {time})">
           <button type="submit">Create watermark</button>
         </form>
+
+        <details class="anti-capture-block">
+          <summary>Anti-camera capture settings (apply when editing a template)</summary>
+          <form id="updateWatermarkTemplateForm" class="watermark-anti-capture-form">
+            <label>Template ID
+              <input id="acTemplateId" autocomplete="off" placeholder="Watermark template ID">
+            </label>
+            <label>Name
+              <input id="acName" autocomplete="off" placeholder="Name">
+            </label>
+            <label>Pattern
+              <input id="acPattern" autocomplete="off" placeholder="Pattern">
+            </label>
+            <label>Opacity %
+              <input id="acOpacity" type="number" min="5" max="100" value="33">
+            </label>
+            <label>Density tiles (1–12)
+              <input id="acDensity" type="number" min="1" max="12" value="4">
+            </label>
+            <label>Diagonal angle °
+              <input id="acAngle" type="number" min="-90" max="90" value="-28">
+            </label>
+            <label><input id="acIncludeUser" type="checkbox" checked> Include user ID</label>
+            <label><input id="acIncludeTimestamp" type="checkbox" checked> Include timestamp</label>
+            <label><input id="acIncludeIp" type="checkbox"> Include IP address</label>
+            <label><input id="acIncludeSession" type="checkbox"> Include session ID</label>
+            <label><input id="acRolling" type="checkbox"> Rolling watermark</label>
+            <button type="submit">Update anti-capture settings</button>
+          </form>
+        </details>
 
         <div class="table-wrap">
           <table>
@@ -306,12 +336,13 @@
                 <th>Name</th>
                 <th>Template ID</th>
                 <th>Watermark pattern</th>
+                <th>Anti-capture</th>
                 <th>Created</th>
               </tr>
             </thead>
             <tbody id="watermarkTemplatesBody">
               <tr>
-                <td colspan="4" class="empty">Refresh to load watermark templates.</td>
+                <td colspan="5" class="empty">Refresh to load watermark templates.</td>
               </tr>
             </tbody>
           </table>

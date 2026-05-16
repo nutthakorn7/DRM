@@ -1,7 +1,9 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Drm.Agent.Core;
 using Drm.Domain;
 using Microsoft.Win32;
@@ -32,15 +34,57 @@ public partial class MainWindow : Window
     private Guid? currentFileId;
     private Uri? currentServerUrl;
     private string currentClientApiKey = string.Empty;
+    private string currentWatermarkBase = "DRM Protected";
+    private readonly ObservableCollection<string> watermarkTiles = new();
+    private readonly DispatcherTimer watermarkRefreshTimer;
+    private readonly Random watermarkJitterRng = new();
+    private const int WatermarkTileCount = 16;
 
     public MainWindow()
     {
         InitializeComponent();
         PreviewKeyDown += MainWindow_PreviewKeyDown;
-        WatermarkText.Text = "DRM Protected";
+        WatermarkTileHost.ItemsSource = watermarkTiles;
+        WatermarkText.Text = currentWatermarkBase;
+        watermarkRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        watermarkRefreshTimer.Tick += (_, _) => RefreshWatermarkTiles();
+        watermarkRefreshTimer.Start();
+        RefreshWatermarkTiles();
         StatusText.Text = "No document loaded.";
         PrefillProtectedPathFromCommandLine();
         ApplyPermissionState();
+    }
+
+    private void RefreshWatermarkTiles()
+    {
+        var nowUtc = DateTimeOffset.UtcNow;
+        var stamp = nowUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'");
+        var label = string.IsNullOrWhiteSpace(currentWatermarkBase) ? "DRM Protected" : currentWatermarkBase;
+        var tileText = $"{label}\n{stamp}";
+
+        if (watermarkTiles.Count != WatermarkTileCount)
+        {
+            watermarkTiles.Clear();
+            for (var i = 0; i < WatermarkTileCount; i++)
+            {
+                watermarkTiles.Add(tileText);
+            }
+        }
+        else
+        {
+            for (var i = 0; i < WatermarkTileCount; i++)
+            {
+                watermarkTiles[i] = tileText;
+            }
+        }
+
+        var jitterX = (watermarkJitterRng.NextDouble() - 0.5) * 12.0;
+        var jitterY = (watermarkJitterRng.NextDouble() - 0.5) * 12.0;
+        WatermarkOffset.X = jitterX;
+        WatermarkOffset.Y = jitterY;
     }
 
     private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -122,9 +166,16 @@ public partial class MainWindow : Window
         currentContentType = PdfContentType;
         currentPermissions = permissions;
         ApplyPermissionState();
-        WatermarkText.Text = watermark;
+        SetWatermarkBase(watermark);
         StatusText.Text = $"Loaded protected PDF file: {Path.GetFileName(path)}";
         PdfHost.Navigate(path);
+    }
+
+    private void SetWatermarkBase(string watermark)
+    {
+        currentWatermarkBase = string.IsNullOrWhiteSpace(watermark) ? "DRM Protected" : watermark;
+        WatermarkText.Text = currentWatermarkBase;
+        RefreshWatermarkTiles();
     }
 
     private void LoadGenericProtectedFile(byte[] content, string contentType, string watermark, Permission permissions)
@@ -135,7 +186,7 @@ public partial class MainWindow : Window
         currentContentType = contentType;
         currentPermissions = permissions;
         ApplyPermissionState();
-        WatermarkText.Text = watermark;
+        SetWatermarkBase(watermark);
         StatusText.Text = $"Loaded protected file: {contentType}";
         PdfHost.Navigate("about:blank");
     }
@@ -234,6 +285,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        watermarkRefreshTimer.Stop();
         DeleteTemporaryPdf();
         base.OnClosed(e);
     }

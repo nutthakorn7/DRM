@@ -110,6 +110,22 @@ public sealed class WatermarkTemplateEntity
 
     public string Pattern { get; set; } = string.Empty;
 
+    public int OpacityPercent { get; set; } = 33;
+
+    public int DensityTiles { get; set; } = 4;
+
+    public int DiagonalAngleDegrees { get; set; } = -28;
+
+    public bool IncludeUserId { get; set; } = true;
+
+    public bool IncludeTimestamp { get; set; } = true;
+
+    public bool IncludeIpAddress { get; set; }
+
+    public bool IncludeSessionId { get; set; }
+
+    public bool RollingEnabled { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 
