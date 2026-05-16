@@ -188,6 +188,53 @@ using (var scope = app.Services.CreateScope())
                 """);
         }
 
+        var hasTenantUsersExternalId = false;
+        var hasTenantUsersActive = false;
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"TenantUsers\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var col = reader.GetString(1);
+                if (string.Equals(col, "ExternalId", StringComparison.Ordinal)) hasTenantUsersExternalId = true;
+                if (string.Equals(col, "Active", StringComparison.Ordinal)) hasTenantUsersActive = true;
+            }
+        }
+
+        if (!hasTenantUsersExternalId)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantUsers" ADD COLUMN "ExternalId" TEXT NULL;
+                """);
+        }
+
+        if (!hasTenantUsersActive)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantUsers" ADD COLUMN "Active" INTEGER NOT NULL DEFAULT 1;
+                """);
+        }
+
+        var hasTenantGroupsExternalId = false;
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"TenantGroups\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), "ExternalId", StringComparison.Ordinal))
+                    hasTenantGroupsExternalId = true;
+            }
+        }
+
+        if (!hasTenantGroupsExternalId)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantGroups" ADD COLUMN "ExternalId" TEXT NULL;
+                """);
+        }
+
         if (openedHere)
         {
             connection.Close();

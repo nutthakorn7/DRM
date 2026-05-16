@@ -60,14 +60,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasKey(user => new { user.TenantId, user.UserId });
             entity.HasIndex(user => new { user.TenantId, user.Email }).IsUnique();
+            entity.HasIndex(user => new { user.TenantId, user.ExternalId });
             entity.Property(user => user.Email).HasMaxLength(320);
             entity.Property(user => user.DisplayName).HasMaxLength(256);
+            entity.Property(user => user.ExternalId).HasMaxLength(256);
         });
 
         modelBuilder.Entity<TenantGroupEntity>(entity =>
         {
             entity.HasKey(group => new { group.TenantId, group.GroupId });
+            entity.HasIndex(group => new { group.TenantId, group.ExternalId });
             entity.Property(group => group.Name).HasMaxLength(256);
+            entity.Property(group => group.ExternalId).HasMaxLength(256);
         });
 
         modelBuilder.Entity<GroupMemberEntity>(entity =>

@@ -50,6 +50,10 @@ public sealed class TenantUserEntity
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string? ExternalId { get; set; }
+
+    public bool Active { get; set; } = true;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 
@@ -60,6 +64,8 @@ public sealed class TenantGroupEntity
     public Guid GroupId { get; set; }
 
     public string Name { get; set; } = string.Empty;
+
+    public string? ExternalId { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
