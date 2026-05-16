@@ -27,18 +27,12 @@ builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
 
-var smtpSettings = new SmtpEmailSettings();
-builder.Configuration.GetSection("Drm:Email:Smtp").Bind(smtpSettings);
-
-if (smtpSettings.IsConfigured)
-{
-    builder.Services.AddSingleton(smtpSettings);
+var emailSettings = builder.Configuration.GetSection("Drm:Email").Get<SmtpEmailSettings>() ?? new SmtpEmailSettings();
+builder.Services.AddSingleton(emailSettings);
+if (emailSettings.IsConfigured)
     builder.Services.AddSingleton<IExternalShareVerificationSender, SmtpExternalShareVerificationSender>();
-}
 else
-{
     builder.Services.AddSingleton<IExternalShareVerificationSender, NoopExternalShareVerificationSender>();
-}
 
 var app = builder.Build();
 

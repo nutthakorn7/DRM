@@ -70,3 +70,41 @@ public sealed class SmtpVerificationSenderBuildMessageTests
         mime.Subject.Should().NotBeNullOrWhiteSpace();
     }
 }
+
+public sealed class SmtpSenderWiringTests : IDisposable
+{
+    private readonly string databasePath =
+        Path.Combine(Path.GetTempPath(), $"drm-smtp-wiring-{Guid.NewGuid():N}.db");
+
+    public void Dispose() => File.Delete(databasePath);
+
+    [Fact]
+    public void When_smtp_host_is_configured_smtp_sender_is_registered()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b =>
+            {
+                b.UseSetting("ConnectionStrings:DrmDb", $"Data Source={databasePath}");
+                b.UseSetting("Drm:Email:SmtpHost", "smtp.test.example");
+            });
+
+        using var scope = factory.Services.CreateScope();
+        var sender = scope.ServiceProvider.GetRequiredService<IExternalShareVerificationSender>();
+        sender.Should().BeOfType<SmtpExternalShareVerificationSender>();
+    }
+
+    [Fact]
+    public void When_smtp_host_is_not_configured_noop_sender_is_registered()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b =>
+            {
+                b.UseSetting("ConnectionStrings:DrmDb", $"Data Source={databasePath}");
+                // Drm:Email:SmtpHost intentionally absent
+            });
+
+        using var scope = factory.Services.CreateScope();
+        var sender = scope.ServiceProvider.GetRequiredService<IExternalShareVerificationSender>();
+        sender.Should().BeOfType<NoopExternalShareVerificationSender>();
+    }
+}
