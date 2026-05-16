@@ -290,6 +290,7 @@ app.MapAdminDirectorySyncEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();
+app.MapScimGroupsEndpoints();
 app.MapAgentEndpoints();
 
 app.Run();
