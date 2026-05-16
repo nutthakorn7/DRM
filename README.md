@@ -410,3 +410,49 @@ Supported notification events (each independently opt-in):
 `adminEmailsCsv` accepts a comma-separated list of admin email addresses. Notifications use the same `Drm:Email:SmtpHost` configuration as Phase 5AE verification codes. When SMTP is unconfigured, the notification sender is a no-op and no emails are sent.
 
 SMTP failures log a warning and do not affect the primary operation (file revoke, policy decision, etc.). The `/admin/` console includes an **Email notifications** section for loading and saving tenant notification config.
+
+## Phase 5AH SCIM 2.0 Provisioning
+
+Enterprise identity providers (Entra ID, Okta, OneLogin) can now automatically provision and deprovision DRM users and groups via the SCIM 2.0 standard (RFC 7644).
+
+**Base URL per tenant:** `/scim/v2/{tenantId}/`
+
+**Authentication:** `Authorization: Bearer <AdminApiKey>` — uses the same key as `X-DRM-Admin-Key`.
+
+### Users
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/scim/v2/{tenantId}/Users` | List users (supports `filter`, `startIndex`, `count`) |
+| `POST` | `/scim/v2/{tenantId}/Users` | Create user |
+| `GET` | `/scim/v2/{tenantId}/Users/{id}` | Get user by DRM UserId |
+| `PUT` | `/scim/v2/{tenantId}/Users/{id}` | Replace user (updates email, displayName, externalId, active) |
+| `DELETE` | `/scim/v2/{tenantId}/Users/{id}` | Delete user and remove from all groups |
+
+Supported filter attributes: `userName eq "..."` and `externalId eq "..."`.
+
+The `active` field is stored on the user record. Policy enforcement based on `active = false` is not yet implemented — a deactivated user can still open files in this phase.
+
+### Groups
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/scim/v2/{tenantId}/Groups` | List groups (supports `filter`, `startIndex`, `count`) |
+| `POST` | `/scim/v2/{tenantId}/Groups` | Create group |
+| `GET` | `/scim/v2/{tenantId}/Groups/{id}` | Get group with current member list |
+| `PUT` | `/scim/v2/{tenantId}/Groups/{id}` | Replace group — replaces entire member list |
+| `DELETE` | `/scim/v2/{tenantId}/Groups/{id}` | Delete group and all memberships |
+
+Supported filter attributes: `displayName eq "..."` and `externalId eq "..."`.
+
+Group PUT replaces the entire membership list. Members not present in the request body are removed. Members are referenced by DRM UserId (`value` field).
+
+### ServiceProviderConfig
+
+`GET /scim/v2/{tenantId}/ServiceProviderConfig` returns supported SCIM capabilities. PATCH and bulk operations are not supported in this phase.
+
+### IdP Configuration
+
+Configure the SCIM provisioning app in your IdP with:
+- **Tenant URL:** `https://your-server/scim/v2/{tenantId}`
+- **Secret Token:** value of `Drm:Security:AdminApiKey`
