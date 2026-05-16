@@ -243,6 +243,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseAdminApiKeyAuthentication();
+app.UseScimBearerAuthentication();
 app.UseClientApiKeyAuthentication();
 app.Use(async (context, next) =>
 {
@@ -287,6 +288,7 @@ app.MapAdminSiemEndpoints();
 app.MapAdminExternalShareSettingsEndpoints();
 app.MapAdminDirectorySyncEndpoints();
 app.MapAdminNotificationConfigEndpoints();
+app.MapScimEndpoints();
 app.MapAgentEndpoints();
 
 app.Run();
