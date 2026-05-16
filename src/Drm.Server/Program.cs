@@ -35,6 +35,11 @@ if (emailSettings.IsConfigured)
     builder.Services.AddSingleton<IExternalShareVerificationSender, SmtpExternalShareVerificationSender>();
 else
     builder.Services.AddSingleton<IExternalShareVerificationSender, NoopExternalShareVerificationSender>();
+if (emailSettings.IsConfigured)
+    builder.Services.AddSingleton<IAdminNotificationSender, SmtpAdminNotificationSender>();
+else
+    builder.Services.AddSingleton<IAdminNotificationSender, NoopAdminNotificationSender>();
+builder.Services.AddScoped<IAdminNotificationService, AdminNotificationService>();
 
 var app = builder.Build();
 
@@ -234,6 +239,7 @@ app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
 app.MapAdminExternalShareSettingsEndpoints();
 app.MapAdminDirectorySyncEndpoints();
+app.MapAdminNotificationConfigEndpoints();
 app.MapAgentEndpoints();
 
 app.Run();
