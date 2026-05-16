@@ -338,3 +338,39 @@ This is still a locked viewer shell only. It keeps the verification session toke
 Admin share-link creation now returns a ready-to-open `shareUrl` alongside the one-time `accessToken`. The URL includes `tenantId`, `accessToken`, and `guestEmail` query parameters so recipients can open `/share/` with prefilled access details instead of manually copying values.
 
 The `/share/` shell reads those query parameters, prefills the verification-start form, and keeps the same security boundary: guests still must request and confirm a verification code before a viewer session opens, and no file keys or document bytes are released by this phase.
+
+## Phase 5AB Server-Side File Ciphertext Storage
+
+When an agent or CLI protects a file, the server now stores the encrypted file payload alongside the wrapped key. The protection workflow uploads nonce, ciphertext, tag, and AEAD associated data to `POST /api/files/{fileId}/ciphertext` immediately after writing the `.drmx` container. This payload is the prerequisite for external browser viewers to decrypt and render protected documents without trusting the agent's local filesystem.
+
+## Phase 5AC External Viewer Content and Key Delivery
+
+Verified external viewer sessions can now retrieve the encrypted file payload and the unwrapped file key from the server. `GET /api/share-links/viewer/content` returns nonce, ciphertext, tag, and AEAD associated data for a file whose ciphertext was uploaded in Phase 5AB. `POST /api/share-links/viewer/key` unwraps and returns the plaintext file key. Both endpoints re-validate session expiry, share-link state, and file revocation. Each key release records an `external_share_viewer_key_released` audit event.
+
+## Phase 5AD Browser PDF Rendering
+
+External guests with a verified viewer session can now view protected PDF files directly in the browser. After opening a viewer session, the `/share/` shell fetches the encrypted file payload from `GET /api/share-links/viewer/content` and the unwrapped file key from `POST /api/share-links/viewer/key`, decrypts the content in-memory using the Web Crypto API (AES-256-GCM), and renders all pages into `<canvas>` elements via PDF.js. The file key and decrypted bytes are never written to browser storage (localStorage, sessionStorage, or IndexedDB), and no download, print, or export actions are exposed. A watermark overlay derived from the viewer session policy is displayed over the rendered pages.
+
+Non-PDF content types receive an "unsupported content type" message and no content is fetched.
+
+## Phase 5AE SMTP Email Verification
+
+External share verification codes are now delivered via SMTP. Configure `Drm:Email:SmtpHost` to activate the SMTP sender; without that setting the server uses the no-op sender suitable for development and test environments.
+
+Example configuration (see `deploy/management/appsettings.onprem.example.json`):
+
+```json
+"Drm": {
+  "Email": {
+    "SmtpHost": "smtp.example.com",
+    "SmtpPort": 587,
+    "SmtpUseTls": true,
+    "SmtpUsername": "noreply@example.com",
+    "SmtpPassword": "REPLACE_WITH_SMTP_PASSWORD",
+    "FromAddress": "noreply@example.com",
+    "FromName": "DRM Security"
+  }
+}
+```
+
+The verification email is plain text containing the six-digit code and its expiry time. When `SmtpHost` is absent (default), the no-op sender is registered and verification codes are only accessible through the `POST /api/share-links/verification/start` response for integration testing and local development.
