@@ -237,6 +237,27 @@ public sealed class AgentCommandEntity
     public DateTimeOffset? CompletedAtUtc { get; set; }
 }
 
+public sealed class TenantExternalShareSettingsEntity
+{
+    public Guid TenantId { get; set; }
+
+    public bool ExternalSharingEnabled { get; set; } = true;
+
+    public string? AllowedGuestEmailDomainsCsv { get; set; }
+
+    public string? BlockedGuestEmailsCsv { get; set; }
+
+    public int? MaxShareLinkLifetimeHours { get; set; }
+
+    public int? MaxShareLinkMaxUses { get; set; }
+
+    public int? MaxActiveShareLinksPerFile { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    public Guid UpdatedByUserId { get; set; }
+}
+
 public sealed class FileKeyEntity
 {
     public Guid TenantId { get; set; }

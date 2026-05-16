@@ -24,6 +24,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<ExternalShareVerificationEntity> ExternalShareVerifications => Set<ExternalShareVerificationEntity>();
 
+    public DbSet<TenantExternalShareSettingsEntity> TenantExternalShareSettings => Set<TenantExternalShareSettingsEntity>();
+
     public DbSet<SiemWebhookEntity> SiemWebhooks => Set<SiemWebhookEntity>();
 
     public DbSet<AgentDeviceEntity> AgentDevices => Set<AgentDeviceEntity>();
@@ -107,6 +109,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(verification => verification.GuestEmail).HasMaxLength(320);
             entity.Property(verification => verification.CodeHash).HasMaxLength(128);
             entity.Property(verification => verification.SessionTokenHash).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<TenantExternalShareSettingsEntity>(entity =>
+        {
+            entity.HasKey(settings => settings.TenantId);
+            entity.Property(settings => settings.AllowedGuestEmailDomainsCsv).HasMaxLength(4096);
+            entity.Property(settings => settings.BlockedGuestEmailsCsv).HasMaxLength(16384);
         });
 
         modelBuilder.Entity<SiemWebhookEntity>(entity =>
