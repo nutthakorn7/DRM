@@ -12,7 +12,7 @@ public sealed record ServerPolicyDecision(
     bool FileFound,
     bool InvalidPermission);
 
-public sealed class PolicyDecisionService(AppDbContext dbContext)
+public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotificationService notificationService)
 {
     public async Task<ServerPolicyDecision> DecideAsync(
         Guid tenantId,
@@ -89,6 +89,15 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
                     CreatedAtUtc = decisionTime
                 });
                 await dbContext.SaveChangesAsync(cancellationToken);
+                await notificationService.NotifyAsync(
+                    tenantId,
+                    new AdminNotificationEvent(
+                        "access_denied",
+                        fileId,
+                        userId,
+                        null,
+                        decisionTime),
+                    cancellationToken);
             }
 
             return new ServerPolicyDecision(
@@ -123,6 +132,15 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
                     CreatedAtUtc = decisionTime
                 });
                 await dbContext.SaveChangesAsync(cancellationToken);
+                await notificationService.NotifyAsync(
+                    tenantId,
+                    new AdminNotificationEvent(
+                        "access_denied",
+                        fileId,
+                        userId,
+                        null,
+                        decisionTime),
+                    cancellationToken);
             }
 
             return new ServerPolicyDecision(
@@ -199,6 +217,18 @@ public sealed class PolicyDecisionService(AppDbContext dbContext)
                 CreatedAtUtc = decisionTime
             });
             await dbContext.SaveChangesAsync(cancellationToken);
+            if (!decision.Allowed)
+            {
+                await notificationService.NotifyAsync(
+                    tenantId,
+                    new AdminNotificationEvent(
+                        "access_denied",
+                        fileId,
+                        userId,
+                        null,
+                        decisionTime),
+                    cancellationToken);
+            }
         }
 
         var offlineLeaseExpiresAtUtc = decision.Allowed && file.OfflineLeaseMinutes > 0

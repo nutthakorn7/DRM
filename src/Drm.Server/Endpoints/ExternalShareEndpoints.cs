@@ -291,6 +291,7 @@ public static class ExternalShareEndpoints
     private static async Task<Results<Ok<ExternalShareViewerSessionResponse>, BadRequest<ErrorResponse>, NotFound>> OpenViewerSessionAsync(
         OpenExternalShareViewerSessionRequest request,
         AppDbContext dbContext,
+        IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
         if (request.TenantId == Guid.Empty)
@@ -362,6 +363,15 @@ public static class ExternalShareEndpoints
             });
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            await notificationService.NotifyAsync(
+                shareLink.TenantId,
+                new AdminNotificationEvent(
+                    "external_share_viewer_opened",
+                    shareLink.FileId,
+                    null,
+                    shareLink.GuestEmail,
+                    now),
+                cancellationToken);
         }
 
         return TypedResults.Ok(new ExternalShareViewerSessionResponse(

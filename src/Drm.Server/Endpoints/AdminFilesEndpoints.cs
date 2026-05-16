@@ -125,6 +125,7 @@ public static class AdminFilesEndpoints
         CreateExternalShareLinkRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
+        IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
         var file = await dbContext.ProtectedFiles
@@ -169,6 +170,15 @@ public static class AdminFilesEndpoints
             now));
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await notificationService.NotifyAsync(
+            request.TenantId,
+            new AdminNotificationEvent(
+                "external_share_link_created",
+                fileId,
+                request.AdminUserId,
+                NormalizeEmail(request.GuestEmail),
+                now),
+            cancellationToken);
 
         var shareUrl = BuildExternalShareUrl(
             httpContext,
@@ -247,6 +257,7 @@ public static class AdminFilesEndpoints
         RevokeFileRequest request,
         AppDbContext dbContext,
         ISiemDispatcher siemDispatcher,
+        IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
         var file = await dbContext.ProtectedFiles
@@ -271,6 +282,15 @@ public static class AdminFilesEndpoints
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await siemDispatcher.DispatchAsync(auditEvent, cancellationToken);
+        await notificationService.NotifyAsync(
+            file.TenantId,
+            new AdminNotificationEvent(
+                "file_revoked",
+                file.Id,
+                request.AdminUserId,
+                null,
+                DateTimeOffset.UtcNow),
+            cancellationToken);
 
         return TypedResults.Ok(new RevokeFileResponse(file.TenantId, file.Id, file.Revoked));
     }
