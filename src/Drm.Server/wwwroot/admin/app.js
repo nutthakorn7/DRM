@@ -22,6 +22,7 @@ const shareLinkCreatedOutput = document.querySelector("#shareLinkCreatedOutput")
 const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
 const auditEventsBody = document.querySelector("#auditEventsBody");
 const healthOutput = document.querySelector("#healthOutput");
+const syncOutput = document.querySelector("#syncOutput");
 
 tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
@@ -199,6 +200,33 @@ document.querySelector("#createSiemWebhookForm").addEventListener("submit", asyn
 
 document.querySelector("#downloadAuditCsv").addEventListener("click", () => {
   downloadAuditCsv();
+});
+
+document.querySelector("#directorySyncConfigForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    entraTenantId: document.querySelector("#dirEntraTenantId").value.trim(),
+    clientId: document.querySelector("#dirClientId").value.trim(),
+    clientSecret: document.querySelector("#dirClientSecret").value.trim()
+  };
+  await apiFetch("/api/admin/directory/config", {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+  setStatus("Directory config saved", "ok");
+});
+
+document.querySelector("#triggerSync").addEventListener("click", async () => {
+  syncOutput.textContent = "Syncing…";
+  const body = { tenantId: requireTenantId() };
+  const result = await apiFetch("/api/admin/directory/sync", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  syncOutput.textContent = result
+    ? JSON.stringify(result, null, 2)
+    : "Sync returned no result.";
 });
 
 document.querySelector("#grantForm").addEventListener("submit", async (event) => {

@@ -53,6 +53,28 @@
         <button id="saveSession" type="button">Save session</button>
       </section>
 
+      <section class="panel" id="directory">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Identity</p>
+            <h3>Directory sync</h3>
+          </div>
+        </div>
+
+        <form class="create-row" id="directorySyncConfigForm">
+          <input id="dirEntraTenantId" autocomplete="off" placeholder="Entra tenant ID (e.g. contoso.onmicrosoft.com)">
+          <input id="dirClientId" autocomplete="off" placeholder="Client ID (app registration GUID)">
+          <input id="dirClientSecret" type="password" autocomplete="off" placeholder="Client secret">
+          <button type="submit">Save config</button>
+        </form>
+
+        <div class="create-row">
+          <button id="triggerSync" type="button">Sync now</button>
+        </div>
+
+        <pre id="syncOutput" class="output-block"></pre>
+      </section>
+
       <section class="panel" id="users">
         <div class="section-head">
           <div>
