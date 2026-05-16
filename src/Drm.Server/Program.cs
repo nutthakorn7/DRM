@@ -70,6 +70,19 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_FileViewerPreviewPages_TenantId_FileId"
             ON "FileViewerPreviewPages" ("TenantId", "FileId");
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantDirectorySyncConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantDirectorySyncConfigs" PRIMARY KEY,
+                "EntraTenantId" TEXT NOT NULL DEFAULT '',
+                "ClientId" TEXT NOT NULL DEFAULT '',
+                "ClientSecret" TEXT NOT NULL DEFAULT '',
+                "LastSyncStatus" TEXT NULL,
+                "LastSyncAtUtc" TEXT NULL,
+                "LastSyncUserCount" INTEGER NULL,
+                "LastSyncGroupCount" INTEGER NULL,
+                "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
+            );
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;

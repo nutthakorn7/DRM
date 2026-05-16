@@ -34,6 +34,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<FileKeyEntity> FileKeys => Set<FileKeyEntity>();
 
+    public DbSet<TenantDirectorySyncConfigEntity> TenantDirectorySyncConfigs => Set<TenantDirectorySyncConfigEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -150,6 +152,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(fileKey => fileKey.WrappedKeyNonceBase64).HasMaxLength(64);
             entity.Property(fileKey => fileKey.WrappedKeyCiphertextBase64).HasMaxLength(256);
             entity.Property(fileKey => fileKey.WrappedKeyTagBase64).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<TenantDirectorySyncConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+            entity.Property(c => c.EntraTenantId).HasMaxLength(64);
+            entity.Property(c => c.ClientId).HasMaxLength(128);
+            entity.Property(c => c.ClientSecret).HasMaxLength(512);
+            entity.Property(c => c.LastSyncStatus).HasMaxLength(32);
         });
     }
 }

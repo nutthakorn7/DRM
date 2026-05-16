@@ -274,3 +274,24 @@ public sealed class FileKeyEntity
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
+
+public sealed class TenantDirectorySyncConfigEntity
+{
+    public Guid TenantId { get; set; }
+
+    public string EntraTenantId { get; set; } = string.Empty;
+
+    public string ClientId { get; set; } = string.Empty;
+
+    public string ClientSecret { get; set; } = string.Empty;
+
+    public string? LastSyncStatus { get; set; }
+
+    public DateTimeOffset? LastSyncAtUtc { get; set; }
+
+    public int? LastSyncUserCount { get; set; }
+
+    public int? LastSyncGroupCount { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
