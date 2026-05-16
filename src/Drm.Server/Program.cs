@@ -26,7 +26,19 @@ builder.Services
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
-builder.Services.AddSingleton<IExternalShareVerificationSender, NoopExternalShareVerificationSender>();
+
+var smtpSettings = new SmtpEmailSettings();
+builder.Configuration.GetSection("Drm:Email:Smtp").Bind(smtpSettings);
+
+if (smtpSettings.IsConfigured)
+{
+    builder.Services.AddSingleton(smtpSettings);
+    builder.Services.AddSingleton<IExternalShareVerificationSender, SmtpExternalShareVerificationSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IExternalShareVerificationSender, NoopExternalShareVerificationSender>();
+}
 
 var app = builder.Build();
 
@@ -34,6 +46,128 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.EnsureCreated();
+    if (dbContext.Database.IsSqlite())
+    {
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantExternalShareSettings" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantExternalShareSettings" PRIMARY KEY,
+                "ExternalSharingEnabled" INTEGER NOT NULL,
+                "AllowedGuestEmailDomainsCsv" TEXT NOT NULL DEFAULT '',
+                "BlockedGuestEmailsCsv" TEXT NOT NULL DEFAULT '',
+                "MaxShareLinkLifetimeHours" INTEGER NULL,
+                "MaxShareLinkMaxUses" INTEGER NULL,
+                "MaxActiveShareLinksPerFile" INTEGER NULL,
+                "UpdatedAtUtc" TEXT NOT NULL,
+                "UpdatedByUserId" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileViewerPreviewPages" (
+                "TenantId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "PageNumber" INTEGER NOT NULL,
+                "SvgMarkup" TEXT NOT NULL DEFAULT '',
+                "UploadedAtUtc" TEXT NOT NULL,
+                "UploadedByUserId" TEXT NOT NULL,
+                CONSTRAINT "PK_FileViewerPreviewPages" PRIMARY KEY ("TenantId", "FileId", "PageNumber")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileViewerPreviewPages_TenantId_FileId"
+            ON "FileViewerPreviewPages" ("TenantId", "FileId");
+            """);
+
+        var connection = dbContext.Database.GetDbConnection();
+        var openedHere = connection.State != System.Data.ConnectionState.Open;
+        if (openedHere)
+        {
+            connection.Open();
+        }
+
+        var hasAllowedDomainsColumn = false;
+        var hasBlockedGuestEmailsColumn = false;
+        var hasMaxShareLinkLifetimeHoursColumn = false;
+        var hasMaxShareLinkMaxUsesColumn = false;
+        var hasMaxActiveShareLinksPerFileColumn = false;
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"TenantExternalShareSettings\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = reader.GetString(1);
+                if (string.Equals(columnName, "AllowedGuestEmailDomainsCsv", StringComparison.Ordinal))
+                {
+                    hasAllowedDomainsColumn = true;
+                }
+
+                if (string.Equals(columnName, "BlockedGuestEmailsCsv", StringComparison.Ordinal))
+                {
+                    hasBlockedGuestEmailsColumn = true;
+                }
+
+                if (string.Equals(columnName, "MaxShareLinkLifetimeHours", StringComparison.Ordinal))
+                {
+                    hasMaxShareLinkLifetimeHoursColumn = true;
+                }
+
+                if (string.Equals(columnName, "MaxShareLinkMaxUses", StringComparison.Ordinal))
+                {
+                    hasMaxShareLinkMaxUsesColumn = true;
+                }
+
+                if (string.Equals(columnName, "MaxActiveShareLinksPerFile", StringComparison.Ordinal))
+                {
+                    hasMaxActiveShareLinksPerFileColumn = true;
+                }
+            }
+        }
+
+        if (!hasAllowedDomainsColumn)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantExternalShareSettings"
+                ADD COLUMN "AllowedGuestEmailDomainsCsv" TEXT NOT NULL DEFAULT '';
+                """);
+        }
+
+        if (!hasBlockedGuestEmailsColumn)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantExternalShareSettings"
+                ADD COLUMN "BlockedGuestEmailsCsv" TEXT NOT NULL DEFAULT '';
+                """);
+        }
+
+        if (!hasMaxShareLinkLifetimeHoursColumn)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantExternalShareSettings"
+                ADD COLUMN "MaxShareLinkLifetimeHours" INTEGER NULL;
+                """);
+        }
+
+        if (!hasMaxShareLinkMaxUsesColumn)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantExternalShareSettings"
+                ADD COLUMN "MaxShareLinkMaxUses" INTEGER NULL;
+                """);
+        }
+
+        if (!hasMaxActiveShareLinksPerFileColumn)
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantExternalShareSettings"
+                ADD COLUMN "MaxActiveShareLinksPerFile" INTEGER NULL;
+                """);
+        }
+
+        if (openedHere)
+        {
+            connection.Close();
+        }
+    }
 }
 
 app.UseAdminApiKeyAuthentication();
@@ -78,6 +212,7 @@ app.MapAdminWatermarkTemplatesEndpoints();
 app.MapAdminPolicySimulatorEndpoints();
 app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
+app.MapAdminExternalShareSettingsEndpoints();
 app.MapAgentEndpoints();
 
 app.Run();
