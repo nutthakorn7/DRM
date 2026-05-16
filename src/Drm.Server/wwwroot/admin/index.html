@@ -53,6 +53,29 @@
         <button id="saveSession" type="button">Save session</button>
       </section>
 
+      <section class="panel" id="notifications">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Alerts</p>
+            <h3>Email notifications</h3>
+          </div>
+          <button id="loadNotificationConfig" type="button">Load</button>
+        </div>
+
+        <form id="notificationConfigForm">
+          <div class="create-row">
+            <input id="notifyAdminEmails" autocomplete="off" placeholder="Admin emails (comma-separated)">
+            <button type="submit">Save</button>
+          </div>
+          <div class="check-row">
+            <label><input type="checkbox" id="notifyOnExternalShareViewed"> External share viewed</label>
+            <label><input type="checkbox" id="notifyOnFileRevoked"> File revoked</label>
+            <label><input type="checkbox" id="notifyOnAccessDenied"> Access denied</label>
+            <label><input type="checkbox" id="notifyOnShareLinkCreated"> Share link created</label>
+          </div>
+        </form>
+      </section>
+
       <section class="panel" id="directory">
         <div class="section-head">
           <div>

@@ -229,6 +229,34 @@ document.querySelector("#triggerSync").addEventListener("click", async () => {
     : "Sync returned no result.";
 });
 
+document.querySelector("#loadNotificationConfig").addEventListener("click", async () => {
+  const config = await apiFetch(`/api/admin/notification-config?tenantId=${requireTenantId()}`);
+  if (config) {
+    document.querySelector("#notifyAdminEmails").value = config.adminEmailsCsv ?? "";
+    document.querySelector("#notifyOnExternalShareViewed").checked = config.notifyOnExternalShareViewed;
+    document.querySelector("#notifyOnFileRevoked").checked = config.notifyOnFileRevoked;
+    document.querySelector("#notifyOnAccessDenied").checked = config.notifyOnAccessDenied;
+    document.querySelector("#notifyOnShareLinkCreated").checked = config.notifyOnShareLinkCreated;
+  }
+});
+
+document.querySelector("#notificationConfigForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    adminEmailsCsv: document.querySelector("#notifyAdminEmails").value.trim(),
+    notifyOnExternalShareViewed: document.querySelector("#notifyOnExternalShareViewed").checked,
+    notifyOnFileRevoked: document.querySelector("#notifyOnFileRevoked").checked,
+    notifyOnAccessDenied: document.querySelector("#notifyOnAccessDenied").checked,
+    notifyOnShareLinkCreated: document.querySelector("#notifyOnShareLinkCreated").checked
+  };
+  await apiFetch("/api/admin/notification-config", {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+  setStatus("Notification config saved", "ok");
+});
+
 document.querySelector("#grantForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const fileId = document.querySelector("#grantFileId").value.trim();
