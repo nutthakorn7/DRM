@@ -29,8 +29,7 @@ public static class ScimBearerAuthentication
                 !authHeader.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                context.Response.ContentType = "application/scim+json";
-                await context.Response.WriteAsJsonAsync(new ScimError { Status = 401, Detail = "Bearer token required." });
+                await context.Response.WriteAsJsonAsync(new ScimError { Status = "401", Detail = "Bearer token required." }, options: null, contentType: "application/scim+json");
                 return;
             }
 
@@ -38,8 +37,7 @@ public static class ScimBearerAuthentication
             if (!KeysMatch(configuredKey, submitted))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                context.Response.ContentType = "application/scim+json";
-                await context.Response.WriteAsJsonAsync(new ScimError { Status = 403, Detail = "Invalid bearer token." });
+                await context.Response.WriteAsJsonAsync(new ScimError { Status = "403", Detail = "Invalid bearer token." }, options: null, contentType: "application/scim+json");
                 return;
             }
 
