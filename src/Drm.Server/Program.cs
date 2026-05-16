@@ -26,6 +26,8 @@ builder.Services
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
+builder.Services.AddHttpClient("EntraGraph");
+builder.Services.AddScoped<IDirectorySyncService, EntraIdDirectorySyncService>();
 
 var emailSettings = builder.Configuration.GetSection("Drm:Email").Get<SmtpEmailSettings>() ?? new SmtpEmailSettings();
 builder.Services.AddSingleton(emailSettings);
@@ -220,6 +222,7 @@ app.MapAdminPolicySimulatorEndpoints();
 app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
 app.MapAdminExternalShareSettingsEndpoints();
+app.MapAdminDirectorySyncEndpoints();
 app.MapAgentEndpoints();
 
 app.Run();
