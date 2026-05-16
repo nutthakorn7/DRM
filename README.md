@@ -390,3 +390,23 @@ The sync maps Entra object IDs to DRM user/group IDs, allowing subsequent SSO se
 The `/admin/` console includes a **Directory sync** section for saving config and triggering sync. Sync errors (invalid credentials, network failure) return HTTP 500 with details in the server log.
 
 Client secret is stored in plain text in the server database. Production deployments should restrict database access and consider a secrets manager or KMS integration for the client secret at rest.
+
+## Phase 5AG Admin Email Notifications
+
+Administrators can now receive email alerts when key DRM events occur. Configure per-tenant notification settings with:
+
+- `PUT /api/admin/notification-config` — set admin email addresses and opt-in flags for each event type
+- `GET /api/admin/notification-config?tenantId=...` — retrieve current config
+
+Supported notification events (each independently opt-in):
+
+| Event | Flag |
+|---|---|
+| External guest opens a viewer session | `notifyOnExternalShareViewed` |
+| A protected file is revoked | `notifyOnFileRevoked` |
+| Policy decision denies access | `notifyOnAccessDenied` |
+| An external share link is created | `notifyOnShareLinkCreated` |
+
+`adminEmailsCsv` accepts a comma-separated list of admin email addresses. Notifications use the same `Drm:Email:SmtpHost` configuration as Phase 5AE verification codes. When SMTP is unconfigured, the notification sender is a no-op and no emails are sent.
+
+SMTP failures log a warning and do not affect the primary operation (file revoke, policy decision, etc.). The `/admin/` console includes an **Email notifications** section for loading and saving tenant notification config.
