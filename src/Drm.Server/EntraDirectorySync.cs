@@ -39,7 +39,8 @@ public sealed class EntraIdDirectorySyncService(
 
         foreach (var u in entraUsers)
         {
-            if (!Guid.TryParse(u.Id, out var userId)) continue;
+            var externalId = u.Id;
+            if (string.IsNullOrWhiteSpace(externalId)) continue;
 
             var email = u.Mail ?? u.UserPrincipalName ?? string.Empty;
             if (string.IsNullOrWhiteSpace(email)) continue;
@@ -47,16 +48,17 @@ public sealed class EntraIdDirectorySyncService(
             var displayName = u.DisplayName ?? email;
 
             var existing = await dbContext.TenantUsers
-                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.UserId == userId, cancellationToken);
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ExternalId == externalId, cancellationToken);
 
             if (existing == null)
             {
                 dbContext.TenantUsers.Add(new TenantUserEntity
                 {
                     TenantId = tenantId,
-                    UserId = userId,
+                    UserId = Guid.NewGuid(),
                     Email = email,
                     DisplayName = displayName,
+                    ExternalId = externalId,
                     CreatedAtUtc = DateTimeOffset.UtcNow
                 });
                 usersUpserted++;
@@ -68,44 +70,67 @@ public sealed class EntraIdDirectorySyncService(
             }
         }
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+
         int groupsUpserted = 0;
         int membershipsUpserted = 0;
 
+        var groupsToSync = new List<(string ExternalId, Guid GroupId, string Name)>();
+
         foreach (var g in entraGroups)
         {
-            if (!Guid.TryParse(g.Id, out var groupId)) continue;
+            var externalId = g.Id;
+            if (string.IsNullOrWhiteSpace(externalId)) continue;
 
-            var name = g.DisplayName ?? groupId.ToString();
+            var name = g.DisplayName ?? externalId;
 
             var existingGroup = await dbContext.TenantGroups
-                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.GroupId == groupId, cancellationToken);
+                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ExternalId == externalId, cancellationToken);
 
+            Guid groupId;
             if (existingGroup == null)
             {
-                dbContext.TenantGroups.Add(new TenantGroupEntity
+                var newGroup = new TenantGroupEntity
                 {
                     TenantId = tenantId,
-                    GroupId = groupId,
+                    GroupId = Guid.NewGuid(),
                     Name = name,
+                    ExternalId = externalId,
                     CreatedAtUtc = DateTimeOffset.UtcNow
-                });
+                };
+                dbContext.TenantGroups.Add(newGroup);
+                groupId = newGroup.GroupId;
                 groupsUpserted++;
             }
             else
             {
                 existingGroup.Name = name;
+                groupId = existingGroup.GroupId;
             }
 
+            groupsToSync.Add((externalId, groupId, name));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var (externalId, groupId, _) in groupsToSync)
+        {
             var members = await FetchAllPagesAsync<EntraDirectoryObject>(
-                http, $"https://graph.microsoft.com/v1.0/groups/{g.Id}/members?$select=id",
+                http, $"https://graph.microsoft.com/v1.0/groups/{externalId}/members?$select=id",
                 token, cancellationToken);
 
             foreach (var m in members)
             {
-                if (!Guid.TryParse(m.Id, out var memberUserId)) continue;
+                var memberExternalId = m.Id;
+                if (string.IsNullOrWhiteSpace(memberExternalId)) continue;
+
+                var memberUser = await dbContext.TenantUsers
+                    .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.ExternalId == memberExternalId, cancellationToken);
+
+                if (memberUser == null) continue;
 
                 var memberExists = await dbContext.GroupMembers.AnyAsync(
-                    x => x.TenantId == tenantId && x.GroupId == groupId && x.UserId == memberUserId,
+                    x => x.TenantId == tenantId && x.GroupId == groupId && x.UserId == memberUser.UserId,
                     cancellationToken);
 
                 if (!memberExists)
@@ -114,7 +139,7 @@ public sealed class EntraIdDirectorySyncService(
                     {
                         TenantId = tenantId,
                         GroupId = groupId,
-                        UserId = memberUserId,
+                        UserId = memberUser.UserId,
                         CreatedAtUtc = DateTimeOffset.UtcNow
                     });
                     membershipsUpserted++;
@@ -122,24 +147,43 @@ public sealed class EntraIdDirectorySyncService(
             }
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var syncConfig = await dbContext.TenantDirectorySyncConfigs
-            .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
-
-        if (syncConfig != null)
+        try
         {
-            syncConfig.LastSyncAtUtc = DateTimeOffset.UtcNow;
-            syncConfig.LastSyncStatus = "ok";
-            syncConfig.LastSyncUserCount = usersUpserted;
-            syncConfig.LastSyncGroupCount = groupsUpserted;
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            var syncConfig = await dbContext.TenantDirectorySyncConfigs
+                .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
+
+            if (syncConfig != null)
+            {
+                syncConfig.LastSyncAtUtc = DateTimeOffset.UtcNow;
+                syncConfig.LastSyncStatus = "ok";
+                syncConfig.LastSyncUserCount = usersUpserted;
+                syncConfig.LastSyncGroupCount = groupsUpserted;
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            logger.LogInformation("Entra sync complete: {Users} users, {Groups} groups, {Memberships} memberships upserted.",
+                usersUpserted, groupsUpserted, membershipsUpserted);
+
+            return new DirectorySyncResult(usersUpserted, groupsUpserted, membershipsUpserted);
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Entra sync failed for tenant {TenantId}", tenantId);
 
-        logger.LogInformation("Entra sync complete: {Users} users, {Groups} groups, {Memberships} memberships upserted.",
-            usersUpserted, groupsUpserted, membershipsUpserted);
+            var syncConfig = await dbContext.TenantDirectorySyncConfigs
+                .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
 
-        return new DirectorySyncResult(usersUpserted, groupsUpserted, membershipsUpserted);
+            if (syncConfig != null)
+            {
+                syncConfig.LastSyncAtUtc = DateTimeOffset.UtcNow;
+                syncConfig.LastSyncStatus = "error";
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            throw;
+        }
     }
 
     private static async Task<string> AcquireTokenAsync(

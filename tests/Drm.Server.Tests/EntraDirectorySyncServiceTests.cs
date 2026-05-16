@@ -42,17 +42,22 @@ public sealed class EntraDirectorySyncServiceTests : IDisposable
         users.Should().ContainSingle(u =>
             u.Email == "alice@contoso.com" &&
             u.DisplayName == "Alice Smith" &&
-            u.UserId == new Guid("10000000-0000-0000-0000-000000000001"));
+            u.ExternalId == "10000000-0000-0000-0000-000000000001");
 
         var groups = await db.TenantGroups.Where(g => g.TenantId == tenantId).ToListAsync();
         groups.Should().ContainSingle(g =>
             g.Name == "Engineering" &&
-            g.GroupId == new Guid("20000000-0000-0000-0000-000000000001"));
+            g.ExternalId == "20000000-0000-0000-0000-000000000001");
+
+        var aliceExternalId = users.Single().ExternalId;
+        var aliceUserId = users.Single().UserId;
+        var engineeringExternalId = groups.Single().ExternalId;
+        var engineeringGroupId = groups.Single().GroupId;
 
         var members = await db.GroupMembers.Where(m => m.TenantId == tenantId).ToListAsync();
         members.Should().ContainSingle(m =>
-            m.GroupId == new Guid("20000000-0000-0000-0000-000000000001") &&
-            m.UserId == new Guid("10000000-0000-0000-0000-000000000001"));
+            m.GroupId == engineeringGroupId &&
+            m.UserId == aliceUserId);
     }
 
     [Fact]
@@ -83,7 +88,8 @@ public sealed class EntraDirectorySyncServiceTests : IDisposable
         db.Database.EnsureCreated();
 
         var tenantId = Guid.NewGuid();
-        var userId = new Guid("10000000-0000-0000-0000-000000000001");
+        var userId = Guid.NewGuid();
+        var externalId = "10000000-0000-0000-0000-000000000001";
 
         db.TenantDirectorySyncConfigs.Add(new TenantDirectorySyncConfigEntity
         {
@@ -99,6 +105,7 @@ public sealed class EntraDirectorySyncServiceTests : IDisposable
             UserId = userId,
             Email = "alice@contoso.com",
             DisplayName = "Old Name",
+            ExternalId = externalId,
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
@@ -109,7 +116,7 @@ public sealed class EntraDirectorySyncServiceTests : IDisposable
         var result = await service.SyncAsync(tenantId, CancellationToken.None);
 
         result.UsersUpserted.Should().Be(0);
-        var user = await db.TenantUsers.SingleAsync(u => u.TenantId == tenantId && u.UserId == userId);
+        var user = await db.TenantUsers.SingleAsync(u => u.TenantId == tenantId && u.ExternalId == externalId);
         user.DisplayName.Should().Be("Alice Smith");
     }
 
