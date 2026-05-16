@@ -289,6 +289,7 @@ app.MapAdminExternalShareSettingsEndpoints();
 app.MapAdminDirectorySyncEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
+app.MapScimUsersEndpoints();
 app.MapAgentEndpoints();
 
 app.Run();
