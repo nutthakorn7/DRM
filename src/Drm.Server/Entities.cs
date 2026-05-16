@@ -295,3 +295,20 @@ public sealed class TenantDirectorySyncConfigEntity
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
+
+public sealed class TenantAdminNotificationConfigEntity
+{
+    public Guid TenantId { get; set; }
+
+    public string AdminEmailsCsv { get; set; } = string.Empty;
+
+    public bool NotifyOnExternalShareViewed { get; set; }
+
+    public bool NotifyOnFileRevoked { get; set; }
+
+    public bool NotifyOnAccessDenied { get; set; }
+
+    public bool NotifyOnShareLinkCreated { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}

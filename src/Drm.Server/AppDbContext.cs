@@ -36,6 +36,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TenantDirectorySyncConfigEntity> TenantDirectorySyncConfigs => Set<TenantDirectorySyncConfigEntity>();
 
+    public DbSet<TenantAdminNotificationConfigEntity> TenantAdminNotificationConfigs => Set<TenantAdminNotificationConfigEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -161,6 +163,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(c => c.ClientId).HasMaxLength(128);
             entity.Property(c => c.ClientSecret).HasMaxLength(512);
             entity.Property(c => c.LastSyncStatus).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<TenantAdminNotificationConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+            entity.Property(c => c.AdminEmailsCsv).HasMaxLength(1024);
         });
     }
 }

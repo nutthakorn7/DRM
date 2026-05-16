@@ -85,6 +85,17 @@ using (var scope = app.Services.CreateScope())
                 "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
             );
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantAdminNotificationConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantAdminNotificationConfigs" PRIMARY KEY,
+                "AdminEmailsCsv" TEXT NOT NULL DEFAULT '',
+                "NotifyOnExternalShareViewed" INTEGER NOT NULL DEFAULT 0,
+                "NotifyOnFileRevoked" INTEGER NOT NULL DEFAULT 0,
+                "NotifyOnAccessDenied" INTEGER NOT NULL DEFAULT 0,
+                "NotifyOnShareLinkCreated" INTEGER NOT NULL DEFAULT 0,
+                "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
+            );
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;
