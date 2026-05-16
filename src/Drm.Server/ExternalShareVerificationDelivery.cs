@@ -45,6 +45,9 @@ public sealed class SmtpExternalShareVerificationSender(
 {
     public async Task SendAsync(ExternalShareVerificationMessage message, CancellationToken cancellationToken)
     {
+        if (!settings.IsConfigured)
+            throw new InvalidOperationException("SMTP is not configured.");
+
         var mimeMessage = BuildMessage(message, settings);
 
         using var client = new SmtpClient();
