@@ -268,6 +268,7 @@ public static class AdminFilesEndpoints
             return TypedResults.NotFound();
         }
 
+        var now = DateTimeOffset.UtcNow;
         file.Revoked = true;
         var auditEvent = new AuditEventEntity
         {
@@ -276,7 +277,7 @@ public static class AdminFilesEndpoints
             UserId = request.AdminUserId,
             EventType = "file_revoked",
             ReasonCode = "revoked",
-            CreatedAtUtc = DateTimeOffset.UtcNow
+            CreatedAtUtc = now
         };
         dbContext.AuditEvents.Add(auditEvent);
 
@@ -289,7 +290,7 @@ public static class AdminFilesEndpoints
                 file.Id,
                 request.AdminUserId,
                 null,
-                DateTimeOffset.UtcNow),
+                now),
             cancellationToken);
 
         return TypedResults.Ok(new RevokeFileResponse(file.TenantId, file.Id, file.Revoked));

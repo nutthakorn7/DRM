@@ -96,7 +96,8 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
                         fileId,
                         userId,
                         null,
-                        decisionTime),
+                        decisionTime,
+                        ReasonCode: "file_not_found"),
                     cancellationToken);
             }
 
@@ -139,7 +140,8 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
                         fileId,
                         userId,
                         null,
-                        decisionTime),
+                        decisionTime,
+                        ReasonCode: "device_disabled"),
                     cancellationToken);
             }
 
@@ -226,7 +228,8 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
                         fileId,
                         userId,
                         null,
-                        decisionTime),
+                        decisionTime,
+                        ReasonCode: decision.ReasonCode),
                     cancellationToken);
             }
         }

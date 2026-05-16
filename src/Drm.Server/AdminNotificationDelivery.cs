@@ -16,7 +16,8 @@ public sealed record AdminNotificationEvent(
     Guid? FileId,
     Guid? UserId,
     string? GuestEmail,
-    DateTimeOffset OccurredAtUtc);
+    DateTimeOffset OccurredAtUtc,
+    string? ReasonCode = null);
 
 public interface IAdminNotificationSender
 {
@@ -78,6 +79,8 @@ public sealed class SmtpAdminNotificationSender(
         if (message.Event.UserId.HasValue)
             sb.AppendLine($"User: {message.Event.UserId}");
         sb.AppendLine($"Time: {message.Event.OccurredAtUtc:u}");
+        if (!string.IsNullOrWhiteSpace(message.Event.ReasonCode))
+            sb.AppendLine($"Reason: {message.Event.ReasonCode}");
         sb.AppendLine();
         sb.AppendLine("This is an automated notification from DRM Security.");
 
