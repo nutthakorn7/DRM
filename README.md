@@ -374,3 +374,19 @@ Example configuration (see `deploy/management/appsettings.onprem.example.json`):
 ```
 
 The verification email is plain text containing the six-digit code and its expiry time. When `SmtpHost` is absent (default), the no-op sender is registered and verification codes are only accessible through the `POST /api/share-links/verification/start` response for integration testing and local development.
+
+## Phase 5AF Entra ID Directory Sync
+
+Administrators can now sync users and groups from Microsoft Entra ID (Azure AD) without manually creating them one-by-one. Configure a [Microsoft Entra application registration](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app) with `User.Read.All` and `Group.Read.All` application permissions (not delegated), then grant admin consent.
+
+New admin endpoints:
+
+- `PUT /api/admin/directory/config` — store Entra tenant ID, client ID, and client secret for a DRM tenant
+- `GET /api/admin/directory/config?tenantId=...` — retrieve config (client secret is never returned)
+- `POST /api/admin/directory/sync` — trigger an immediate sync; returns users, groups, and memberships upserted
+
+The sync maps Entra object IDs to DRM user/group IDs, allowing subsequent SSO sessions to look up the matching DRM user by the Entra `oid` claim. Users already in DRM with the same object ID have their email and display name updated on sync. Group memberships are additive — members deleted from Entra are not removed from DRM in this phase.
+
+The `/admin/` console includes a **Directory sync** section for saving config and triggering sync. Sync errors (invalid credentials, network failure) return HTTP 500 with details in the server log.
+
+Client secret is stored in plain text in the server database. Production deployments should restrict database access and consider a secrets manager or KMS integration for the client secret at rest.
