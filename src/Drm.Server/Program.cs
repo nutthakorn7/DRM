@@ -161,6 +161,19 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_OutlookAttachmentEvents_TenantId_Id"
             ON "OutlookAttachmentEvents" ("TenantId", "Id");
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileTags" (
+                "TenantId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "Tag" TEXT NOT NULL,
+                "AssignedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_FileTags" PRIMARY KEY ("TenantId", "FileId", "Tag")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileTags_TenantId_Tag"
+            ON "FileTags" ("TenantId", "Tag");
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;
@@ -382,6 +395,8 @@ app.MapAdminBoxIntegrationEndpoints();
 app.MapBoxWebhookEndpoints();
 app.MapAdminOutlookIntegrationEndpoints();
 app.MapOutlookAddInEndpoints();
+app.MapAdminFileTagsEndpoints();
+app.MapAdminLicenseEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

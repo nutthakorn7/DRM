@@ -9,5 +9,7 @@ public enum Permission
     Copy = 1 << 2,
     ExportOriginal = 1 << 3,
     Edit = 1 << 4,
-    DeleteProtectedCopy = 1 << 5
+    DeleteProtectedCopy = 1 << 5,
+    RunMacros = 1 << 6,
+    TransferOwnership = 1 << 7
 }

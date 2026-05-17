@@ -232,6 +232,39 @@ public partial class MainWindow : Window
         StatusText.Text = message;
     }
 
+    private async void CheckLicenseButton_Click(object sender, RoutedEventArgs e)
+    {
+        CheckLicenseButton.IsEnabled = false;
+        LicenseTierText.Text = "Checking…";
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+            using var response = await httpClient.GetAsync("/api/admin/license");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var tiers = new List<string>();
+            if (doc.RootElement.TryGetProperty("enabledTiers", out var tiersEl))
+            {
+                foreach (var t in tiersEl.EnumerateArray()) tiers.Add(t.GetString() ?? "");
+            }
+            var paid = doc.RootElement.TryGetProperty("paidEncrypterCount", out var pEl) ? pEl.GetInt32() : 0;
+            var free = doc.RootElement.TryGetProperty("freeViewerCount", out var fEl) ? fEl.GetInt32() : 0;
+            LicenseTierText.Text = $"{string.Join(" + ", tiers)} • {paid} paid · {free} free viewers";
+        }
+        catch (Exception exception)
+        {
+            LicenseTierText.Text = $"Error: {exception.Message}";
+        }
+        finally
+        {
+            CheckLicenseButton.IsEnabled = true;
+        }
+    }
+
     private async void CheckOutlookStatusButton_Click(object sender, RoutedEventArgs e)
     {
         CheckOutlookStatusButton.IsEnabled = false;

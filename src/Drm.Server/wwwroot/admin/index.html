@@ -360,6 +360,14 @@
             <input id="templateAllowPrint" type="checkbox">
             <span>Allow print</span>
           </label>
+          <label class="check-row">
+            <input id="templateAllowMacros" type="checkbox">
+            <span>Allow macros</span>
+          </label>
+          <label class="check-row">
+            <input id="templateAllowTransferOwnership" type="checkbox">
+            <span>Allow ownership transfer</span>
+          </label>
           <button type="submit">Create template</button>
         </form>
 
@@ -541,6 +549,18 @@
           <button class="danger" type="submit">Delete protected copy</button>
         </form>
 
+        <form class="apply-template-row" id="addTagForm">
+          <input id="tagFileId" autocomplete="off" placeholder="File ID">
+          <input id="tagValue" autocomplete="off" placeholder="Tag (e.g. confidential, hr, q4-2026)" maxlength="64">
+          <button type="submit">Add tag</button>
+        </form>
+
+        <div class="tag-filter-row">
+          <span class="hint">Filter by tag:</span>
+          <span id="tagChips" class="tag-chips"></span>
+          <button id="refreshTags" type="button">Refresh tag list</button>
+        </div>
+
         <div class="section-head compact-head">
           <div>
             <p class="eyebrow">External sharing</p>
@@ -721,6 +741,16 @@
         </div>
         <button id="checkHealth" type="button">Check /healthz</button>
         <pre id="healthOutput">No check run.</pre>
+      </section>
+
+      <section class="panel compact" id="license">
+        <div>
+          <p class="eyebrow">Subscription</p>
+          <h3>License usage</h3>
+        </div>
+        <button id="loadLicense" type="button">Load license</button>
+        <div id="licenseTiers" class="license-tiers"></div>
+        <p class="hint">Free viewers = paid encrypters × 9. Configure tiers in <code>Drm:License:EnabledTiers</code>.</p>
       </section>
     </section>
   </main>

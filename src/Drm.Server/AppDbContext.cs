@@ -46,6 +46,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<OutlookAttachmentEventEntity> OutlookAttachmentEvents => Set<OutlookAttachmentEventEntity>();
 
+    public DbSet<FileTagEntity> FileTags => Set<FileTagEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -219,6 +221,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.AttachmentName).HasMaxLength(512);
             entity.Property(e => e.Status).HasMaxLength(64);
             entity.Property(e => e.ProtectedFileId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<FileTagEntity>(entity =>
+        {
+            entity.HasKey(t => new { t.TenantId, t.FileId, t.Tag });
+            entity.HasIndex(t => new { t.TenantId, t.Tag });
+            entity.Property(t => t.Tag).HasMaxLength(64);
         });
     }
 }

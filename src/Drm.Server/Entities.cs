@@ -358,6 +358,17 @@ public sealed class BoxWebhookEventEntity
     public DateTimeOffset ReceivedAtUtc { get; set; }
 }
 
+public sealed class FileTagEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string Tag { get; set; } = string.Empty;
+
+    public DateTimeOffset AssignedAtUtc { get; set; }
+}
+
 public sealed class TenantOutlookIntegrationConfigEntity
 {
     public Guid TenantId { get; set; }

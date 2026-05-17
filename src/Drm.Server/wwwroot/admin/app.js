@@ -121,11 +121,18 @@ document.querySelector("#refreshWatermarkTemplates").addEventListener("click", (
 document.querySelector("#createPolicyTemplateForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const offlineLeaseValue = document.querySelector("#templateOfflineLease").value.trim();
+  const basePerms = document.querySelector("#templatePermissions").value.trim();
+  const extras = [];
+  if (document.querySelector("#templateAllowMacros").checked) extras.push("RunMacros");
+  if (document.querySelector("#templateAllowTransferOwnership").checked) extras.push("TransferOwnership");
+  const combinedPerms = extras.length
+    ? (basePerms ? `${basePerms}, ${extras.join(", ")}` : extras.join(", "))
+    : basePerms;
   const body = {
     tenantId: requireTenantId(),
     templateId: document.querySelector("#templateId").value.trim(),
     name: document.querySelector("#templateName").value.trim(),
-    permissions: document.querySelector("#templatePermissions").value.trim(),
+    permissions: combinedPerms,
     watermarkTemplate: document.querySelector("#templateWatermark").value.trim(),
     offlineLeaseMinutes: offlineLeaseValue ? Number(offlineLeaseValue) : 0,
     allowPrint: document.querySelector("#templateAllowPrint").checked
@@ -464,6 +471,59 @@ document.querySelector("#protectWizardForm").addEventListener("submit", async (e
   await runProtectWizard();
 });
 
+// File tagging
+let activeTagFilter = null;
+
+document.querySelector("#addTagForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fileId = document.querySelector("#tagFileId").value.trim();
+  const tag = document.querySelector("#tagValue").value.trim();
+  if (!fileId || !tag) {
+    setStatus("File ID and tag required", "error");
+    return;
+  }
+  await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/tags`, {
+    method: "POST",
+    body: JSON.stringify({ tenantId: requireTenantId(), tag })
+  });
+  document.querySelector("#tagValue").value = "";
+  setStatus(`Tag "${tag}" added to ${fileId.slice(0, 8)}…`, "ok");
+  await refreshTagChips();
+});
+
+document.querySelector("#refreshTags").addEventListener("click", refreshTagChips);
+
+async function refreshTagChips() {
+  const summaries = await apiFetch(`/api/admin/tags?tenantId=${encodeURIComponent(requireTenantId())}`);
+  const host = document.querySelector("#tagChips");
+  if (!summaries.length) {
+    host.innerHTML = '<span class="hint">No tags yet.</span>';
+    return;
+  }
+  host.innerHTML = summaries.map((s) => {
+    const cls = activeTagFilter === s.tag ? "tag-chip active" : "tag-chip";
+    return `<span class="${cls}" data-tag="${escapeHtml(s.tag)}">${escapeHtml(s.tag)} · ${s.fileCount}</span>`;
+  }).join("");
+  host.querySelectorAll("[data-tag]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const tag = el.dataset.tag;
+      activeTagFilter = activeTagFilter === tag ? null : tag;
+      refreshTagChips();
+      refreshFiles();
+    });
+  });
+}
+
+// License
+document.querySelector("#loadLicense").addEventListener("click", async () => {
+  const license = await apiFetch("/api/admin/license");
+  const host = document.querySelector("#licenseTiers");
+  const chips = license.enabledTiers.map((t) =>
+    `<span class="license-chip">${escapeHtml(t)}</span>`).join("");
+  host.innerHTML = `${chips}<div class="license-summary">${license.paidEncrypterCount} paid encrypters · <strong>${license.freeViewerCount}</strong> free viewers (×9)</div>`;
+  setStatus(`${license.enabledTiers.length} tier${license.enabledTiers.length === 1 ? "" : "s"} enabled`, "ok");
+});
+
 filesBody.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-revoke-file-id]");
   if (!button) {
@@ -573,9 +633,15 @@ async function refreshFiles() {
   const tenantId = requireTenantId();
   const query = document.querySelector("#fileQuery").value.trim();
   const url = `/api/admin/files?tenantId=${encodeURIComponent(tenantId)}&q=${encodeURIComponent(query)}`;
-  const files = await apiFetch(url);
+  let files = await apiFetch(url);
+  if (activeTagFilter) {
+    const taggedIds = new Set(await apiFetch(
+      `/api/admin/files-by-tag?tenantId=${encodeURIComponent(tenantId)}&tag=${encodeURIComponent(activeTagFilter)}`));
+    files = files.filter((f) => taggedIds.has(f.fileId));
+  }
   renderFiles(files);
-  setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded`, "ok");
+  const suffix = activeTagFilter ? ` (filter: ${activeTagFilter})` : "";
+  setStatus(`${files.length} file${files.length === 1 ? "" : "s"} loaded${suffix}`, "ok");
 }
 
 async function refreshCommands() {

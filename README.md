@@ -581,3 +581,50 @@ Delivers an Office Web Add-in that scans outgoing email attachments and register
 5. Click **Scan & register attachments** on any composed message — every attachment generates an event row visible in the admin events table
 
 This phase ships the configuration plane, classification logic, manifest, and task pane. The attachment-content upload + encrypted .drmx replacement data plane is deferred to a follow-up — current behaviour registers metadata so administrators can audit attachment flow end-to-end.
+
+## Phase 5AL Quick-wins Bundle
+
+Five small parity gaps closed in one phase.
+
+### File tagging
+
+New `FileTagEntity` table lets administrators tag protected files (`confidential`, `q4-2026`, `hr`, etc) and filter the Files panel by tag. Tags are tenant-scoped, deduplicated per file, and capped at 64 characters.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/files/{fileId}/tags` | Add tag (`{tenantId, tag}`) |
+| `DELETE` | `/api/admin/files/{fileId}/tags/{tag}?tenantId=...` | Remove tag |
+| `GET` | `/api/admin/files/{fileId}/tags?tenantId=...` | List tags for a file |
+| `GET` | `/api/admin/tags?tenantId=...` | Tag summary (tag + file count) |
+| `GET` | `/api/admin/files-by-tag?tenantId=...&tag=X` | File IDs with this tag |
+
+Admin Files panel gains an **Add tag** form, a **filter chip row** (click to toggle), and a per-row tag-list rendered on each file. Windows tray gains a **Default tag** text input persisted alongside other credentials.
+
+### Macro execution + Ownership transfer permissions
+
+`Permission` enum extended with `RunMacros = 1 << 6` and `TransferOwnership = 1 << 7`. The PolicyTemplate string-based permissions parser already supports the new flags via case-insensitive `Enum.TryParse`. Admin Templates panel exposes two new checkboxes (`Allow macros`, `Allow ownership transfer`) that get appended to the permissions string on submit. The Windows viewer renders a `Macros / Transfer` suffix on its `Permissions:` status line whenever those flags are set.
+
+### License tier feature flags
+
+New `LicenseTier` flag enum (`Standard | Api | NetFolder | RemoteDelete | Mobile | Box | Outlook | All`) with a CSV parser tied to `Drm:License:EnabledTiers` configuration. `GET /api/admin/license` returns the enabled tiers plus a paid encrypter count (`Drm:License:PaidEncrypterCount`) and a derived free-viewer count (paid count multiplied by 9, matching FinalCode's licensing model). The admin console gets a **License usage** panel rendering tier chips and the multiplier summary. The Windows tray adds a **License:** status line with the same data.
+
+### License multiplier display
+
+The `freeViewerCount = paidEncrypterCount * 9` ratio comes from FinalCode's catalog (10 paid means 90 free viewers). It is computed server-side and displayed both in the admin license panel and in the Windows tray license line.
+
+### Configuration example
+
+```json
+{
+  "Drm": {
+    "License": {
+      "EnabledTiers": "Standard, Api, Box, Outlook",
+      "PaidEncrypterCount": "10"
+    }
+  }
+}
+```
+
+Blank or `All` enables every tier. Unknown tokens are ignored.
+
+Tests: 5 (tags CRUD/list/conflict/not-found) + 3 (license endpoint + tier parser) = 8 new, 186/186 pass.

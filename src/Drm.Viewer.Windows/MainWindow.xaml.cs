@@ -451,9 +451,18 @@ public partial class MainWindow : Window
         CopyButton.IsEnabled = canRenderInline && state.CanCopy;
         PrintButton.IsEnabled = canRenderInline && state.CanPrint;
         ExportButton.IsEnabled = hasDocument && state.CanExportOriginal;
-        PermissionText.Text = hasDocument
-            ? $"Permissions: {currentPermissions}"
-            : "Permissions: not loaded";
+        if (hasDocument)
+        {
+            var extras = new List<string>();
+            if ((currentPermissions & Permission.RunMacros) != 0) extras.Add("Macros");
+            if ((currentPermissions & Permission.TransferOwnership) != 0) extras.Add("Transfer");
+            var extrasText = extras.Count > 0 ? $" • {string.Join(" • ", extras)}" : string.Empty;
+            PermissionText.Text = $"Permissions: {currentPermissions}{extrasText}";
+        }
+        else
+        {
+            PermissionText.Text = "Permissions: not loaded";
+        }
     }
 
     private bool CurrentFileIsPdf()
