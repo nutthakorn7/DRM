@@ -1,0 +1,18 @@
+{
+  "Tenant ID": "รหัสประจำองค์กรของคุณ — IT admin จะแจ้งให้ตอนสร้างบัญชี DRM",
+  "X-DRM-Admin-Key": "รหัสลับสำหรับเข้า /api/admin/* — ใช้เหมือนรหัสผ่าน อย่าวางในแชทหรือ ticket",
+  "Admin user ID": "UUID ของ admin — ใช้เพื่อให้ audit log ระบุได้ว่าใครเป็นคนเปลี่ยน",
+  "Watermark template": "เทมเพลตลายน้ำที่ใช้ซ้ำได้ (ข้อความ + ความโปร่งใส + ตำแหน่ง) ตั้งครั้งเดียวใช้กับหลายไฟล์",
+  "Watermark pattern": "ข้อความที่ปรากฏบนหน้าเอกสาร รองรับ token {user} {file} {time} ที่ viewer จะแทนค่าตอนเปิด",
+  "Policy template": "เทมเพลตนโยบายที่รวมสิทธิ + ลายน้ำ + offline lease ใช้กับหลายไฟล์ได้",
+  "OfflineLease": "ระยะเวลาที่ viewer เปิดไฟล์ได้โดยไม่ต้องเชื่อม server ตั้งเป็น 0 ถ้าอยากให้ตรวจสิทธิทุกครั้ง",
+  "Run macros": "อนุญาตให้ผู้รับรันมาโคร Office (VBA) ปิดไว้ default เพราะปลอดภัยกว่า",
+  "Allow ownership transfer": "อนุญาตให้ผู้รับโอนสิทธิเป็นเจ้าของไฟล์แทน — ใช้ระวัง เพราะเขาจะ revoke คนอื่นได้",
+  "Allow print": "อนุญาตให้ viewer สั่งพิมพ์เอกสาร",
+  "Container passphrase": "รหัสที่มนุษย์พิมพ์ ใช้ PBKDF2 derive AES-GCM key สำหรับ .drmcontainer",
+  "Trailer secret": "HMAC key ใช้เซ็น transparent-encryption trailer สร้างโดย operator เก็บใน server",
+  "Print watermark": "ข้อความที่ stamp ลงบนหน้ากระดาษตอนพิมพ์ (ไม่ใช่แค่หน้าจอ) ใช้ตามรอย leak จากกระดาษ",
+  "Rolling watermark": "ลายน้ำที่เลื่อนตำแหน่งทีละหน่อย ทำให้ภาพถ่ายหน้าจอแต่ละครั้งได้ลายต่างกัน",
+  "Anti-capture": "การตั้งค่าให้ลายน้ำหน้าจอตัดออกจากภาพถ่ายได้ยาก (ความหนาแน่น/ความโปร่งใส/มุมเอียง)",
+  "Persona": "บทบาทที่กำหนดสิทธิและ UI: Employee / KnowledgeWorker / Executive / Admin"
+}

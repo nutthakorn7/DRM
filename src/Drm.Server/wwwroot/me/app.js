@@ -3,6 +3,34 @@
 
 const SESSION_KEY = "drm-me-session-v1";
 const TOUR_KEY = "drm-me-tour-completed-v1";
+const ROLE_PICKER_KEY = "drm-me-role-picked-v1";
+
+const ROLE_DETAILS = [
+  {
+    id: "Employee",
+    icon: "👤",
+    title: "Employee / Sales rep",
+    blurb: "Send proposals, quotes, and pitch decks. The simplest defaults: 1-week expiry, no print, one recipient at a time."
+  },
+  {
+    id: "KnowledgeWorker",
+    icon: "📚",
+    title: "Lawyer, HR, finance analyst",
+    blurb: "Send sensitive docs and revoke them if engagement ends. You manage your own files plus see who opened what."
+  },
+  {
+    id: "Executive",
+    icon: "🎯",
+    title: "Executive / board member",
+    blurb: "Distribute board decks and IR material with no-print + no-photo. Tenant-wide audit view."
+  },
+  {
+    id: "Admin",
+    icon: "🛠",
+    title: "IT admin",
+    blurb: "Configure tenants, watermark templates, integrations, audit, and DRM policy. You'll spend most time in /admin/."
+  }
+];
 
 const tenantIdInput = document.querySelector("#tenantId");
 const userIdInput = document.querySelector("#userId");
@@ -74,6 +102,29 @@ async function loadPersona() {
   } catch (err) {
     personaBadge.textContent = "Offline";
   }
+}
+
+async function loadRecentRecipients() {
+  const t = tenantIdInput.value.trim();
+  const u = userIdInput.value.trim();
+  const datalist = document.querySelector("#recentRecipientsList");
+  const hint = document.querySelector("#recentHint");
+  if (!t || !u || !datalist) return;
+  try {
+    const resp = await fetch(
+      `/api/me/recent-recipients?tenantId=${encodeURIComponent(t)}&userId=${encodeURIComponent(u)}&limit=8`);
+    if (!resp.ok) return;
+    const recents = await resp.json();
+    datalist.innerHTML = recents
+      .map((r) => `<option value="${r.email}">${r.email} · ${r.useCount} send${r.useCount === 1 ? "" : "s"}</option>`)
+      .join("");
+    if (recents.length && !recipientInput.value) {
+      hint.hidden = false;
+      hint.textContent = `Last used: ${recents[0].email} — start typing to pick from ${recents.length} recent recipient${recents.length === 1 ? "" : "s"}.`;
+    } else {
+      hint.hidden = true;
+    }
+  } catch { /* ignore */ }
 }
 
 // Drop zone wiring
@@ -194,7 +245,7 @@ anotherFileLink.addEventListener("click", (e) => {
 });
 
 [tenantIdInput, userIdInput].forEach((el) => {
-  el.addEventListener("change", () => { saveSession(); loadPersona(); });
+  el.addEventListener("change", () => { saveSession(); loadPersona(); loadRecentRecipients(); });
 });
 
 // Bootstrap
@@ -206,8 +257,54 @@ anotherFileLink.addEventListener("click", (e) => {
   }
   updateSessionLabel();
   loadPersona();
-  maybeShowTour();
+  loadRecentRecipients();
+  if (!maybeShowRolePicker()) {
+    maybeShowTour();
+  }
 })();
+
+function maybeShowRolePicker() {
+  if (localStorage.getItem(ROLE_PICKER_KEY)) return false;
+
+  const overlay = document.createElement("div");
+  overlay.className = "role-picker-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:24px";
+  const card = document.createElement("div");
+  card.style.cssText = "background:#fff;padding:28px;border-radius:12px;max-width:680px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.3)";
+  card.innerHTML = `
+    <h2 style="margin:0 0 6px 0;font-size:1.4rem">Which best describes you?</h2>
+    <p style="margin:0 0 18px 0;color:#6b7280">This personalises the UI hints on this device. Your actual permissions are set by your IT admin and won't change here.</p>
+    <div class="role-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+    <button type="button" class="skip" style="margin-top:14px;padding:6px 12px;background:transparent;border:none;color:#6b7280;cursor:pointer">Skip for now</button>`;
+  const grid = card.querySelector(".role-grid");
+  for (const role of ROLE_DETAILS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.role = role.id;
+    btn.style.cssText = "text-align:left;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit";
+    btn.innerHTML = `
+      <div style="font-size:24px;line-height:1">${role.icon}</div>
+      <div style="margin-top:6px;font-weight:600;color:#111827">${role.title}</div>
+      <div style="margin-top:4px;font-size:0.85rem;color:#6b7280;line-height:1.4">${role.blurb}</div>`;
+    btn.onmouseover = () => { btn.style.borderColor = "#a45b13"; btn.style.background = "#fff8f0"; };
+    btn.onmouseout = () => { btn.style.borderColor = "#e5e7eb"; btn.style.background = "#fff"; };
+    btn.onclick = () => {
+      localStorage.setItem(ROLE_PICKER_KEY, role.id);
+      personaBadge.textContent = role.id + " (self-declared)";
+      overlay.remove();
+      maybeShowTour();
+    };
+    grid.appendChild(btn);
+  }
+  card.querySelector(".skip").onclick = () => {
+    localStorage.setItem(ROLE_PICKER_KEY, "skipped");
+    overlay.remove();
+    maybeShowTour();
+  };
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  return true;
+}
 
 function maybeShowTour() {
   if (localStorage.getItem(TOUR_KEY)) return;

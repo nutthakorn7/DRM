@@ -501,6 +501,7 @@ app.MapAdminFolderWatcherEndpoints();
 app.MapCompatibilityEndpoints();
 app.MapPersonaEndpoints();
 app.MapQuickShareEndpoints();
+app.MapRecentRecipientsEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

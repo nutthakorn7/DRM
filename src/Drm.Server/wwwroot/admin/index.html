@@ -765,6 +765,59 @@
         </div>
       </section>
 
+      <section class="panel" id="dashboard">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Server</p>
+            <h3>Status dashboard</h3>
+          </div>
+          <button id="refreshDashboard" type="button">Refresh all</button>
+        </div>
+        <p class="hint">One-click pulse of every subsystem. Each tile turns green when the corresponding endpoint responds; click a tile to jump to its detailed panel.</p>
+        <div class="status-grid" id="statusGrid">
+          <article class="status-tile" data-subsystem="health" data-jump="status">
+            <span class="dot"></span>
+            <strong>Server</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="directory" data-jump="directory">
+            <span class="dot"></span>
+            <strong>Directory sync</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="box" data-jump="box">
+            <span class="dot"></span>
+            <strong>Box</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="outlook" data-jump="outlook">
+            <span class="dot"></span>
+            <strong>Outlook add-in</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="folder-watcher" data-jump="folder-watcher">
+            <span class="dot"></span>
+            <strong>Folder watcher</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="license" data-jump="license">
+            <span class="dot"></span>
+            <strong>License</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="audit" data-jump="audit">
+            <span class="dot"></span>
+            <strong>Audit feed</strong>
+            <span class="detail">—</span>
+          </article>
+          <article class="status-tile" data-subsystem="containers" data-jump="containers">
+            <span class="dot"></span>
+            <strong>Containers</strong>
+            <span class="detail">—</span>
+          </article>
+        </div>
+      </section>
+
       <section class="panel compact" id="status">
         <div>
           <p class="eyebrow">Server</p>

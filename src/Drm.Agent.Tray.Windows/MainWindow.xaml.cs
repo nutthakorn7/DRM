@@ -368,6 +368,18 @@ public partial class MainWindow : Window
         ContainerDropZone.Background = System.Windows.Media.Brushes.White;
     }
 
+    private static readonly System.Windows.Media.Brush WizActiveBrush =
+        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xA4, 0x5B, 0x13));
+    private static readonly System.Windows.Media.Brush WizInactiveBrush =
+        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+
+    private void UpdateContainerWizardDots(int activeStep)
+    {
+        WizStep1Dot.Background = activeStep >= 1 ? WizActiveBrush : WizInactiveBrush;
+        WizStep2Dot.Background = activeStep >= 2 ? WizActiveBrush : WizInactiveBrush;
+        WizStep3Dot.Background = activeStep >= 3 ? WizActiveBrush : WizInactiveBrush;
+    }
+
     private async void ContainerDropZone_Drop(object sender, System.Windows.DragEventArgs e)
     {
         ContainerDropZone_DragLeave(sender, e);
@@ -380,13 +392,17 @@ public partial class MainWindow : Window
             SetStatus("Drop a folder (not a single file).");
             return;
         }
+        UpdateContainerWizardDots(2);
 
         var passphrase = ContainerPassphraseBox.Password;
         if (string.IsNullOrEmpty(passphrase) || passphrase.Length < 6)
         {
-            SetStatus("Container passphrase must be at least 6 characters.");
+            SetStatus("Step 2: set a passphrase ≥ 6 characters, then drop the folder again.");
+            ContainerDropHint.Text = $"Folder ready: {Path.GetFileName(folder)} — fill the passphrase below and drop again.";
+            ContainerPassphraseBox.Focus();
             return;
         }
+        UpdateContainerWizardDots(3);
 
         try
         {
@@ -437,7 +453,9 @@ public partial class MainWindow : Window
             var registered = registerResponse.IsSuccessStatusCode;
 
             SetStatus($"Container created: {outPath} ({entries.Count} files, {container.Length:N0} bytes). Server register: {(registered ? "ok" : (int)registerResponse.StatusCode)}.");
-            ContainerDropHint.Text = $"Last sealed: {displayName} ({entries.Count} files → {Path.GetFileName(outPath)})";
+            ContainerDropHint.Text = $"✓ Sealed: {displayName} ({entries.Count} files → {Path.GetFileName(outPath)})";
+            UpdateContainerWizardDots(0);
+            ContainerPassphraseBox.Password = string.Empty;
         }
         catch (Exception ex)
         {

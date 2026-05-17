@@ -492,6 +492,31 @@ public partial class MainWindow : Window
         MarkFirstRunOverlaySeen();
     }
 
+    private void OpenDrmExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantIdValue = currentIdentity?.TenantId
+                ?? throw new InvalidOperationException("Open a protected file first so the explorer knows which tenant to query.");
+            var adminKey = ClientApiKeyBox.Password.Trim();
+            if (string.IsNullOrEmpty(adminKey))
+            {
+                StatusText.Text = "DRM Explorer needs your client / admin key — fill the Client Key field first.";
+                return;
+            }
+            var explorer = new DrmExplorerWindow(serverUrl, tenantIdValue, adminKey)
+            {
+                Owner = this
+            };
+            explorer.Show();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Could not open DRM Explorer: {ex.Message}";
+        }
+    }
+
     private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.F1)

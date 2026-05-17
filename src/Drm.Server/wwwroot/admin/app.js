@@ -98,13 +98,31 @@ if (globalSearch) {
 }
 
 // Glossary tooltips: decorate any element whose text content contains a
-// term defined in /admin/glossary.json. Decoration is idempotent.
+// term defined in /admin/glossary.<locale>.json. Decoration is idempotent
+// and falls back to English when the locale-specific file is missing.
 (async function initGlossary() {
+  const locale = (localStorage.getItem("drm:locale")
+                  ?? navigator.language?.slice(0, 2)
+                  ?? "en").toLowerCase();
+  const candidates = locale === "en" ? ["en"] : [locale, "en"];
+
   let glossary = {};
-  try {
-    const resp = await fetch("/admin/glossary.json");
-    if (resp.ok) glossary = await resp.json();
-  } catch { /* offline or missing — skip silently */ }
+  for (const lang of candidates) {
+    const paths = [
+      `/admin/glossary.${lang}.json`,
+      // Backwards-compat: the original release shipped a single
+      // glossary.json file. Honour it as the EN baseline.
+      lang === "en" ? "/admin/glossary.json" : null
+    ].filter(Boolean);
+    for (const path of paths) {
+      try {
+        const resp = await fetch(path);
+        if (!resp.ok) continue;
+        const localeMap = await resp.json();
+        glossary = { ...localeMap, ...glossary }; // EN keys win when locale-specific is missing
+      } catch { /* skip */ }
+    }
+  }
 
   function decorate() {
     if (!Object.keys(glossary).length) return;
@@ -139,6 +157,115 @@ document.querySelector("#checkHealth").addEventListener("click", async () => {
   const response = await fetch("/healthz");
   healthOutput.textContent = JSON.stringify(await response.json(), null, 2);
 });
+
+// Unified status dashboard — one card, 8 traffic-light tiles.
+document.querySelector("#refreshDashboard")?.addEventListener("click", refreshStatusDashboard);
+
+document.querySelectorAll(".status-tile").forEach((tile) => {
+  tile.addEventListener("click", () => {
+    const jump = tile.getAttribute("data-jump");
+    if (jump) {
+      const target = document.getElementById(jump);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+});
+
+async function refreshStatusDashboard() {
+  const tenantId = tenantIdInput.value.trim();
+
+  setStatus("Polling subsystems…", "ok");
+
+  async function probe(subsystem, request) {
+    const tile = document.querySelector(`.status-tile[data-subsystem="${subsystem}"]`);
+    if (!tile) return;
+    tile.classList.remove("is-ok", "is-warn", "is-err");
+    try {
+      const result = await request();
+      tile.classList.add(result.level);
+      tile.querySelector(".detail").textContent = result.detail;
+    } catch (err) {
+      tile.classList.add("is-err");
+      tile.querySelector(".detail").textContent = err?.message ?? "error";
+    }
+  }
+
+  await Promise.all([
+    probe("health", async () => {
+      const r = await fetch("/healthz");
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      return { level: "is-ok", detail: "healthy" };
+    }),
+    probe("directory", async () => {
+      if (!tenantId) return { level: "is-warn", detail: "no tenant" };
+      const r = await fetch(`/api/admin/directory/config?tenantId=${encodeURIComponent(tenantId)}`, {
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+      });
+      if (r.status === 404) return { level: "is-warn", detail: "not configured" };
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const c = await r.json();
+      return { level: c.lastSyncStatus === "ok" ? "is-ok" : "is-warn", detail: c.lastSyncStatus ?? "unknown" };
+    }),
+    probe("box", async () => {
+      if (!tenantId) return { level: "is-warn", detail: "no tenant" };
+      const r = await fetch(`/api/admin/box/config?tenantId=${encodeURIComponent(tenantId)}`, {
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+      });
+      if (r.status === 404) return { level: "is-warn", detail: "not configured" };
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const c = await r.json();
+      return { level: c.enabled ? "is-ok" : "is-warn", detail: c.enabled ? `${c.lastWebhookEventCount} events` : "disabled" };
+    }),
+    probe("outlook", async () => {
+      if (!tenantId) return { level: "is-warn", detail: "no tenant" };
+      const r = await fetch(`/api/admin/outlook/config?tenantId=${encodeURIComponent(tenantId)}`, {
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+      });
+      if (r.status === 404) return { level: "is-warn", detail: "not configured" };
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const c = await r.json();
+      return { level: c.enabled ? "is-ok" : "is-warn", detail: c.enabled ? `${c.lifetimeProtectedCount} protected` : "disabled" };
+    }),
+    probe("folder-watcher", async () => {
+      if (!tenantId) return { level: "is-warn", detail: "no tenant" };
+      const r = await fetch(`/api/admin/folder-watcher/config?tenantId=${encodeURIComponent(tenantId)}`, {
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+      });
+      if (r.status === 404) return { level: "is-warn", detail: "not configured" };
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const c = await r.json();
+      const level = c.enabled && c.lastReportStatus === "ok" ? "is-ok"
+                    : c.enabled ? "is-warn" : "is-warn";
+      return { level, detail: c.enabled ? `${c.lastFilesProtected ?? 0} protected` : "disabled" };
+    }),
+    probe("license", async () => {
+      const r = await fetch("/api/admin/license", {
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+      });
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const c = await r.json();
+      return { level: "is-ok", detail: `${c.enabledTiers.length} tier${c.enabledTiers.length === 1 ? "" : "s"} · ${c.paidEncrypterCount} paid` };
+    }),
+    probe("audit", async () => {
+      if (!tenantId) return { level: "is-warn", detail: "no tenant" };
+      const r = await fetch(`/api/audit?tenantId=${encodeURIComponent(tenantId)}&limit=1`);
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const list = await r.json();
+      return { level: "is-ok", detail: list.length > 0 ? "events flowing" : "no events yet" };
+    }),
+    probe("containers", async () => {
+      if (!tenantId) return { level: "is-warn", detail: "no tenant" };
+      const r = await fetch(`/api/admin/secure-containers?tenantId=${encodeURIComponent(tenantId)}`, {
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+      });
+      if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
+      const list = await r.json();
+      return { level: "is-ok", detail: `${list.length} container${list.length === 1 ? "" : "s"}` };
+    })
+  ]);
+
+  setStatus("Dashboard refreshed", "ok");
+}
 
 document.querySelector("#createUserForm").addEventListener("submit", async (event) => {
   event.preventDefault();

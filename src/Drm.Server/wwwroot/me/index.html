@@ -44,7 +44,10 @@
 
       <label class="recipient">
         Send to
-        <input id="recipient" type="email" required placeholder="bob@example.com" autocomplete="email">
+        <input id="recipient" type="email" required placeholder="bob@example.com"
+               autocomplete="email" list="recentRecipientsList">
+        <datalist id="recentRecipientsList"></datalist>
+        <span class="hint" id="recentHint" hidden></span>
       </label>
 
       <details class="advanced">

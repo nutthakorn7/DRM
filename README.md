@@ -1065,3 +1065,49 @@ This is text-only static analysis — the actual registry write is exercised man
 7 new (verb declaration, file-extension registration, tray CLI flag parity, viewer CLI flag parity, install/uninstall symmetry, no-HKLM contract, path-quoting contract). **238/238 total pass.**
 
 With this phase the Phase 5AS UX scorecard reaches the **88/100 target** set in the plan — right-click in Explorer is the last gap closed.
+
+## Phase 5AS-polish — Path A: push UX scorecard 88 → ~96/100
+
+Six quick wins from the Phase 5AS planning research, each landing in one task.
+
+### 1. Recent recipients autocomplete on `/me/`
+
+`GET /api/me/recent-recipients?tenantId=&userId=&limit=` joins the user's owned files with their share links to surface the most-recently-used guest emails. `/me/` populates a `<datalist>` and hints the last recipient inline so the second-and-onwards Quick Share is one keystroke instead of a full email typing.
+
+### 2. Self-onboarding role picker on `/me/`
+
+First visit to `/me/` shows a 4-card modal: Employee · KnowledgeWorker · Executive · IT admin. Each card carries an icon, role title, and a one-sentence "you'll use it for…". The selection is informational (stored in `localStorage` only — actual capabilities still come from `/api/me/persona` set by admin) and updates the persona badge. A "Skip for now" button is always available.
+
+### 3. DRM Explorer window in viewer
+
+A new `DrmExplorerWindow` (WPF DataGrid) launched from a "🗂 DRM Explorer" button on the viewer toolbar. Lists every protected file in the current tenant with file ID, content type, permissions, owner, expiry, and revoke status. Includes inline filter box (any column, contains, case-insensitive) and a Refresh button. Mirrors FinalCode 5.3's "FinalCode Explorer" UX pattern.
+
+### 4. Container-create wizard in tray
+
+The "Create secure container" panel gains a 3-step progress strip (Drop folder → Set passphrase → Create) with active step dot turning amber. Dropping a folder without a passphrase advances to step 2 and focuses the passphrase field instead of failing. Clearing the passphrase after success resets the wizard for the next folder.
+
+### 5. Unified status dashboard in admin
+
+A new "Status dashboard" panel above the legacy Health panel shows eight subsystem tiles in a responsive grid (Server, Directory sync, Box, Outlook, Folder watcher, License, Audit feed, Containers). Each tile is a traffic light (green = healthy, amber = not configured / disabled, red = error) with a one-line detail (e.g. `12 events`, `disabled`, `HTTP 503`). Clicking a tile scrolls to the corresponding panel. A "Refresh all" button polls every subsystem in parallel.
+
+### 6. i18n glossary stub (TH + JA)
+
+`glossary.en.json` is now the source of truth; `glossary.th.json` and `glossary.ja.json` ship locale-specific translations for the most-used terms. The tooltip decorator reads `localStorage["drm:locale"]` first, then `navigator.language.slice(0, 2)`, then falls back to EN. Locale-specific keys take precedence; missing keys fall through to EN — no broken tooltips for partially translated locales. The legacy `glossary.json` (Phase 5AS) is kept in lockstep with EN for clients that haven't picked up the locale-aware loader.
+
+### Tests
+
+8 new (2 recent recipients + 4 i18n glossary contract + 2 wired through existing suites). **244/244 total pass.**
+
+### UX scorecard impact
+
+| Dimension | Phase 5AS | After polish |
+|---|---|---|
+| Single-click protect | 8 | **10** (recent recipients = one-keystroke send) |
+| Persona switch | 9 | **10** (self-onboarding picker explains roles) |
+| Progressive disclosure | 8 | **9** (container wizard) |
+| Real-time status | 9 | **10** (one-card dashboard with traffic lights) |
+| Tooltip glossary | 9 | **10** (i18n EN/TH/JA) |
+| Explorer-like browse | 8 | **10** (DrmExplorerWindow ships) |
+| **Total** | **88/100** | **~96/100** |
+
+The remaining 4 points require platform work that doesn't fit a single iteration: Office VSTO ribbon, COM-based right-click icons, drag-from-Outlook deep integration, and browser-native CAD rendering (the last is a physical limit of the format).

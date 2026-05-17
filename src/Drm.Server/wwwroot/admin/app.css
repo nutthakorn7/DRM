@@ -460,6 +460,53 @@ button.ghost:hover {
   background: var(--accent-dark);
 }
 
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.status-tile {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: transform 80ms, border-color 80ms;
+}
+
+.status-tile:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.status-tile .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.status-tile.is-ok .dot   { background: #10b981; }
+.status-tile.is-warn .dot { background: #f59e0b; }
+.status-tile.is-err .dot  { background: #ef4444; }
+
+.status-tile strong {
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.status-tile .detail {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .license-tiers {
   display: flex;
   flex-wrap: wrap;
