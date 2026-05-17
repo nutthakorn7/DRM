@@ -415,11 +415,6 @@ select {
   letter-spacing: 0;
 }
 
-.rail h1 {
-  font-size: 29px;
-  line-height: 1.05;
-}
-
 .eyebrow {
   margin: 0 0 7px;
   color: var(--muted);

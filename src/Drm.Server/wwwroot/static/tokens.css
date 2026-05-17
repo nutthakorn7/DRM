@@ -207,6 +207,16 @@
 }
 
 /*
+ * Default heading scale — applied globally so every surface inherits the
+ * 1.25 ratio. Surface CSS can still override with a more specific selector
+ * when a particular context calls for a larger or smaller heading.
+ */
+h1 { font-size: var(--text-h1); line-height: var(--leading-tight); font-weight: var(--weight-bold); }
+h2 { font-size: var(--text-h2); line-height: var(--leading-snug);  font-weight: var(--weight-bold); }
+h3 { font-size: var(--text-h3); line-height: var(--leading-snug);  font-weight: var(--weight-semibold); }
+h4 { font-size: var(--text-lg); line-height: var(--leading-snug);  font-weight: var(--weight-semibold); }
+
+/*
  * Reduced-motion: respect the OS preference globally. Collapses both
  * token-based timings AND any hardcoded transition/animation durations
  * that haven't been migrated to tokens yet. Belt-and-suspenders.

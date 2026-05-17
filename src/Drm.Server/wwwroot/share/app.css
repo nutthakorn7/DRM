@@ -122,12 +122,18 @@ h2 {
   gap: 14px;
   border-top: 1px solid var(--line);
   padding-top: 18px;
-  opacity: 0.76;
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.3);
+  transition: opacity var(--duration-base) var(--ease-out),
+              filter var(--duration-base) var(--ease-out);
 }
 
 .step.active,
 .step.complete {
   opacity: 1;
+  pointer-events: auto;
+  filter: none;
 }
 
 .step-head {

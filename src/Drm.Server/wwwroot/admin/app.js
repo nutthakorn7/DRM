@@ -1711,9 +1711,30 @@ async function apiFetchBlob(url, options = {}) {
   return response.blob();
 }
 
+// Empty-state helper for table bodies. Renders a centered card with icon,
+// title, hint, and optional CTA inside a full-width <td>. Use whenever a list
+// is empty so new users see something better than "No items.".
+function emptyStateRow(colspan, opts) {
+  const cta = opts.cta
+    ? `<button type="button" class="primary"${opts.ctaData ? ' ' + opts.ctaData : ''} style="margin-top:10px">${opts.cta}</button>`
+    : "";
+  return `<tr><td colspan="${colspan}" style="padding:0">
+    <div class="empty-state">
+      <div class="empty-icon" aria-hidden="true">${opts.icon}</div>
+      <div class="empty-title">${opts.title}</div>
+      <div class="empty-hint">${opts.hint}</div>
+      ${cta}
+    </div>
+  </td></tr>`;
+}
+
 function renderUsers(users) {
   if (!users.length) {
-    usersBody.innerHTML = '<tr><td colspan="3" class="empty">No users in this tenant.</td></tr>';
+    usersBody.innerHTML = emptyStateRow(3, {
+      icon: "👥",
+      title: "No users yet",
+      hint: "Add your first user with the form above. Users must exist before files can be protected for them.",
+    });
     return;
   }
 
@@ -1728,7 +1749,11 @@ function renderUsers(users) {
 
 function renderGroupMembers(members) {
   if (!members.length) {
-    groupMembersBody.innerHTML = '<tr><td colspan="2" class="empty">No members in this group.</td></tr>';
+    groupMembersBody.innerHTML = emptyStateRow(2, {
+      icon: "👥",
+      title: "No members in this group",
+      hint: "Use the Add member form above to bring users into this group.",
+    });
     return;
   }
 
@@ -1742,7 +1767,11 @@ function renderGroupMembers(members) {
 
 function renderDevices(devices) {
   if (!devices.length) {
-    devicesBody.innerHTML = '<tr><td colspan="8" class="empty">No agent devices found.</td></tr>';
+    devicesBody.innerHTML = emptyStateRow(8, {
+      icon: "💻",
+      title: "No agent devices registered",
+      hint: "Devices appear here once the DRM agent checks in. Install the agent and run it once to see it listed.",
+    });
     return;
   }
 
@@ -1791,7 +1820,11 @@ function renderDeviceHealth(health) {
 
 function renderPolicyTemplates(templates) {
   if (!templates.length) {
-    policyTemplatesBody.innerHTML = '<tr><td colspan="6" class="empty">No policy templates in this tenant.</td></tr>';
+    policyTemplatesBody.innerHTML = emptyStateRow(6, {
+      icon: "📋",
+      title: "No policy templates yet",
+      hint: "Templates bundle permissions, watermark, and offline-lease into a reusable preset. Create one above so users can apply it when protecting files.",
+    });
     return;
   }
 
@@ -1887,7 +1920,11 @@ function renderAuditEvents(events) {
 
 function renderFiles(files) {
   if (!files.length) {
-    filesBody.innerHTML = '<tr><td colspan="7" class="empty">No protected files found.</td></tr>';
+    filesBody.innerHTML = emptyStateRow(7, {
+      icon: "📄",
+      title: "No protected files yet",
+      hint: "Files appear here once a user protects a document via the Send page, the DRM agent, or the API.",
+    });
     return;
   }
 

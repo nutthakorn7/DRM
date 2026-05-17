@@ -35,18 +35,18 @@
             <h2 id="startTitle">Start verification</h2>
           </div>
         </div>
-        <form id="verificationStartForm">
+        <form id="verificationStartForm" novalidate>
           <label>
             <span>Tenant ID</span>
-            <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" required>
+            <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
           </label>
           <label>
             <span>Access token</span>
-            <input id="accessToken" autocomplete="off" placeholder="Paste the share token" required>
+            <input id="accessToken" autocomplete="off" placeholder="Paste the share token">
           </label>
           <label>
             <span>Guest email</span>
-            <input id="guestEmail" type="email" autocomplete="email" placeholder="guest@example.com" required>
+            <input id="guestEmail" type="email" autocomplete="email" placeholder="guest@example.com">
           </label>
           <button type="submit">Send verification code</button>
         </form>
@@ -60,14 +60,14 @@
             <h2 id="confirmTitle">Confirm code</h2>
           </div>
         </div>
-        <form id="verificationConfirmForm">
+        <form id="verificationConfirmForm" novalidate>
           <label>
             <span>Verification ID</span>
-            <input id="verificationId" autocomplete="off" placeholder="Returned after code send" required>
+            <input id="verificationId" autocomplete="off" placeholder="Returned after code send">
           </label>
           <label>
             <span>Verification code</span>
-            <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" required>
+            <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" placeholder="000000">
           </label>
           <button type="submit">Open viewer session</button>
         </form>
