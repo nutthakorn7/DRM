@@ -528,6 +528,121 @@ body[data-active-tab="all"] section.panel {
   background: var(--accent-dark);
 }
 
+.help-pill {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 10px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.getting-started {
+  border-left: 4px solid var(--accent);
+  background: linear-gradient(180deg, #fff7ed 0%, var(--surface) 60%);
+  order: -10; /* pin to the top of the grid when visible */
+}
+
+.getting-started.is-complete {
+  border-left-color: #10b981;
+  background: linear-gradient(180deg, #ecfdf5 0%, var(--surface) 60%);
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  padding: 14px 4px;
+  border-top: 1px solid var(--line);
+}
+
+.checklist-item:first-child { border-top: none; }
+
+.checklist-item .check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.checklist-item.is-done .check {
+  background: #10b981;
+  border-color: #10b981;
+  color: white;
+}
+
+.checklist-item.is-done .check::before {
+  content: "✓";
+  font-weight: bold;
+}
+
+.checklist-item .step-body strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.checklist-item.is-done .step-body strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.checklist-item .hint {
+  margin: 4px 0 8px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.step-actions button,
+.step-actions a {
+  font-size: 0.85rem;
+  padding: 5px 12px;
+  border-radius: 5px;
+}
+
+.step-actions a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.step-actions a.primary-link {
+  background: var(--accent);
+  color: white;
+  padding: 6px 14px;
+  font-weight: 600;
+}
+
+.step-actions a.primary-link:hover {
+  background: var(--accent-dark);
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

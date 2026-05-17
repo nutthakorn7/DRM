@@ -217,6 +217,8 @@ document.querySelector("#quickShareForm").addEventListener("submit", async (even
     fileIdSummary.textContent = data.fileId;
     result.hidden = false;
     result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    // Mark the "protect" onboarding step done for the admin checklist.
+    localStorage.setItem("drm:onboarded:protect", "1");
   } catch (err) {
     showError(err.message ?? String(err));
   } finally {

@@ -69,6 +69,110 @@ if (forgetSessionBtn) {
   });
 }
 
+// Getting started checklist — guides first-time visitors through the
+// minimum 5 setup steps and auto-checks each one as it gets done.
+(function initGettingStarted() {
+  const DISMISS_KEY = "drm:gettingStartedDismissed";
+  const card = document.querySelector("#gettingStarted");
+  if (!card) return;
+  if (localStorage.getItem(DISMISS_KEY) === "1") {
+    card.hidden = true;
+    return;
+  }
+
+  function randomHex(byteCount) {
+    const bytes = new Uint8Array(byteCount);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function randomGuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const hex = randomHex(16);
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20,32)}`;
+  }
+
+  document.querySelector("#generateTenantId")?.addEventListener("click", () => {
+    const id = randomGuid();
+    tenantIdInput.value = id;
+    tenantIdInput.dispatchEvent(new Event("change", { bubbles: true }));
+    setStatus(`Generated Tenant ID — copy it somewhere safe.`, "ok");
+    tenantIdInput.focus();
+    refresh();
+  });
+
+  document.querySelector("#generateAdminKey")?.addEventListener("click", async () => {
+    const key = randomHex(32);
+    adminKeyInput.value = key;
+    adminKeyInput.dispatchEvent(new Event("change", { bubbles: true }));
+    try {
+      await navigator.clipboard.writeText(key);
+      setStatus(`Generated Admin Key (also copied to clipboard).`, "ok");
+    } catch {
+      setStatus(`Generated Admin Key.`, "ok");
+    }
+    refresh();
+  });
+
+  document.querySelectorAll("[data-jump-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.jumpTab;
+      const panelId = btn.dataset.jumpPanel;
+      if (window.__drmSetActiveTab && tab) {
+        window.__drmSetActiveTab(tab);
+      }
+      if (panelId) {
+        requestAnimationFrame(() => {
+          document.getElementById(panelId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    });
+  });
+
+  document.querySelector("#dismissGettingStarted")?.addEventListener("click", () => {
+    localStorage.setItem(DISMISS_KEY, "1");
+    card.hidden = true;
+    setStatus("Getting started hidden — clear localStorage to bring it back.", "ok");
+  });
+
+  function refresh() {
+    const tenant = tenantIdInput.value.trim();
+    const adminKey = adminKeyInput.value.trim();
+    const hasTenant = tenant && tenant !== "00000000-0000-0000-0000-000000000000";
+    const hasKey = adminKey.length >= 8;
+    const hasUser = localStorage.getItem("drm:onboarded:user") === "1";
+    const hasPolicy = localStorage.getItem("drm:onboarded:policy") === "1";
+    const hasProtect = localStorage.getItem("drm:onboarded:protect") === "1";
+
+    setStep("tenant", hasTenant);
+    setStep("adminKey", hasKey);
+    setStep("user", hasUser);
+    setStep("policy", hasPolicy);
+    setStep("protect", hasProtect);
+
+    const allDone = hasTenant && hasKey && hasUser && hasPolicy && hasProtect;
+    card.classList.toggle("is-complete", allDone);
+  }
+
+  function setStep(name, done) {
+    const item = card.querySelector(`[data-step="${name}"]`);
+    if (item) item.classList.toggle("is-done", !!done);
+  }
+
+  [tenantIdInput, adminKeyInput].forEach(input =>
+    input?.addEventListener("input", refresh));
+
+  // Watch for completion signals dispatched elsewhere in the app.
+  window.addEventListener("drm:onboarded", (e) => {
+    if (e.detail?.step) {
+      localStorage.setItem(`drm:onboarded:${e.detail.step}`, "1");
+      refresh();
+    }
+  });
+
+  refresh();
+})();
+
 // Tab navigation: 5 tabs (overview, identity, policy, files, integrations)
 // collapsing the 19-panel /admin/ console into one tab at a time.
 (function initTabs() {
@@ -351,6 +455,7 @@ document.querySelector("#createUserForm").addEventListener("submit", async (even
 
   event.target.reset();
   await refreshUsers();
+  window.dispatchEvent(new CustomEvent("drm:onboarded", { detail: { step: "user" } }));
 });
 
 document.querySelector("#createGroupForm").addEventListener("submit", async (event) => {
@@ -429,6 +534,7 @@ document.querySelector("#createPolicyTemplateForm").addEventListener("submit", a
 
   event.target.reset();
   await refreshPolicyTemplates();
+  window.dispatchEvent(new CustomEvent("drm:onboarded", { detail: { step: "policy" } }));
 });
 
 document.querySelector("#createWatermarkTemplateForm").addEventListener("submit", async (event) => {

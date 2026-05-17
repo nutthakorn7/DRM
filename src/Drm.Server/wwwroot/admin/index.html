@@ -39,7 +39,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Management API</p>
-          <h2>Tenant operations</h2>
+          <h2>Tenant operations <span class="help-pill" id="topbarHelp" title="First time here? Fill in Tenant ID and Admin Key below — we'll guide you through the 5-step setup checklist on the Overview tab.">First time?</span></h2>
         </div>
         <div class="status-line" id="connectionState">Not connected</div>
       </header>
@@ -782,6 +782,75 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panel getting-started" id="gettingStarted" data-tab="overview">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Welcome</p>
+            <h3>Getting started — set up DRM in 5 steps</h3>
+          </div>
+          <button id="dismissGettingStarted" type="button" class="ghost">Hide</button>
+        </div>
+        <p class="hint">New to DRM? Each step takes 30 seconds or less. We'll mark them done as you complete them.</p>
+
+        <ol class="checklist" id="gettingStartedList">
+          <li class="checklist-item" data-step="tenant">
+            <span class="check">○</span>
+            <div class="step-body">
+              <strong>1. Enter or generate a Tenant ID</strong>
+              <p class="hint">A Tenant ID is your organisation's unique identifier. Ask your IT admin if you have one — or generate a test one to explore.</p>
+              <div class="step-actions">
+                <button type="button" id="generateTenantId">Generate test Tenant ID</button>
+                <a href="#tab-overview" data-scroll-to="tenantId">Where do I enter it?</a>
+              </div>
+            </div>
+          </li>
+
+          <li class="checklist-item" data-step="adminKey">
+            <span class="check">○</span>
+            <div class="step-body">
+              <strong>2. Set the Admin API Key</strong>
+              <p class="hint">A shared secret that protects /api/admin/*. Generate a random 32-byte key now or paste one your IT admin provided.</p>
+              <div class="step-actions">
+                <button type="button" id="generateAdminKey">Generate random Admin Key</button>
+              </div>
+            </div>
+          </li>
+
+          <li class="checklist-item" data-step="user">
+            <span class="check">○</span>
+            <div class="step-body">
+              <strong>3. Create your first user</strong>
+              <p class="hint">You need at least one user before files can be protected.</p>
+              <div class="step-actions">
+                <button type="button" data-jump-tab="identity" data-jump-panel="users">Go to Users panel →</button>
+              </div>
+            </div>
+          </li>
+
+          <li class="checklist-item" data-step="policy">
+            <span class="check">○</span>
+            <div class="step-body">
+              <strong>4. Create a policy template (optional)</strong>
+              <p class="hint">Reusable bundle of permissions + watermark + offline lease. Skip if you just want Quick Send defaults.</p>
+              <div class="step-actions">
+                <button type="button" data-jump-tab="policy" data-jump-panel="templates">Go to Templates →</button>
+              </div>
+            </div>
+          </li>
+
+          <li class="checklist-item" data-step="protect">
+            <span class="check">○</span>
+            <div class="step-body">
+              <strong>5. Protect and send your first file</strong>
+              <p class="hint">Open the Quick Send page, drop any file, type one recipient email, click Send. You'll have a verified share URL in your clipboard.</p>
+              <div class="step-actions">
+                <a href="/me/" class="primary-link">Open Quick Send →</a>
+              </div>
+            </div>
+          </li>
+        </ol>
       </section>
 
       <section class="panel" id="dashboard" data-tab="overview">
