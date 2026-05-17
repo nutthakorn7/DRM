@@ -312,6 +312,52 @@ button.danger:hover {
   gap: 10px;
 }
 
+.anti-capture-block {
+  margin: 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.anti-capture-block > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 2px 0;
+}
+
+.anti-capture-block[open] > summary {
+  margin-bottom: 12px;
+}
+
+.watermark-anti-capture-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 14px;
+  align-items: end;
+}
+
+.watermark-anti-capture-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.watermark-anti-capture-form label:has(input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.watermark-anti-capture-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 .simulator-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
