@@ -806,3 +806,47 @@ Dropping a `.drmcontainer` onto the viewer triggers a blue banner. The user ente
 ### Tests
 
 5 new crypto tests (round-trip, wrong-key auth failure, bad magic, key size validation, KDF determinism) + 3 admin API tests (full lifecycle + empty files + duplicate conflict) = 8 new, **208/208 total pass**.
+
+## Phase 5AQ Folder Watcher Windows Service
+
+FinalCode's "共有フォルダー自動暗号化モジュール" — a Windows service that watches folders on a file server and applies DRM transparent encryption to every file that lands in them. Operators configure the watched paths from the admin console; the service polls the server for config, runs FileSystemWatcher on each path, and stamps a transparent trailer on each new file via the Phase 5AO envelope.
+
+### New project: `Drm.FolderWatcher.Service`
+
+A .NET Worker / Windows Service host with four collaborating pieces:
+
+- `FolderWatcherOptions` — bound from `appsettings.json:FolderWatcher` (server URL, tenant, owner, admin key, trailer secret, poll interval)
+- `FolderProtectionTracker` — in-memory snapshot of `(size, lastWriteUtc)` per file path to suppress re-entrant events caused by the service's own write
+- `FolderProtector` — reads a candidate file with retry, skips files that already carry a transparent trailer, derives the trailer HMAC, calls `TransparentEnvelope.AppendTrailer`, writes the stamped bytes back, then registers the file via `/api/admin/transparent-files` and posts a `folder-watcher/events` row
+- `FolderWatcherWorker` (BackgroundService) — polls `/api/admin/folder-watcher/config` every `PollIntervalSeconds`, adds/removes `FileSystemWatcher` instances to match the config, and reports liveness via `/api/admin/folder-watcher/report`
+
+Install on a file server with:
+
+```powershell
+sc.exe create "DRM Folder Watcher" binPath= "C:\path\to\Drm.FolderWatcher.Service.exe"
+sc.exe start "DRM Folder Watcher"
+```
+
+(The service uses `AddWindowsService(...)` so it integrates with Service Control Manager.)
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` | `/api/admin/folder-watcher/config` | Upsert watched-folder list + enabled flag for a tenant |
+| `GET` | `/api/admin/folder-watcher/config?tenantId=...` | Retrieve config + last-report status |
+| `POST` | `/api/admin/folder-watcher/report` | Service liveness heartbeat (hostname, status, files-protected counter) |
+| `POST` | `/api/admin/folder-watcher/events` | Service-emitted per-file event (protected / already_protected / locked / error) |
+| `GET` | `/api/admin/folder-watcher/events?tenantId=...&limit=N` | Recent events newest-first |
+
+### Admin console
+
+A new **Folder watcher** nav link reveals the panel: enabled toggle, multi-line folder paths input, save button, status block with `lastReportStatus / hostname / lastFilesProtected`, recent events table.
+
+### Windows tray
+
+A new status line **Folder watcher:** with a coloured dot (green = running, amber = enabled w/ stale status, grey = disabled / not configured, red = error) plus a Check button that hits the admin config endpoint.
+
+### Tests
+
+4 new admin API tests (save/retrieve, 404, report updates status, event writes audit row) + 3 tracker unit tests (new path, size/time change, increment + snapshot) = 7 new, **215/215 total pass**.

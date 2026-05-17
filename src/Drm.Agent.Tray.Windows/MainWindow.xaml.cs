@@ -431,6 +431,63 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void CheckFolderWatcherButton_Click(object sender, RoutedEventArgs e)
+    {
+        CheckFolderWatcherButton.IsEnabled = false;
+        FolderWatcherText.Text = "Checking…";
+        FolderWatcherDot.Fill = System.Windows.Media.Brushes.Gold;
+
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+            using var response = await httpClient.GetAsync(
+                $"/api/admin/folder-watcher/config?tenantId={tenantId}");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                FolderWatcherText.Text = "Not configured";
+                FolderWatcherDot.Fill = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+                return;
+            }
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var enabled = doc.RootElement.TryGetProperty("enabled", out var enEl) && enEl.GetBoolean();
+            var folderCount = doc.RootElement.TryGetProperty("watchedFolders", out var folEl) ? folEl.GetArrayLength() : 0;
+            var lastStatus = doc.RootElement.TryGetProperty("lastReportStatus", out var lsEl) ? lsEl.GetString() : null;
+            var lastProtected = doc.RootElement.TryGetProperty("lastFilesProtected", out var lpEl) ? lpEl.GetInt32() : 0;
+            if (enabled && string.Equals(lastStatus, "ok", StringComparison.OrdinalIgnoreCase))
+            {
+                FolderWatcherText.Text = $"Running • {folderCount} folder{(folderCount == 1 ? "" : "s")} • {lastProtected} protected";
+                FolderWatcherDot.Fill = System.Windows.Media.Brushes.MediumSeaGreen;
+            }
+            else if (enabled)
+            {
+                FolderWatcherText.Text = $"Enabled (last status: {lastStatus ?? "n/a"})";
+                FolderWatcherDot.Fill = System.Windows.Media.Brushes.Gold;
+            }
+            else
+            {
+                FolderWatcherText.Text = "Disabled";
+                FolderWatcherDot.Fill = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+            }
+        }
+        catch (Exception ex)
+        {
+            FolderWatcherText.Text = $"Error: {ex.Message}";
+            FolderWatcherDot.Fill = System.Windows.Media.Brushes.IndianRed;
+        }
+        finally
+        {
+            CheckFolderWatcherButton.IsEnabled = true;
+        }
+    }
+
     private async void CheckLicenseButton_Click(object sender, RoutedEventArgs e)
     {
         CheckLicenseButton.IsEnabled = false;

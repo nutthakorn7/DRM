@@ -150,6 +150,23 @@
                             Click="CheckOutlookStatusButton_Click" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Folder watcher:" Foreground="#6B7280" Margin="0,0,6,0" />
+                    <Ellipse x:Name="FolderWatcherDot"
+                             Width="10" Height="10"
+                             Fill="#9CA3AF"
+                             VerticalAlignment="Center"
+                             Margin="0,0,6,0" />
+                    <TextBlock x:Name="FolderWatcherText"
+                               Text="Not checked"
+                               Foreground="#374151"
+                               VerticalAlignment="Center" />
+                    <Button x:Name="CheckFolderWatcherButton"
+                            Content="Check"
+                            Margin="14,0,0,0"
+                            Padding="10,2"
+                            Click="CheckFolderWatcherButton_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                     <TextBlock Text="License:" Foreground="#6B7280" Margin="0,0,6,0" />
                     <TextBlock x:Name="LicenseTierText"
                                Text="Not checked"

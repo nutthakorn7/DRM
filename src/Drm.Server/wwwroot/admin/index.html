@@ -29,6 +29,7 @@
         <a href="#status">Status</a>
         <a href="#transparent">Transparent</a>
         <a href="#containers">Containers</a>
+        <a href="#folder-watcher">Folder watcher</a>
         <a href="/admin/cases/" target="_blank">Use cases ↗</a>
       </nav>
     </aside>
@@ -837,6 +838,53 @@
         </div>
 
         <p class="hint">Drop a folder onto the Windows tray's "Create container" zone to seal it and register it here automatically.</p>
+      </section>
+
+      <section class="panel" id="folder-watcher">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Server</p>
+            <h3>Folder watcher service</h3>
+          </div>
+          <button id="loadFolderWatcher" type="button">Load config</button>
+        </div>
+
+        <p class="hint">The DRM Folder Watcher Windows Service runs on a file server, watches the listed folders, and appends a DRM transparent-encryption trailer to every newly saved file. Configure the service host via <code>appsettings.json</code> in <code>Drm.FolderWatcher.Service</code>.</p>
+
+        <form class="create-row" id="folderWatcherForm">
+          <label class="inline-check">
+            <input id="folderWatcherEnabled" type="checkbox"> Enabled
+          </label>
+          <input id="folderWatcherPaths" autocomplete="off" placeholder="Watched folders (one path per line)">
+          <button type="submit">Save config</button>
+        </form>
+
+        <pre id="folderWatcherStatus" class="output-block">Folder watcher status appears here.</pre>
+
+        <div class="create-row">
+          <button id="refreshFolderWatcherEvents" type="button">Refresh recent events</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Host</th>
+                <th>Folder</th>
+                <th>File</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>File ID</th>
+              </tr>
+            </thead>
+            <tbody id="folderWatcherEventsBody">
+              <tr>
+                <td colspan="7" class="empty">Click "Refresh recent events" to load activity.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="panel compact" id="license">

@@ -54,6 +54,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<SecureContainerFileEntity> SecureContainerFiles => Set<SecureContainerFileEntity>();
 
+    public DbSet<TenantFolderWatcherConfigEntity> TenantFolderWatcherConfigs => Set<TenantFolderWatcherConfigEntity>();
+
+    public DbSet<FolderWatcherEventEntity> FolderWatcherEvents => Set<FolderWatcherEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -258,6 +262,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(c => new { c.TenantId, c.ContainerId, c.OrdinalIndex });
             entity.HasIndex(c => new { c.TenantId, c.ContainerId });
             entity.Property(c => c.RelativePath).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<TenantFolderWatcherConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+            entity.Property(c => c.LastReportStatus).HasMaxLength(64);
+            entity.Property(c => c.Hostname).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<FolderWatcherEventEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Id });
+            entity.Property(e => e.Hostname).HasMaxLength(256);
+            entity.Property(e => e.FolderPath).HasMaxLength(1024);
+            entity.Property(e => e.FileName).HasMaxLength(512);
+            entity.Property(e => e.Status).HasMaxLength(64);
         });
     }
 }

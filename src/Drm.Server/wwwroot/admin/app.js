@@ -572,6 +572,72 @@ async function refreshTransparentFiles() {
   setStatus(`${files.length} transparent file${files.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
+// Folder watcher
+document.querySelector("#folderWatcherForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const pathsText = document.querySelector("#folderWatcherPaths").value;
+  const watchedFolders = pathsText
+    .split(/\r?\n|,/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => ({ path: p, policyTemplateId: null }));
+  const body = {
+    tenantId: requireTenantId(),
+    watchedFolders,
+    enabled: document.querySelector("#folderWatcherEnabled").checked
+  };
+  await apiFetch("/api/admin/folder-watcher/config", {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+  setStatus("Folder watcher config saved", "ok");
+  await loadFolderWatcherConfig();
+});
+
+document.querySelector("#loadFolderWatcher").addEventListener("click", loadFolderWatcherConfig);
+
+async function loadFolderWatcherConfig() {
+  try {
+    const config = await apiFetch(`/api/admin/folder-watcher/config?tenantId=${encodeURIComponent(requireTenantId())}`);
+    document.querySelector("#folderWatcherEnabled").checked = !!config.enabled;
+    document.querySelector("#folderWatcherPaths").value =
+      (config.watchedFolders ?? []).map((f) => f.path).join("\n");
+    document.querySelector("#folderWatcherStatus").textContent = JSON.stringify({
+      enabled: config.enabled,
+      hostname: config.hostname,
+      lastReportStatus: config.lastReportStatus,
+      lastReportAtUtc: config.lastReportAtUtc,
+      lastFilesProtected: config.lastFilesProtected,
+      updatedAtUtc: config.updatedAtUtc
+    }, null, 2);
+    setStatus("Folder watcher config loaded", "ok");
+  } catch (err) {
+    document.querySelector("#folderWatcherStatus").textContent = `No config yet: ${err.message}`;
+  }
+}
+
+document.querySelector("#refreshFolderWatcherEvents").addEventListener("click", async () => {
+  const events = await apiFetch(`/api/admin/folder-watcher/events?tenantId=${encodeURIComponent(requireTenantId())}`);
+  const tbody = document.querySelector("#folderWatcherEventsBody");
+  if (!events.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No folder watcher events yet.</td></tr>';
+    setStatus("No folder watcher events", "ok");
+    return;
+  }
+  tbody.innerHTML = events.map((e) => `
+    <tr>
+      <td>${escapeHtml(formatDate(e.occurredAtUtc))}</td>
+      <td>${escapeHtml(e.hostname)}</td>
+      <td>${escapeHtml(e.folderPath)}</td>
+      <td>${escapeHtml(e.fileName)}</td>
+      <td>${formatBytes(e.fileSize)}</td>
+      <td>${escapeHtml(e.status)}</td>
+      <td>${e.fileId ? `<code>${escapeHtml(e.fileId)}</code>` : ""}</td>
+    </tr>
+  `).join("");
+  setStatus(`${events.length} folder watcher event${events.length === 1 ? "" : "s"} loaded`, "ok");
+});
+
 // Secure containers
 document.querySelector("#refreshSecureContainers").addEventListener("click", refreshSecureContainers);
 

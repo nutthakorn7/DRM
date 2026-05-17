@@ -221,6 +221,35 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_SecureContainerFiles_TenantId_ContainerId"
             ON "SecureContainerFiles" ("TenantId", "ContainerId");
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantFolderWatcherConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantFolderWatcherConfigs" PRIMARY KEY,
+                "WatchedFoldersJson" TEXT NOT NULL DEFAULT '[]',
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "LastReportStatus" TEXT NULL,
+                "LastReportAtUtc" TEXT NULL,
+                "LastFilesProtected" INTEGER NOT NULL DEFAULT 0,
+                "Hostname" TEXT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FolderWatcherEvents" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_FolderWatcherEvents" PRIMARY KEY AUTOINCREMENT,
+                "TenantId" TEXT NOT NULL,
+                "Hostname" TEXT NOT NULL DEFAULT '',
+                "FolderPath" TEXT NOT NULL DEFAULT '',
+                "FileName" TEXT NOT NULL DEFAULT '',
+                "FileSize" INTEGER NOT NULL DEFAULT 0,
+                "Status" TEXT NOT NULL DEFAULT '',
+                "FileId" TEXT NULL,
+                "OccurredAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FolderWatcherEvents_TenantId_Id"
+            ON "FolderWatcherEvents" ("TenantId", "Id");
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;
@@ -451,6 +480,7 @@ app.MapAdminLicenseEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();
 app.MapAdminSecureContainersEndpoints();
+app.MapAdminFolderWatcherEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

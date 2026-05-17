@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Drm.Server\Drm.Server.csproj" />
+    <ProjectReference Include="..\..\src\Drm.FolderWatcher.Service\Drm.FolderWatcher.Service.csproj" />
   </ItemGroup>
 
 </Project>

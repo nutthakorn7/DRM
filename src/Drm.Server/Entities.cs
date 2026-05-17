@@ -366,6 +366,46 @@ public sealed class BoxWebhookEventEntity
     public DateTimeOffset ReceivedAtUtc { get; set; }
 }
 
+public sealed class TenantFolderWatcherConfigEntity
+{
+    public Guid TenantId { get; set; }
+
+    public string WatchedFoldersJson { get; set; } = "[]";
+
+    public bool Enabled { get; set; }
+
+    public string? LastReportStatus { get; set; }
+
+    public DateTimeOffset? LastReportAtUtc { get; set; }
+
+    public int LastFilesProtected { get; set; }
+
+    public string? Hostname { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class FolderWatcherEventEntity
+{
+    public long Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Hostname { get; set; } = string.Empty;
+
+    public string FolderPath { get; set; } = string.Empty;
+
+    public string FileName { get; set; } = string.Empty;
+
+    public long FileSize { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public Guid? FileId { get; set; }
+
+    public DateTimeOffset OccurredAtUtc { get; set; }
+}
+
 public sealed class SecureContainerEntity
 {
     public Guid TenantId { get; set; }
