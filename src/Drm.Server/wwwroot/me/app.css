@@ -63,12 +63,26 @@ body {
   font-weight: 600;
 }
 
-.topbar nav a {
+.topbar nav a,
+.topbar nav .topbar-link {
   margin-left: 20px;
+  padding: 12px 4px;
+  display: inline-block;
   color: var(--muted);
   text-decoration: none;
   font-weight: 500;
+  background: transparent;
+  border: none;
+  font: inherit;
+  cursor: pointer;
 }
+
+.topbar nav .topbar-link {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.topbar nav .topbar-link:hover { color: var(--accent-dark); }
 
 .topbar nav a.active { color: var(--accent); }
 .topbar nav a:hover  { color: var(--ink); }

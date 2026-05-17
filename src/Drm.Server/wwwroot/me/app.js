@@ -260,10 +260,16 @@ anotherFileLink.addEventListener("click", (e) => {
   updateSessionLabel();
   loadPersona();
   loadRecentRecipients();
-  if (!maybeShowRolePicker()) {
-    maybeShowTour();
-  }
+  // No auto-modals on first visit. Form is self-evident. Persona picker is
+  // opt-in via the "Personalize" link in the topbar.
 })();
+
+document.getElementById("personalizeLink")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  // Bypass the localStorage gate so the picker can re-open on demand.
+  localStorage.removeItem(ROLE_PICKER_KEY);
+  maybeShowRolePicker();
+});
 
 function maybeShowRolePicker() {
   if (localStorage.getItem(ROLE_PICKER_KEY)) return false;
@@ -294,14 +300,12 @@ function maybeShowRolePicker() {
       localStorage.setItem(ROLE_PICKER_KEY, role.id);
       personaBadge.textContent = role.id + " (self-declared)";
       overlay.remove();
-      maybeShowTour();
     };
     grid.appendChild(btn);
   }
   card.querySelector(".skip").onclick = () => {
     localStorage.setItem(ROLE_PICKER_KEY, "skipped");
     overlay.remove();
-    maybeShowTour();
   };
   overlay.appendChild(card);
   document.body.appendChild(overlay);
