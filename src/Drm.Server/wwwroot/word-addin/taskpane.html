@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DRM Protect — Word add-in</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" defer></script>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; padding: 14px; color: #1f2937; background: #f9fafb; line-height: 1.45; }
+    h2 { font-size: 14px; margin: 0 0 6px 0; }
+    p  { font-size: 13px; margin: 0 0 12px 0; color: #374151; }
+    label { display: block; font-size: 12px; color: #4b5563; margin-top: 10px; }
+    input { width: 100%; padding: 6px 8px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; }
+    button { padding: 9px 14px; background: #a45b13; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    button:disabled { background: #9ca3af; cursor: default; }
+    button.full { width: 100%; margin-top: 12px; }
+    .status { font-size: 12px; padding: 8px; border-radius: 4px; background: #f3f4f6; margin-top: 10px; white-space: pre-wrap; word-break: break-word; }
+    .ok  { background: #ecfdf5; color: #047857; }
+    .err { background: #fef2f2; color: #b91c1c; }
+    .share-row { display: flex; gap: 6px; margin-top: 8px; }
+    .share-row input { flex: 1; font-family: monospace; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h2>🔒 DRM Protect</h2>
+  <p>Seal this Word document and send a verified link to one recipient.</p>
+
+  <label>Server URL
+    <input id="serverUrl" type="url" placeholder="https://drm.example.com" />
+  </label>
+  <label>Tenant ID
+    <input id="tenantId" type="text" placeholder="GUID" />
+  </label>
+  <label>Your user ID
+    <input id="userId" type="text" placeholder="GUID" />
+  </label>
+  <label>Send to
+    <input id="recipient" type="email" placeholder="bob@example.com" />
+  </label>
+
+  <button id="protectBtn" class="full" type="button" disabled>Protect and send</button>
+
+  <div id="status" class="status">Waiting for Word…</div>
+
+  <div id="result" class="share-row" hidden>
+    <input id="shareUrl" type="text" readonly>
+    <button id="copyBtn" type="button">Copy</button>
+  </div>
+
+  <script>
+    (function () {
+      const statusEl = document.getElementById("status");
+      const protectBtn = document.getElementById("protectBtn");
+      const result = document.getElementById("result");
+      const shareUrlInput = document.getElementById("shareUrl");
+      const copyBtn = document.getElementById("copyBtn");
+
+      function setStatus(text, level) {
+        statusEl.textContent = text;
+        statusEl.className = "status" + (level ? " " + level : "");
+      }
+
+      ["serverUrl", "tenantId", "userId", "recipient"].forEach((id) => {
+        const el = document.getElementById(id);
+        const saved = localStorage.getItem("drm.word." + id);
+        if (saved) el.value = saved;
+        el.addEventListener("change", () => localStorage.setItem("drm.word." + id, el.value));
+      });
+
+      function waitForOffice() {
+        if (typeof Office === "undefined" || !Office.onReady) { return setTimeout(waitForOffice, 50); }
+        Office.onReady(() => {
+          setStatus("Word add-in ready. Fill the fields above, then click Protect.", "ok");
+          protectBtn.disabled = false;
+        });
+      }
+      waitForOffice();
+
+      function getDocumentBytes() {
+        return new Promise((resolve, reject) => {
+          Office.context.document.getFileAsync(
+            Office.FileType.Compressed,
+            { sliceSize: 65536 },
+            (result) => {
+              if (result.status !== Office.AsyncResultStatus.Succeeded) {
+                reject(new Error(result.error?.message ?? "getFileAsync failed"));
+                return;
+              }
+              const file = result.value;
+              const sliceCount = file.sliceCount;
+              const slices = new Array(sliceCount);
+              let pending = sliceCount;
+              for (let i = 0; i < sliceCount; i++) {
+                ((index) => {
+                  file.getSliceAsync(index, (sliceResult) => {
+                    if (sliceResult.status !== Office.AsyncResultStatus.Succeeded) {
+                      reject(new Error(sliceResult.error?.message ?? "getSliceAsync failed"));
+                      return;
+                    }
+                    slices[index] = new Uint8Array(sliceResult.value.data);
+                    pending--;
+                    if (pending === 0) {
+                      file.closeAsync(() => {
+                        const total = slices.reduce((sum, s) => sum + s.length, 0);
+                        const out = new Uint8Array(total);
+                        let cursor = 0;
+                        for (const slice of slices) {
+                          out.set(slice, cursor);
+                          cursor += slice.length;
+                        }
+                        resolve(out);
+                      });
+                    }
+                  });
+                })(i);
+              }
+            });
+        });
+      }
+
+      function bytesToBase64(bytes) {
+        const chunk = 32768;
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        return btoa(binary);
+      }
+
+      protectBtn.addEventListener("click", async () => {
+        protectBtn.disabled = true;
+        setStatus("Reading document bytes…");
+        result.hidden = true;
+        try {
+          const serverUrl = document.getElementById("serverUrl").value.trim().replace(/\/+$/, "");
+          const tenantId = document.getElementById("tenantId").value.trim();
+          const userId = document.getElementById("userId").value.trim();
+          const recipient = document.getElementById("recipient").value.trim();
+          if (!serverUrl || !tenantId || !userId || !recipient) {
+            throw new Error("Fill server URL, tenant, user, and recipient first.");
+          }
+
+          const bytes = await getDocumentBytes();
+          setStatus("Sending to DRM server…");
+
+          const fileName = Office.context.document.url
+            ? Office.context.document.url.split(/[/\\]/).pop() ?? "document.docx"
+            : "document.docx";
+
+          const body = {
+            tenantId, userId,
+            recipientEmail: recipient,
+            fileName,
+            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            fileBytesBase64: bytesToBase64(bytes),
+            expiresInHours: 168,
+            allowPrint: false
+          };
+
+          const resp = await fetch(serverUrl + "/api/me/share", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`Server returned ${resp.status}: ${text}`);
+          }
+          const data = await resp.json();
+          shareUrlInput.value = data.shareUrl;
+          result.hidden = false;
+          setStatus(`✅ Sent. Share URL ready. Expires ${new Date(data.expiresAtUtc).toLocaleString()}.`, "ok");
+        } catch (err) {
+          setStatus("Error: " + (err.message ?? err), "err");
+        } finally {
+          protectBtn.disabled = false;
+        }
+      });
+
+      copyBtn.addEventListener("click", () => {
+        shareUrlInput.select();
+        try {
+          navigator.clipboard.writeText(shareUrlInput.value);
+          copyBtn.textContent = "✓";
+          setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+        } catch { document.execCommand("copy"); }
+      });
+    })();
+  </script>
+</body>
+</html>

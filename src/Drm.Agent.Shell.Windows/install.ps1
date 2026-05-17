@@ -89,13 +89,30 @@ function Set-RegistryValue {
 # Top-level "DRM" submenu attached to every file's right-click menu.
 # The 'Subcommands' value takes a single semicolon-separated string of
 # verb identifiers that resolve under HKCU\Software\Classes\CommandStore.
+# 'Icon' references a Windows system icon (padlock from ImageRes.dll) so
+# the right-click entry carries a recognisable lock glyph without
+# requiring a compiled COM in-proc server.
 $baseKey = "HKCU:\Software\Classes\*\shell\DrmProtect"
 Set-RegistryValue -Path $baseKey -Name "MUIVerb" -Value "DRM"
 Set-RegistryValue -Path $baseKey -Name "Subcommands" -Value (($commands | ForEach-Object { $_.Verb }) -join ";")
+# Padlock icon (ImageRes.dll resource index -78 is the closed-lock badge
+# used by Windows for protected items). Fallback path is always present
+# on Windows 10/11.
+Set-RegistryValue -Path $baseKey -Name "Icon" -Value "imageres.dll,-78"
 
 foreach ($cmd in $commands) {
     $verbKey = "HKCU:\Software\Classes\CommandStore\shell\$($cmd.Verb)"
     Set-RegistryValue -Path $verbKey -Name "" -Value $cmd.Label
+    # Each sub-action also gets a glyph — Send picks the share icon, Protect
+    # picks the lock, Transparent picks the eye-with-lock. ImageRes.dll
+    # ships on every modern Windows install.
+    $subIcon = switch ($cmd.Verb) {
+        "Drm.QuickSend"          { "imageres.dll,-1024" }   # share-style icon
+        "Drm.Protect"            { "imageres.dll,-78" }     # padlock
+        "Drm.TransparentProtect" { "imageres.dll,-5366" }   # shield+eye
+        default { "imageres.dll,-78" }
+    }
+    Set-RegistryValue -Path $verbKey -Name "Icon" -Value $subIcon
     $cmdLine = "`"$($cmd.Exe)`" $($cmd.Argument) `"%1`""
     Set-RegistryValue -Path "$verbKey\command" -Name "" -Value $cmdLine
 }

@@ -123,6 +123,22 @@ public sealed class ShellIntegrationScriptTests
             "install.ps1 must wrap path interpolations in `\" to handle spaces");
     }
 
+    [Fact]
+    public void Install_script_assigns_an_icon_to_the_drm_submenu_and_every_subverb()
+    {
+        // Phase 5AS-polish stopgap: rely on Windows system icons (imageres.dll)
+        // so the right-click "DRM" submenu and every sub-action carry a
+        // recognisable glyph without a compiled COM in-proc server.
+        InstallScript.Should().Contain("imageres.dll,-78",
+            "DRM submenu must have a padlock icon");
+        InstallScript.Should().Contain("Icon",
+            "Icon values must be set on the registry keys");
+
+        var subIconCount = Regex.Matches(InstallScript, "imageres\\.dll,-\\d+").Count;
+        subIconCount.Should().BeGreaterThanOrEqualTo(3,
+            "submenu + at least three sub-verbs each get an icon");
+    }
+
     private static string GetTopLevelKey(string fullKey)
     {
         // We treat "HKCU:\Software\Classes\X\Y\Z" → "HKCU:\Software\Classes\X"

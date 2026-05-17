@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DRM Word add-in manifest. Sideloads a "🔒 Protect" ribbon group with
+  one button that opens a taskpane offering Quick Send for the active
+  document.
+
+  Replace ${SERVER_BASE_URL} (six occurrences) with your DRM server
+  URL before sideloading.
+
+  Sideload steps (Word desktop on Windows):
+    1. Save this file as drm-word-manifest.xml
+    2. Word → Insert → My Add-ins → Upload My Add-in → choose the file
+    3. The "🔒 DRM" group appears at the right end of the Home ribbon
+-->
+<OfficeApp
+    xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+    xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+    xsi:type="TaskPaneApp">
+
+  <Id>00000000-0000-0000-0000-D8C0DEDD0001</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>DRM</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="DRM Protect" />
+  <Description DefaultValue="Protect this Word document with DRM and send a verified share link to one recipient." />
+  <IconUrl DefaultValue="${SERVER_BASE_URL}/word-addin/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="${SERVER_BASE_URL}/word-addin/icon-80.png" />
+  <SupportUrl DefaultValue="${SERVER_BASE_URL}/word-addin/" />
+  <AppDomains>
+    <AppDomain>${SERVER_BASE_URL}</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="${SERVER_BASE_URL}/word-addin/taskpane.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Drm.Group">
+                <Label resid="Drm.GroupLabel" />
+                <Icon>
+                  <bt:Image size="16" resid="Drm.Icon16" />
+                  <bt:Image size="32" resid="Drm.Icon32" />
+                  <bt:Image size="80" resid="Drm.Icon80" />
+                </Icon>
+                <Control xsi:type="Button" id="Drm.ProtectButton">
+                  <Label resid="Drm.ProtectLabel" />
+                  <Supertip>
+                    <Title resid="Drm.ProtectLabel" />
+                    <Description resid="Drm.ProtectTip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Drm.Icon16" />
+                    <bt:Image size="32" resid="Drm.Icon32" />
+                    <bt:Image size="80" resid="Drm.Icon80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>DrmProtectTaskpane</TaskpaneId>
+                    <SourceLocation resid="Drm.TaskpaneUrl" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Drm.Icon16" DefaultValue="${SERVER_BASE_URL}/word-addin/icon-16.png" />
+        <bt:Image id="Drm.Icon32" DefaultValue="${SERVER_BASE_URL}/word-addin/icon-32.png" />
+        <bt:Image id="Drm.Icon80" DefaultValue="${SERVER_BASE_URL}/word-addin/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Drm.TaskpaneUrl" DefaultValue="${SERVER_BASE_URL}/word-addin/taskpane.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="${SERVER_BASE_URL}/word-addin/" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="DRM Protect — get started" />
+        <bt:String id="Drm.GroupLabel" DefaultValue="🔒 DRM" />
+        <bt:String id="Drm.ProtectLabel" DefaultValue="Protect" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Click Protect on the Home ribbon to seal this document with DRM and send a verified share link." />
+        <bt:String id="Drm.ProtectTip" DefaultValue="Seal the current document with DRM and copy a verified share link to your clipboard." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
