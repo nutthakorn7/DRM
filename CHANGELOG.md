@@ -4,6 +4,60 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+_No unreleased changes — the next release line will appear here._
+
+## [1.0.0] — 2026-05-17
+
+**The parity milestone.** Closes the FinalCode parity roadmap (Phases 5AH → 5AR
++ Phase 5B web polish) and ships the first production-grade, design-systemed
+DRM platform. Server, viewer, agent, folder-watcher service, and three web
+surfaces (admin / send-file / external viewer) are feature-complete against the
+FinalCode V6 and FinalCode JP feature catalogs. Phase 6 (mobile viewer for iOS
+and Android) is the next horizon.
+
+**What's in this release:**
+- Full SCIM 2.0 provisioning (Phase 5AH) for Entra ID / Okta / OneLogin
+- File tagging, macro/ownership/permission controls, license-tier flags, license
+  multiplier display (Phase 5AL)
+- Print watermark separated from screen watermark, server-side PDF compositor
+  (Phase 5AM)
+- ZIP conversion, dynamic policy push UI signal, 3 sales-use-case admin pages
+  (Phase 5AN)
+- Transparent encryption with extension-preserving trailer + admin UI + tray
+  + viewer integration (Phase 5AO)
+- Secure container (folder-level encryption + viewer UI) with PBKDF2-SHA256
+  at 600 000 iterations and per-container random salt (Phase 5AP)
+- Windows shared-folder auto-encrypt service with cancellation-aware retry
+  (Phase 5AQ)
+- CAD compatibility matrix endpoint, viewer notices, admin reference page
+  (Phase 5AR)
+- Critical security remediations: startup guard for missing admin key /
+  trailer secret, server-side HMAC stamp / verify (trailer secret never
+  leaves the trust boundary), zip-slip rejection in container pack / unpack,
+  folder-watcher graceful cancellation, viewer temp-file cleanup, LRU bound
+  on the protection-tracker (C1–C4 + I4 + I7 + M2 + M4)
+- Production readiness: GitHub Actions CI workflow + multi-stage Dockerfile
+  for `Drm.Server` running as non-root
+- Phase 5B web console polish: welcome screen, getting-started checklist,
+  5-tab IA + per-tab sub-nav, settings drawer for license + health, sidebar
+  collapse + auto-collapse on mobile, jargon tooltips, empty-state pattern,
+  44px touch targets, focus-ring system, reduced-motion respect
+- Three-tier design token system in `wwwroot/static/tokens.css`: primitives
+  → aliases → component tokens
+- Teal-on-slate brand direction unified across all web surfaces, replaces
+  brown-on-cream
+- IBM Plex Sans + IBM Plex Mono replace the Arial/system-stack default
+- `DESIGN.md` source of truth for color, typography, layout, motion, and
+  patterns
+
+**Migration notes (from earlier dev builds):**
+- Set `Drm:Security:AdminApiKey` in non-Development environments before
+  starting the server — `SecurityStartupGuard` now refuses to start without it
+- Set `Drm:Security:TransparentTrailerSecret` to a real value (not the
+  documented placeholder) — guard refuses placeholder values
+- Legacy v1 secure containers continue to open via `DeriveKeyLegacyV1`; new
+  containers use v2 with per-container salt. No data migration required.
+
 ### Phase 5B — Web console polish + design system (2026-05-17, single session)
 
 Took /admin/ from "functional but unfriendly" (audit grade B−) to A− across a
