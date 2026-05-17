@@ -8,6 +8,28 @@
   <link rel="stylesheet" href="/admin/app.css">
 </head>
 <body>
+  <div class="welcome-screen" id="welcomeScreen" hidden role="dialog" aria-labelledby="welcomeTitle">
+    <div class="welcome-card">
+      <div class="welcome-logo" aria-hidden="true">🔒</div>
+      <p class="eyebrow">First time here</p>
+      <h1 id="welcomeTitle">Welcome to DRM Management</h1>
+      <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, Admin Key, and Admin user ID for you — you can replace them with real credentials anytime.</p>
+
+      <ul class="welcome-steps">
+        <li><span class="step-num">1</span> Generate credentials</li>
+        <li><span class="step-num">2</span> Add your first user</li>
+        <li><span class="step-num">3</span> Create a policy template</li>
+        <li><span class="step-num">4</span> Protect &amp; send a file</li>
+      </ul>
+
+      <div class="welcome-actions">
+        <button type="button" class="primary" id="welcomeStart">Create test tenant →</button>
+        <button type="button" class="ghost" id="welcomeSkip">I already have credentials</button>
+      </div>
+      <p class="hint welcome-foot">Generated credentials live only in this browser. Nothing is sent until you call the API.</p>
+    </div>
+  </div>
+
   <main class="workspace">
     <aside class="rail" aria-label="Console navigation">
       <div class="rail-head">

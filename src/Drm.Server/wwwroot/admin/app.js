@@ -233,6 +233,59 @@ if (forgetSessionBtn) {
   window.__drmSetActiveTab = setActiveTab; // expose for search-bar use
 })();
 
+(function initWelcomeScreen() {
+  const BOOTSTRAP_KEY = "drm:bootstrapped";
+  const screen = document.getElementById("welcomeScreen");
+  if (!screen) return;
+
+  const tenantInput  = document.getElementById("tenantId");
+  const adminInput   = document.getElementById("adminKey");
+  const userInput    = document.getElementById("adminUserId");
+
+  const hasStoredTenant = !!(tenantInput && tenantInput.value && tenantInput.value.trim());
+  const bootstrapped    = localStorage.getItem(BOOTSTRAP_KEY) === "1";
+  if (hasStoredTenant || bootstrapped) {
+    screen.hidden = true;
+    return;
+  }
+  screen.hidden = false;
+
+  function uuid() {
+    if (crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const b = new Uint8Array(16); crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map(x => x.toString(16).padStart(2, "0"));
+    return `${h.slice(0,4).join("")}-${h.slice(4,6).join("")}-${h.slice(6,8).join("")}-${h.slice(8,10).join("")}-${h.slice(10,16).join("")}`;
+  }
+  function adminKey() {
+    const b = new Uint8Array(24); crypto.getRandomValues(b);
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function fire(el) { el && el.dispatchEvent(new Event("change", { bubbles: true })); }
+
+  function dismiss() {
+    localStorage.setItem(BOOTSTRAP_KEY, "1");
+    screen.style.transition = "opacity 200ms ease";
+    screen.style.opacity = "0";
+    setTimeout(() => { screen.hidden = true; screen.style.opacity = ""; }, 220);
+  }
+
+  const startBtn = document.getElementById("welcomeStart");
+  if (startBtn) startBtn.addEventListener("click", () => {
+    if (tenantInput && !tenantInput.value) { tenantInput.value = uuid(); fire(tenantInput); }
+    if (adminInput  && !adminInput.value)  { adminInput.value  = adminKey(); fire(adminInput); }
+    if (userInput   && !userInput.value)   { userInput.value   = uuid(); fire(userInput); }
+    dismiss();
+    setTimeout(() => {
+      const gs = document.getElementById("gettingStarted");
+      if (gs) gs.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 260);
+  });
+
+  const skipBtn = document.getElementById("welcomeSkip");
+  if (skipBtn) skipBtn.addEventListener("click", dismiss);
+})();
+
 (function initRailToggle() {
   const KEY = "drm:railCollapsed";
   const workspace = document.querySelector(".workspace");
