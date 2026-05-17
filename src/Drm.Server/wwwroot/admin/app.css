@@ -36,6 +36,11 @@ select {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
+  transition: grid-template-columns 180ms ease;
+}
+
+.workspace[data-rail-collapsed="true"] {
+  grid-template-columns: 64px minmax(0, 1fr);
 }
 
 .rail {
@@ -45,6 +50,16 @@ select {
   padding: 28px 24px;
   color: #f4f1ea;
   background: #20201d;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow: hidden;
+  transition: padding 180ms ease;
+}
+
+.workspace[data-rail-collapsed="true"] .rail {
+  padding: 28px 10px;
 }
 
 .rail .brand {
@@ -53,10 +68,89 @@ select {
   gap: 6px;
 }
 
+.rail .brand-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.rail .brand-logo {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: #a45b13;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.rail .brand-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .rail .brand .hint {
   color: #c7bda9;
   font-size: 12px;
   margin: 4px 0 0 0;
+}
+
+.rail-toggle {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #c7bda9;
+  border: 1px solid #3a3a36;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  transition: background 120ms ease, color 120ms ease, transform 180ms ease;
+}
+
+.rail-toggle:hover {
+  background: #2c2c28;
+  color: #fff;
+}
+
+.workspace[data-rail-collapsed="true"] .rail-toggle-icon {
+  transform: rotate(180deg);
+  display: inline-block;
+}
+
+.workspace[data-rail-collapsed="true"] .rail .brand-text,
+.workspace[data-rail-collapsed="true"] .rail .nav-label,
+.workspace[data-rail-collapsed="true"] .rail .rail-secondary .eyebrow {
+  display: none;
+}
+
+.workspace[data-rail-collapsed="true"] .rail .brand-row {
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace[data-rail-collapsed="true"] .rail nav a {
+  display: grid;
+  place-items: center;
+  padding: 8px 0;
+  font-size: 18px;
+}
+
+.rail .nav-icon {
+  display: inline-block;
+  width: 22px;
+  text-align: center;
+  margin-right: 8px;
+}
+
+.workspace[data-rail-collapsed="true"] .rail .nav-icon {
+  margin-right: 0;
 }
 
 .rail .rail-secondary {

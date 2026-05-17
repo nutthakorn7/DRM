@@ -11,19 +11,27 @@
   <main class="workspace">
     <aside class="rail" aria-label="Console navigation">
       <div class="brand">
-        <p class="eyebrow">DRM</p>
-        <h1>DRM Management</h1>
-        <p class="hint" id="railPersonaHint">Admin console</p>
+        <div class="brand-row">
+          <div class="brand-logo" aria-hidden="true">🔒</div>
+          <div class="brand-text">
+            <p class="eyebrow">DRM</p>
+            <h1>DRM Management</h1>
+            <p class="hint" id="railPersonaHint">Admin console</p>
+          </div>
+          <button type="button" class="rail-toggle" id="railToggle" aria-label="Collapse sidebar" aria-expanded="true" title="Collapse sidebar">
+            <span class="rail-toggle-icon">⟨</span>
+          </button>
+        </div>
       </div>
       <nav>
-        <a class="active" href="/admin/">⚙️ Admin console</a>
-        <a href="/me/">📤 Send a file</a>
-        <a href="/share/">📥 Open shared file</a>
+        <a class="active" href="/admin/"><span class="nav-icon">⚙️</span><span class="nav-label">Admin console</span></a>
+        <a href="/me/"><span class="nav-icon">📤</span><span class="nav-label">Send a file</span></a>
+        <a href="/share/"><span class="nav-icon">📥</span><span class="nav-label">Open shared file</span></a>
       </nav>
       <nav class="rail-secondary" aria-label="Documentation">
         <p class="eyebrow">Reference</p>
-        <a href="/admin/cases/" target="_blank">Use cases ↗</a>
-        <a href="/admin/compatibility/" target="_blank">Compatibility ↗</a>
+        <a href="/admin/cases/" target="_blank"><span class="nav-icon">📘</span><span class="nav-label">Use cases ↗</span></a>
+        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon">🧩</span><span class="nav-label">Compatibility ↗</span></a>
       </nav>
     </aside>
 

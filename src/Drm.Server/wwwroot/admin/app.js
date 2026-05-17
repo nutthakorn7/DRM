@@ -233,6 +233,29 @@ if (forgetSessionBtn) {
   window.__drmSetActiveTab = setActiveTab; // expose for search-bar use
 })();
 
+(function initRailToggle() {
+  const KEY = "drm:railCollapsed";
+  const workspace = document.querySelector(".workspace");
+  const toggle = document.getElementById("railToggle");
+  if (!workspace || !toggle) return;
+
+  function apply(collapsed) {
+    workspace.dataset.railCollapsed = collapsed ? "true" : "false";
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
+    toggle.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  }
+
+  const initial = localStorage.getItem(KEY) === "1";
+  apply(initial);
+
+  toggle.addEventListener("click", () => {
+    const next = workspace.dataset.railCollapsed !== "true";
+    apply(next);
+    localStorage.setItem(KEY, next ? "1" : "0");
+  });
+})();
+
 // Global search: hit `/` anywhere to jump to the panel-filter input.
 const globalSearch = document.querySelector("#globalSearch");
 if (globalSearch) {
