@@ -221,6 +221,9 @@ select {
   font-size: 20px;
   line-height: 1.2;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .page-header .brand-text .hint {
@@ -1345,6 +1348,16 @@ pre {
 }
 
 @media (max-width: 820px) {
+  /* Page-header has 3 children competing for ~310px (after the 64px
+     rail). On the brand side, drop the "Admin console" hint so the
+     wordmark gets full single-line width. On the right side, hide the
+     status-line text — the gear button + the badge near "Tenant
+     operations" already cover that information. */
+  .page-header { gap: 10px; }
+  .page-header .brand-logo { width: 36px; height: 36px; font-size: 18px; flex-basis: 36px; }
+  .page-header .brand-text .hint { display: none; }
+  .page-header .status-line { display: none; }
+
   /* Keep the rail as a narrow icon-only sidebar on mobile instead of
      stacking the full 248px rail above the content. The JS forces
      data-rail-collapsed="true" by default on this viewport unless the
