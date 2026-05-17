@@ -232,6 +232,74 @@ public partial class MainWindow : Window
         StatusText.Text = message;
     }
 
+    private async void CheckBoxStatusButton_Click(object sender, RoutedEventArgs e)
+    {
+        CheckBoxStatusButton.IsEnabled = false;
+        BoxStatusText.Text = "Checking…";
+        BoxStatusDot.Fill = System.Windows.Media.Brushes.Gold;
+
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+
+            var request = new HttpRequestMessage(HttpMethod.Get,
+                $"/api/admin/box/config?tenantId={tenantId}");
+            using var response = await httpClient.SendAsync(request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                BoxStatusText.Text = "Not configured";
+                BoxStatusDot.Fill = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                BoxStatusText.Text = $"Error {(int)response.StatusCode}";
+                BoxStatusDot.Fill = System.Windows.Media.Brushes.IndianRed;
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            var enabled = document.RootElement.TryGetProperty("enabled", out var enEl) && enEl.GetBoolean();
+            var lastStatus = document.RootElement.TryGetProperty("lastConnectionStatus", out var lsEl)
+                ? lsEl.GetString()
+                : null;
+
+            if (enabled && string.Equals(lastStatus, "ok", StringComparison.OrdinalIgnoreCase))
+            {
+                BoxStatusText.Text = "Connected";
+                BoxStatusDot.Fill = System.Windows.Media.Brushes.MediumSeaGreen;
+            }
+            else if (enabled)
+            {
+                BoxStatusText.Text = $"Enabled (last: {lastStatus ?? "untested"})";
+                BoxStatusDot.Fill = System.Windows.Media.Brushes.Gold;
+            }
+            else
+            {
+                BoxStatusText.Text = "Disabled";
+                BoxStatusDot.Fill = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+            }
+        }
+        catch (Exception exception)
+        {
+            BoxStatusText.Text = $"Error: {exception.Message}";
+            BoxStatusDot.Fill = System.Windows.Media.Brushes.IndianRed;
+        }
+        finally
+        {
+            CheckBoxStatusButton.IsEnabled = true;
+        }
+    }
+
     private void PrefillSourcePathFromCommandLine()
     {
         var sourcePath = TryGetCommandLineValue("--protect", Environment.GetCommandLineArgs());

@@ -318,6 +318,46 @@ public sealed class TenantDirectorySyncConfigEntity
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
 
+public sealed class TenantBoxIntegrationConfigEntity
+{
+    public Guid TenantId { get; set; }
+
+    public string ClientId { get; set; } = string.Empty;
+
+    public string ClientSecret { get; set; } = string.Empty;
+
+    public string EnterpriseId { get; set; } = string.Empty;
+
+    public string WebhookSecret { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; }
+
+    public string? LastConnectionStatus { get; set; }
+
+    public DateTimeOffset? LastConnectionAtUtc { get; set; }
+
+    public int LastWebhookEventCount { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class BoxWebhookEventEntity
+{
+    public long Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string EventType { get; set; } = string.Empty;
+
+    public string SourceItemId { get; set; } = string.Empty;
+
+    public string SourceItemName { get; set; } = string.Empty;
+
+    public string? CreatedByEmail { get; set; }
+
+    public DateTimeOffset ReceivedAtUtc { get; set; }
+}
+
 public sealed class TenantAdminNotificationConfigEntity
 {
     public Guid TenantId { get; set; }

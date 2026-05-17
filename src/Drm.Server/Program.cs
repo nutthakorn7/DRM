@@ -28,6 +28,8 @@ builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
 builder.Services.AddHttpClient("EntraGraph");
 builder.Services.AddScoped<IDirectorySyncService, EntraIdDirectorySyncService>();
+builder.Services.AddHttpClient("BoxApi");
+builder.Services.AddScoped<IBoxIntegrationService, BoxIntegrationService>();
 
 var emailSettings = builder.Configuration.GetSection("Drm:Email").Get<SmtpEmailSettings>() ?? new SmtpEmailSettings();
 builder.Services.AddSingleton(emailSettings);
@@ -100,6 +102,35 @@ using (var scope = app.Services.CreateScope())
                 "NotifyOnShareLinkCreated" INTEGER NOT NULL DEFAULT 0,
                 "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
             );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantBoxIntegrationConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantBoxIntegrationConfigs" PRIMARY KEY,
+                "ClientId" TEXT NOT NULL DEFAULT '',
+                "ClientSecret" TEXT NOT NULL DEFAULT '',
+                "EnterpriseId" TEXT NOT NULL DEFAULT '',
+                "WebhookSecret" TEXT NOT NULL DEFAULT '',
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "LastConnectionStatus" TEXT NULL,
+                "LastConnectionAtUtc" TEXT NULL,
+                "LastWebhookEventCount" INTEGER NOT NULL DEFAULT 0,
+                "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "BoxWebhookEvents" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_BoxWebhookEvents" PRIMARY KEY AUTOINCREMENT,
+                "TenantId" TEXT NOT NULL,
+                "EventType" TEXT NOT NULL DEFAULT '',
+                "SourceItemId" TEXT NOT NULL DEFAULT '',
+                "SourceItemName" TEXT NOT NULL DEFAULT '',
+                "CreatedByEmail" TEXT NULL,
+                "ReceivedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_BoxWebhookEvents_TenantId_ReceivedAtUtc"
+            ON "BoxWebhookEvents" ("TenantId", "ReceivedAtUtc");
             """);
 
         var connection = dbContext.Database.GetDbConnection();
@@ -318,6 +349,8 @@ app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
 app.MapAdminExternalShareSettingsEndpoints();
 app.MapAdminDirectorySyncEndpoints();
+app.MapAdminBoxIntegrationEndpoints();
+app.MapBoxWebhookEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

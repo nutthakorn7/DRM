@@ -23,6 +23,8 @@ const siemWebhooksBody = document.querySelector("#siemWebhooksBody");
 const auditEventsBody = document.querySelector("#auditEventsBody");
 const healthOutput = document.querySelector("#healthOutput");
 const syncOutput = document.querySelector("#syncOutput");
+const boxOutput = document.querySelector("#boxOutput");
+const boxEventsBody = document.querySelector("#boxEventsBody");
 
 tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
@@ -257,6 +259,71 @@ document.querySelector("#triggerSync").addEventListener("click", async () => {
   syncOutput.textContent = result
     ? JSON.stringify(result, null, 2)
     : "Sync returned no result.";
+});
+
+document.querySelector("#boxConfigForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    clientId: document.querySelector("#boxClientId").value.trim(),
+    clientSecret: document.querySelector("#boxClientSecret").value,
+    enterpriseId: document.querySelector("#boxEnterpriseId").value.trim(),
+    webhookSecret: document.querySelector("#boxWebhookSecret").value,
+    enabled: document.querySelector("#boxEnabled").checked
+  };
+  await apiFetch("/api/admin/box/config", { method: "PUT", body: JSON.stringify(body) });
+  setStatus("Box config saved", "ok");
+});
+
+document.querySelector("#refreshBoxConfig").addEventListener("click", async () => {
+  try {
+    const config = await apiFetch(`/api/admin/box/config?tenantId=${encodeURIComponent(requireTenantId())}`);
+    if (config) {
+      document.querySelector("#boxClientId").value = config.clientId ?? "";
+      document.querySelector("#boxEnterpriseId").value = config.enterpriseId ?? "";
+      document.querySelector("#boxEnabled").checked = !!config.enabled;
+      boxOutput.textContent = JSON.stringify({
+        enabled: config.enabled,
+        lastConnectionStatus: config.lastConnectionStatus,
+        lastConnectionAtUtc: config.lastConnectionAtUtc,
+        lastWebhookEventCount: config.lastWebhookEventCount,
+        updatedAtUtc: config.updatedAtUtc
+      }, null, 2);
+    }
+    setStatus("Box config loaded", "ok");
+  } catch (err) {
+    boxOutput.textContent = `No config: ${err.message}`;
+  }
+});
+
+document.querySelector("#testBoxConnection").addEventListener("click", async () => {
+  boxOutput.textContent = "Testing Box connection…";
+  const body = { tenantId: requireTenantId() };
+  const result = await apiFetch("/api/admin/box/test-connection", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  boxOutput.textContent = JSON.stringify(result, null, 2);
+  setStatus(result.success ? "Box connection OK" : "Box connection failed", result.success ? "ok" : "error");
+});
+
+document.querySelector("#refreshBoxEvents").addEventListener("click", async () => {
+  const events = await apiFetch(`/api/admin/box/events?tenantId=${encodeURIComponent(requireTenantId())}`);
+  if (!events.length) {
+    boxEventsBody.innerHTML = '<tr><td colspan="5" class="empty">No Box webhook events received yet.</td></tr>';
+    setStatus("No Box events", "ok");
+    return;
+  }
+  boxEventsBody.innerHTML = events.map((e) => `
+    <tr>
+      <td>${escapeHtml(formatDate(e.receivedAtUtc))}</td>
+      <td>${escapeHtml(e.eventType)}</td>
+      <td>${escapeHtml(e.sourceItemName)}</td>
+      <td><code>${escapeHtml(e.sourceItemId)}</code></td>
+      <td>${escapeHtml(e.createdByEmail ?? "")}</td>
+    </tr>
+  `).join("");
+  setStatus(`${events.length} Box event${events.length === 1 ? "" : "s"} loaded`, "ok");
 });
 
 document.querySelector("#loadNotificationConfig").addEventListener("click", async () => {

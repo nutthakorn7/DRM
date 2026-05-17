@@ -513,3 +513,38 @@ The **Protected files** panel gains an expandable wizard that runs three steps i
 3. Create an external share link with guest email + expiry (optional)
 
 Each step is skipped when its inputs are blank, producing a checked-step output log instead of separate panel hops. This matches FinalCode\047s single-form recipient + expiry workflow.
+
+## Phase 5AJ Box Integration
+
+Server-side integration with Box (cloud storage) lets administrators connect a Box enterprise account, receive Box webhook events for file uploads/changes, and surface activity in the admin console and Windows tray.
+
+### Capabilities
+
+- **Per-tenant Box configuration** — Client ID, Client Secret, Enterprise ID, Webhook signing secret, Enabled flag, with last-connection status and webhook event counter
+- **Test connection** — performs an OAuth2 client-credentials token request against `https://api.box.com/oauth2/token` to verify credentials and stores the result
+- **Webhook receiver** — public `POST /api/box/webhook` endpoint verifies the Box `BOX-SIGNATURE-PRIMARY` / `BOX-SIGNATURE-SECONDARY` HMAC-SHA256 signatures, parses the JSON payload (trigger, source.id, source.name, created_by.login), and persists an event row
+- **Event activity feed** — admin console table of recent events
+- **Tray status indicator** — green/amber/grey dot shows whether Box is connected, enabled, or unconfigured
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` | `/api/admin/box/config` | Upsert per-tenant Box configuration |
+| `GET` | `/api/admin/box/config?tenantId=...` | Retrieve current configuration (secrets omitted from response) |
+| `POST` | `/api/admin/box/test-connection` | Validates credentials by calling the Box token endpoint and persists status |
+| `GET` | `/api/admin/box/events?tenantId=...&limit=N` | Lists the most recent webhook events (newest first, default 50, max 200) |
+| `POST` | `/api/box/webhook` | Public Box webhook receiver — requires `X-DRM-Tenant-Id` header and a valid HMAC signature in `BOX-SIGNATURE-PRIMARY` or `BOX-SIGNATURE-SECONDARY`. Returns `202 Accepted` on success, `401` on bad signature, `404` if the tenant has no enabled configuration |
+
+### Box app setup
+
+1. In the Box Developer Console, create a **Custom App** with **Server Authentication (Client Credentials Grant)**
+2. Grant the app access to your enterprise and authorize it from the admin console
+3. Copy the **Client ID**, **Client Secret**, and **Enterprise ID** into the DRM admin Box panel
+4. Create a Box webhook with the URL `https://your-server/api/box/webhook` and the header `X-DRM-Tenant-Id: <tenantId>`. Use the same signing secret on the Box side and the DRM config
+
+### Security
+
+Webhook signatures use `HMAC-SHA256(secret, raw-body)` base64-encoded, compared with `CryptographicOperations.FixedTimeEquals` to prevent timing attacks. The webhook endpoint reads the raw request body before any framework parsing to ensure the signature applies to the exact bytes Box sent.
+
+This phase delivers the data and admin plane for Box integration. The Box file-content download → encrypt → re-upload data plane is deferred to a follow-up phase (configuration and webhook surface ship now so the admin workflow is visible).

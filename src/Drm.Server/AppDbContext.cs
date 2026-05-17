@@ -38,6 +38,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TenantAdminNotificationConfigEntity> TenantAdminNotificationConfigs => Set<TenantAdminNotificationConfigEntity>();
 
+    public DbSet<TenantBoxIntegrationConfigEntity> TenantBoxIntegrationConfigs => Set<TenantBoxIntegrationConfigEntity>();
+
+    public DbSet<BoxWebhookEventEntity> BoxWebhookEvents => Set<BoxWebhookEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -173,6 +177,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasKey(c => c.TenantId);
             entity.Property(c => c.AdminEmailsCsv).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<TenantBoxIntegrationConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+            entity.Property(c => c.ClientId).HasMaxLength(128);
+            entity.Property(c => c.ClientSecret).HasMaxLength(512);
+            entity.Property(c => c.EnterpriseId).HasMaxLength(64);
+            entity.Property(c => c.WebhookSecret).HasMaxLength(256);
+            entity.Property(c => c.LastConnectionStatus).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<BoxWebhookEventEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.ReceivedAtUtc });
+            entity.Property(e => e.EventType).HasMaxLength(128);
+            entity.Property(e => e.SourceItemId).HasMaxLength(64);
+            entity.Property(e => e.SourceItemName).HasMaxLength(512);
+            entity.Property(e => e.CreatedByEmail).HasMaxLength(256);
         });
     }
 }

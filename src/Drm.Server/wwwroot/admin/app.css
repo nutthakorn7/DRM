@@ -368,6 +368,14 @@ button.danger:hover {
   margin-top: 12px;
 }
 
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
 .simulator-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;

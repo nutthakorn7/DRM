@@ -15,6 +15,7 @@
         <h1>DRM Management</h1>
       </div>
       <nav>
+        <a href="#box">Box</a>
         <a class="active" href="#users">Users</a>
         <a href="#groups">Groups</a>
         <a href="#devices">Devices</a>
@@ -96,6 +97,53 @@
         </div>
 
         <pre id="syncOutput" class="output-block"></pre>
+      </section>
+
+      <section class="panel" id="box">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Cloud storage</p>
+            <h3>Box integration</h3>
+          </div>
+          <button id="refreshBoxConfig" type="button">Load</button>
+        </div>
+
+        <form class="create-row" id="boxConfigForm">
+          <input id="boxClientId" autocomplete="off" placeholder="Box Client ID">
+          <input id="boxClientSecret" type="password" autocomplete="off" placeholder="Box Client Secret">
+          <input id="boxEnterpriseId" autocomplete="off" placeholder="Enterprise ID">
+          <input id="boxWebhookSecret" type="password" autocomplete="off" placeholder="Webhook signing secret">
+          <label class="inline-check">
+            <input id="boxEnabled" type="checkbox"> Enabled
+          </label>
+          <button type="submit">Save config</button>
+        </form>
+
+        <div class="create-row">
+          <button id="testBoxConnection" type="button">Test connection</button>
+          <button id="refreshBoxEvents" type="button">Refresh events</button>
+        </div>
+
+        <pre id="boxOutput" class="output-block">Box status appears here.</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Received</th>
+                <th>Event</th>
+                <th>Item</th>
+                <th>Item ID</th>
+                <th>Created by</th>
+              </tr>
+            </thead>
+            <tbody id="boxEventsBody">
+              <tr>
+                <td colspan="5" class="empty">Click "Refresh events" to load recent Box webhook events.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="panel" id="users">

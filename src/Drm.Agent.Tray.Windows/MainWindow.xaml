@@ -113,7 +113,26 @@
         </Grid>
 
         <Border Grid.Row="3" BorderBrush="#D1D5DB" BorderThickness="1" Background="#FFFFFF" Padding="12">
-            <TextBlock x:Name="StatusText" Text="Ready." TextWrapping="Wrap" Foreground="#111827" />
+            <StackPanel>
+                <TextBlock x:Name="StatusText" Text="Ready." TextWrapping="Wrap" Foreground="#111827" />
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Box:" Foreground="#6B7280" Margin="0,0,6,0" />
+                    <Ellipse x:Name="BoxStatusDot"
+                             Width="10" Height="10"
+                             Fill="#9CA3AF"
+                             VerticalAlignment="Center"
+                             Margin="0,0,6,0" />
+                    <TextBlock x:Name="BoxStatusText"
+                               Text="Not checked"
+                               Foreground="#374151"
+                               VerticalAlignment="Center" />
+                    <Button x:Name="CheckBoxStatusButton"
+                            Content="Check"
+                            Margin="14,0,0,0"
+                            Padding="10,2"
+                            Click="CheckBoxStatusButton_Click" />
+                </StackPanel>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>
