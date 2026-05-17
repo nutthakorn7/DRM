@@ -121,6 +121,9 @@ if (forgetSessionBtn) {
       if (window.__drmSetActiveTab && tab) {
         window.__drmSetActiveTab(tab);
       }
+      if (tab && panelId && window.__drmSetActiveSubtab) {
+        window.__drmSetActiveSubtab(tab, panelId);
+      }
       if (panelId) {
         requestAnimationFrame(() => {
           document.getElementById(panelId)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -189,19 +192,82 @@ if (forgetSessionBtn) {
     return VALID_TABS.has(stored) ? stored : "overview";
   }
 
+  function panelLabel(panel) {
+    const h3 = panel.querySelector("h3");
+    if (h3) {
+      let raw = h3.cloneNode(true);
+      raw.querySelectorAll("span.help-pill, .badge").forEach((n) => n.remove());
+      let text = raw.textContent.trim().split(/[—–·]/)[0].trim();
+      // Cap at ~22 chars to keep pills compact
+      if (text.length > 22) text = text.slice(0, 20).trim() + "…";
+      return text || panel.id;
+    }
+    return panel.id;
+  }
+
+  function renderSubnav(tab) {
+    const subnav = document.getElementById("subTabNav");
+    if (!subnav) return;
+    subnav.innerHTML = "";
+    if (tab === "all") return;
+    const panels = [...document.querySelectorAll(`section.panel[data-tab="${tab}"]`)];
+    if (panels.length <= 1) {
+      panels.forEach((p) => p.classList.remove("subtab-hidden"));
+      return;
+    }
+    // Bump the Getting Started panel to first if present (matches its CSS order: -10)
+    panels.sort((a, b) => {
+      if (a.id === "gettingStarted") return -1;
+      if (b.id === "gettingStarted") return 1;
+      return 0;
+    });
+    const subKey = `drm:adminActiveSubtab:${tab}`;
+    const stored = localStorage.getItem(subKey);
+    const initial = panels.find((p) => p.id === stored)?.id || panels[0].id;
+
+    panels.forEach((panel) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "subtab-link";
+      btn.dataset.subtab = panel.id;
+      btn.setAttribute("role", "tab");
+      btn.textContent = panelLabel(panel);
+      btn.addEventListener("click", () => setActiveSubtab(tab, panel.id));
+      subnav.appendChild(btn);
+    });
+    setActiveSubtab(tab, initial, { skipScroll: true });
+  }
+
+  function setActiveSubtab(tab, panelId, { skipScroll = false } = {}) {
+    const panels = [...document.querySelectorAll(`section.panel[data-tab="${tab}"]`)];
+    panels.forEach((p) => p.classList.toggle("subtab-hidden", p.id !== panelId));
+    document.querySelectorAll("#subTabNav .subtab-link").forEach((b) => {
+      b.setAttribute("aria-selected", b.dataset.subtab === panelId ? "true" : "false");
+    });
+    localStorage.setItem(`drm:adminActiveSubtab:${tab}`, panelId);
+  }
+
   function setActiveTab(name, { fromHash = false } = {}) {
-    if (!VALID_TABS.has(name)) name = "overview";
+    if (!VALID_TABS.has(name) && name !== "all") name = "overview";
     document.body.dataset.activeTab = name;
     document.querySelectorAll(".tab-link").forEach((btn) => {
       const isActive = btn.dataset.tabLink === name;
       btn.setAttribute("aria-selected", isActive ? "true" : "false");
     });
-    localStorage.setItem(TAB_KEY, name);
-    if (!fromHash) {
+    if (name !== "all") localStorage.setItem(TAB_KEY, name);
+    if (!fromHash && name !== "all") {
       const newHash = `#tab-${name}`;
       if (location.hash !== newHash) {
         history.replaceState(null, "", newHash);
       }
+    }
+    if (name === "all") {
+      // Search mode: clear sub-nav, reveal everything.
+      const subnav = document.getElementById("subTabNav");
+      if (subnav) subnav.innerHTML = "";
+      document.querySelectorAll("section.panel.subtab-hidden").forEach((p) => p.classList.remove("subtab-hidden"));
+    } else {
+      renderSubnav(name);
     }
   }
 
@@ -220,7 +286,7 @@ if (forgetSessionBtn) {
       const owningTab = target?.dataset.tab;
       if (owningTab && VALID_TABS.has(owningTab)) {
         setActiveTab(owningTab);
-        // Wait one frame so the now-visible panel can be scrolled into view.
+        setActiveSubtab(owningTab, id);
         requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
         event.preventDefault();
       }
@@ -231,6 +297,7 @@ if (forgetSessionBtn) {
   setActiveTab(readDesiredTab(), { fromHash: true });
 
   window.__drmSetActiveTab = setActiveTab; // expose for search-bar use
+  window.__drmSetActiveSubtab = setActiveSubtab;
 })();
 
 (function initWelcomeScreen() {
