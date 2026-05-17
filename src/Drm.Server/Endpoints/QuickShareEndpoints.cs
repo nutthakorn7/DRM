@@ -123,8 +123,18 @@ public static class QuickShareEndpoints
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        // Encode tenantId + accessToken + guestEmail so the recipient gets a
+        // one-click link that pre-fills everything on /share/. They never
+        // have to type a GUID. Mirrors BuildExternalShareUrl in
+        // AdminFilesEndpoints so both admin-created and quick-share links
+        // behave the same.
         var origin = $"{httpContext.Request.Scheme}://{httpContext.Request.Host}";
-        var shareUrl = $"{origin}/share/?token={rawToken}";
+        var query = QueryString.Create([
+            new KeyValuePair<string, string?>("tenantId", request.TenantId.ToString()),
+            new KeyValuePair<string, string?>("accessToken", rawToken),
+            new KeyValuePair<string, string?>("guestEmail", request.RecipientEmail.Trim())
+        ]);
+        var shareUrl = $"{origin}/share/{query}";
         return TypedResults.Created(
             $"/api/admin/files/{fileId}",
             new QuickShareResponse(

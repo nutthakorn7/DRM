@@ -147,23 +147,37 @@
   function applyQueryPrefill() {
     const query = new URLSearchParams(window.location.search);
     const tenantId = (query.get("tenantId") || "").trim();
-    const accessToken = (query.get("accessToken") || "").trim();
+    // Accept either `accessToken` (full URL builder) or `token` (legacy
+    // short URL) so recipients of either link shape are pre-filled.
+    const accessToken = (query.get("accessToken") || query.get("token") || "").trim();
     const guestEmail = (query.get("guestEmail") || "").trim();
 
-    if (tenantId) {
-      setValue("tenantId", tenantId);
-    }
+    if (tenantId) setValue("tenantId", tenantId);
+    if (accessToken) setValue("accessToken", accessToken);
+    if (guestEmail) setValue("guestEmail", guestEmail);
 
-    if (accessToken) {
-      setValue("accessToken", accessToken);
-    }
-
-    if (guestEmail) {
-      setValue("guestEmail", guestEmail);
+    // If tenant + token both came from the URL, collapse the advanced block
+    // and show a small "loaded" badge so the recipient sees a tight,
+    // one-decision form: "Send verification code".
+    const advanced = document.getElementById("shareDetailsAdvanced");
+    const badge = document.getElementById("prefillBadge");
+    if (tenantId && accessToken && advanced) {
+      advanced.open = false;
+      if (badge) badge.hidden = false;
+      setStatus(
+        guestEmail
+          ? `Share details loaded for ${guestEmail}. Click Send verification code to continue.`
+          : "Share details loaded. Confirm your email and send verification code.",
+        ""
+      );
+      return;
     }
 
     if (tenantId || accessToken || guestEmail) {
-      setStatus("Share details loaded from link. Send verification code to continue.", "");
+      // Partial prefill — keep the advanced block expanded so the recipient
+      // can spot what's missing.
+      if (advanced) advanced.open = true;
+      setStatus("Share details partially loaded. Fill in any missing fields and send verification code.", "");
     }
   }
 

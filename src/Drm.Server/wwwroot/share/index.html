@@ -36,14 +36,22 @@
           </div>
         </div>
         <form id="verificationStartForm" novalidate>
-          <label>
-            <span>Tenant ID</span>
-            <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
-          </label>
-          <label>
-            <span>Access token</span>
-            <input id="accessToken" autocomplete="off" placeholder="Paste the share token">
-          </label>
+          <!-- Tenant + access token are encoded in the share URL so the
+               recipient never has to type a GUID. Wrap them in a <details>
+               that collapses by default when prefill succeeds. Only the
+               guest email stays visible because the recipient must confirm
+               it. -->
+          <details id="shareDetailsAdvanced">
+            <summary>Share details from link <span class="hint" id="prefillBadge" hidden>✓ loaded</span></summary>
+            <label>
+              <span>Tenant ID</span>
+              <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+            </label>
+            <label>
+              <span>Access token</span>
+              <input id="accessToken" autocomplete="off" placeholder="Paste the share token">
+            </label>
+          </details>
           <label>
             <span>Guest email</span>
             <input id="guestEmail" type="email" autocomplete="email" placeholder="guest@example.com">

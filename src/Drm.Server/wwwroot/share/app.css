@@ -158,6 +158,53 @@ form {
   gap: 12px;
 }
 
+/* Advanced "Share details from link" disclosure. Collapsed by default
+   when the URL pre-filled the tenant + token so the recipient sees only
+   the email field and the primary CTA. */
+form details#shareDetailsAdvanced {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--page);
+  padding: 8px 12px;
+}
+
+form details#shareDetailsAdvanced > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+form details#shareDetailsAdvanced > summary::-webkit-details-marker { display: none; }
+form details#shareDetailsAdvanced > summary::before {
+  content: "▸";
+  font-size: 10px;
+  color: var(--muted);
+  margin-right: 4px;
+  transition: transform 120ms ease;
+}
+form details#shareDetailsAdvanced[open] > summary::before {
+  transform: rotate(90deg);
+  display: inline-block;
+}
+
+form details#shareDetailsAdvanced > label { margin-top: 10px; }
+
+form details#shareDetailsAdvanced .hint {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ok);
+  font-weight: 600;
+}
+
 label {
   display: grid;
   gap: 6px;
