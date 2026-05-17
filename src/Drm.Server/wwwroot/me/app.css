@@ -14,7 +14,8 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-feature-settings: "ss01" on, "ss03" on, "cv02" on;
   background: var(--page);
   color: var(--ink);
   line-height: 1.5;

@@ -431,6 +431,7 @@ if (forgetSessionBtn) {
 
 (function initRailToggle() {
   const KEY = "drm:railCollapsed";
+  const MOBILE_QUERY = window.matchMedia("(max-width: 820px)");
   const workspace = document.querySelector(".workspace");
   const toggle = document.getElementById("railToggle");
   if (!workspace || !toggle) return;
@@ -440,15 +441,31 @@ if (forgetSessionBtn) {
     toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     toggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
     toggle.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+    // On mobile, the workspace grid widens when expanded so the labels can fit.
+    if (MOBILE_QUERY.matches) {
+      workspace.dataset.railExpandedOnMobile = collapsed ? "false" : "true";
+    } else {
+      delete workspace.dataset.railExpandedOnMobile;
+    }
   }
 
-  const initial = localStorage.getItem(KEY) === "1";
+  // On mobile, default to collapsed if the user hasn't explicitly chosen.
+  const stored = localStorage.getItem(KEY);
+  const initial = stored === null
+    ? MOBILE_QUERY.matches
+    : stored === "1";
   apply(initial);
 
   toggle.addEventListener("click", () => {
     const next = workspace.dataset.railCollapsed !== "true";
     apply(next);
     localStorage.setItem(KEY, next ? "1" : "0");
+  });
+
+  // If viewport crosses the 820 boundary and the user never picked, re-apply
+  // the appropriate default so the sidebar isn't stuck in a wrong state.
+  MOBILE_QUERY.addEventListener?.("change", () => {
+    if (localStorage.getItem(KEY) === null) apply(MOBILE_QUERY.matches);
   });
 })();
 
