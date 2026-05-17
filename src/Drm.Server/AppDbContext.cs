@@ -48,6 +48,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<FileTagEntity> FileTags => Set<FileTagEntity>();
 
+    public DbSet<TransparentProtectedFileEntity> TransparentProtectedFiles => Set<TransparentProtectedFileEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -230,6 +232,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(t => new { t.TenantId, t.FileId, t.Tag });
             entity.HasIndex(t => new { t.TenantId, t.Tag });
             entity.Property(t => t.Tag).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<TransparentProtectedFileEntity>(entity =>
+        {
+            entity.HasKey(t => new { t.TenantId, t.FileId });
+            entity.HasIndex(t => t.TenantId);
+            entity.Property(t => t.OriginalFileName).HasMaxLength(512);
+            entity.Property(t => t.ContentType).HasMaxLength(128);
         });
     }
 }

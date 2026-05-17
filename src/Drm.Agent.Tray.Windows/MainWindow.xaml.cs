@@ -232,6 +232,107 @@ public partial class MainWindow : Window
         StatusText.Text = message;
     }
 
+    private void TransparentDropZone_DragEnter(object sender, System.Windows.DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            e.Effects = System.Windows.DragDropEffects.Copy;
+            TransparentDropZone.BorderBrush = System.Windows.Media.Brushes.SteelBlue;
+            TransparentDropZone.Background = System.Windows.Media.Brushes.AliceBlue;
+        }
+        else
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void TransparentDropZone_DragLeave(object sender, System.Windows.DragEventArgs e)
+    {
+        TransparentDropZone.BorderBrush = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0xD1, 0xD5, 0xDB));
+        TransparentDropZone.Background = System.Windows.Media.Brushes.White;
+    }
+
+    private async void TransparentDropZone_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        TransparentDropZone_DragLeave(sender, e);
+        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) return;
+        if (e.Data.GetData(System.Windows.DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+
+        var sourceFile = paths.FirstOrDefault(File.Exists);
+        if (sourceFile is null)
+        {
+            SetStatus("Drop a file (folders are not supported).");
+            return;
+        }
+
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            var ownerUserId = ParseRequiredGuid(UserIdBox.Text, "User ID");
+            var fileId = Guid.NewGuid();
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+
+            using var secretResponse = await httpClient.GetAsync("/api/admin/transparent-files/secret");
+            secretResponse.EnsureSuccessStatusCode();
+            var secretJson = await secretResponse.Content.ReadAsStringAsync();
+            using var secretDoc = System.Text.Json.JsonDocument.Parse(secretJson);
+            var secret = secretDoc.RootElement.GetProperty("secret").GetString() ?? "";
+            var hmacKey = System.Text.Encoding.UTF8.GetBytes(secret);
+
+            var originalBytes = await File.ReadAllBytesAsync(sourceFile);
+            var fileName = Path.GetFileName(sourceFile);
+            var contentType = Path.GetExtension(sourceFile).ToLowerInvariant() switch
+            {
+                ".pdf" => "application/pdf",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                ".txt" => "text/plain",
+                _ => "application/octet-stream"
+            };
+
+            var metadata = new Drm.Crypto.TransparentMetadata(
+                tenantId,
+                fileId,
+                ownerUserId,
+                contentType,
+                fileName,
+                DateTimeOffset.UtcNow,
+                null);
+            var stamped = Drm.Crypto.TransparentEnvelope.AppendTrailer(originalBytes, metadata, hmacKey);
+            var outPath = Path.Combine(Path.GetDirectoryName(sourceFile)!, $"{Path.GetFileNameWithoutExtension(sourceFile)}-drm{Path.GetExtension(sourceFile)}");
+            await File.WriteAllBytesAsync(outPath, stamped);
+
+            var registerBody = new
+            {
+                tenantId,
+                fileId,
+                ownerUserId,
+                originalFileName = fileName,
+                contentType,
+                policyTemplateId = (Guid?)null
+            };
+            using var registerContent = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(registerBody),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            using var registerResponse = await httpClient.PostAsync("/api/admin/transparent-files", registerContent);
+            var registered = registerResponse.IsSuccessStatusCode;
+
+            SetStatus($"Transparent file written: {outPath} ({stamped.Length:N0} bytes). Server register: {(registered ? "ok" : (int)registerResponse.StatusCode)}.");
+            TransparentDropHint.Text = $"Last protected: {fileName} → {Path.GetFileName(outPath)} (+{stamped.Length - originalBytes.Length} bytes trailer)";
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Transparent-protect failed: {ex.Message}");
+        }
+    }
+
     private async void CheckLicenseButton_Click(object sender, RoutedEventArgs e)
     {
         CheckLicenseButton.IsEnabled = false;

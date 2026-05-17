@@ -60,6 +60,12 @@
             <Button x:Name="OpenButton" Grid.Row="4" Grid.Column="7" Width="80" Height="28" Content="Open" Click="OpenButton_Click" />
         </Grid>
         </Border>
+        <Border Grid.Row="0" VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
+                Background="#FEF3C7" BorderBrush="#FCD34D" BorderThickness="0,1,0,0"
+                Padding="14,6" x:Name="TransparentBanner" Visibility="Collapsed">
+            <TextBlock x:Name="TransparentBannerText" Foreground="#92400E"
+                       TextWrapping="Wrap" FontSize="12" />
+        </Border>
 
         <DockPanel Grid.Row="1" Background="#1F2937" LastChildFill="True">
             <StackPanel DockPanel.Dock="Right"

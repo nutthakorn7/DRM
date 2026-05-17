@@ -1,7 +1,7 @@
 <Window x:Class="Drm.Agent.Tray.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DRM Agent" Height="730" Width="720" MinHeight="700" MinWidth="680"
+        Title="DRM Agent" Height="900" Width="720" MinHeight="860" MinWidth="680"
         Background="#F7F8FA"
         AllowDrop="True"
         DragEnter="Window_DragEnter"
@@ -166,6 +166,32 @@
                     <TextBox x:Name="DefaultTagBox" Width="220" Height="22"
                              VerticalContentAlignment="Center" />
                 </StackPanel>
+                <Border BorderBrush="#D1D5DB" BorderThickness="1" Background="#F9FAFB"
+                        Padding="10" Margin="0,10,0,0" CornerRadius="4">
+                    <StackPanel>
+                        <TextBlock Text="Transparent protect (extension preserved)"
+                                   FontWeight="SemiBold" Foreground="#374151" />
+                        <TextBlock Text="Drop a file onto the box below to append a DRM trailer. The file remains openable in its native application."
+                                   Foreground="#6B7280" TextWrapping="Wrap" Margin="0,4,0,8" />
+                        <Border x:Name="TransparentDropZone"
+                                Background="#FFFFFF"
+                                BorderBrush="#D1D5DB"
+                                BorderThickness="2"
+                                CornerRadius="6"
+                                Padding="12"
+                                AllowDrop="True"
+                                MinHeight="44"
+                                DragEnter="TransparentDropZone_DragEnter"
+                                DragLeave="TransparentDropZone_DragLeave"
+                                DragOver="TransparentDropZone_DragEnter"
+                                Drop="TransparentDropZone_Drop">
+                            <TextBlock x:Name="TransparentDropHint"
+                                       Text="Drop file here to transparent-protect (output: same name + same extension, with DRM trailer appended)"
+                                       Foreground="#9CA3AF"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Border>
     </Grid>

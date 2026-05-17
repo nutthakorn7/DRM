@@ -694,3 +694,60 @@ When an admin applies a policy template or saves anti-capture watermark settings
 ### Tests
 
 3 new (ZIP archive content, 404 unknown file, 400 blank tenant). 191/191 total pass.
+
+## Phase 5AO Transparent Encryption (Extension Preserved)
+
+FinalCode's "透過暗号" (transparent encryption) keeps the original file extension and lets users open files in their native application while DRM-aware tools still surface tenant + policy metadata. Phase 5AO ships the trailer format, server registry, admin UI, tray drag-drop, and viewer banner.
+
+### Trailer format
+
+`Drm.Crypto.TransparentEnvelope` appends a tamper-evident block to the end of any file:
+
+```
+[magic        ] 8 B  "DRMTRANS"
+[version      ] 1 B  = 1
+[metadata len ] 4 B  little-endian
+[metadata JSON] N B  UTF-8
+[HMAC-SHA256  ] 32 B over (magic + version + length + metadata) using configured secret
+[trailer size ] 4 B  total trailer length (locator)
+```
+
+The leading bytes of the original file are untouched, so PDFs, ZIP-based Office documents, and plain text remain readable in their native applications. DRM-aware tools recover the metadata by reading the last 4 bytes, walking back to the magic marker, and verifying the HMAC.
+
+Tampering with any byte in the trailer invalidates the HMAC and the trailer is treated as not present. The trailer secret comes from `Drm:Security:TransparentTrailerSecret` (defaults to a baked-in placeholder when unset).
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/transparent-files` | Register a transparent file with metadata |
+| `GET` | `/api/admin/transparent-files?tenantId=...` | List registered transparent files |
+| `GET` | `/api/admin/transparent-files/{fileId}?tenantId=...` | Get a registered file |
+| `DELETE` | `/api/admin/transparent-files/{fileId}?tenantId=...` | Deregister a transparent file |
+| `GET` | `/api/admin/transparent-files/secret` | Return the configured HMAC secret (admin-only) for clients that need to write or verify trailers |
+
+### Admin console
+
+A new **Transparent-encryption files** panel under the new `Transparent` nav link lets admins register files, list them, and deregister. Each registration writes an audit event `transparent_file_registered`.
+
+### Windows tray
+
+The protect form gains a **Transparent protect** drop zone. Dropping a file onto it:
+
+1. Fetches the trailer secret from the admin endpoint
+2. Builds a `TransparentMetadata` envelope from the configured tenant / user / file
+3. Appends the HMAC-protected trailer using `TransparentEnvelope.AppendTrailer`
+4. Writes a sibling file `<name>-drm<ext>` next to the original
+5. Registers the file in the server registry
+
+### Windows viewer
+
+Dropping any file (not just `.drmx`) onto the viewer fetches the trailer secret and runs `TransparentEnvelope.TryReadTrailer`. When a valid trailer is found, a yellow banner appears at the top of the window summarising tenant, file ID, registration timestamp, and original file size — letting the user verify that a copy delivered to them is the real DRM-protected one.
+
+### Tests
+
+5 envelope round-trip tests (append/read, missing trailer, wrong secret, tampered trailer, strip) + 4 admin API tests (CRUD + conflict + bad-request + secret endpoint) = 9 new, **200/200 total pass**.
+
+### Deferred to a follow-up phase
+
+The Windows shell extension that draws a lock-overlay badge on Explorer icons is intentionally deferred — it requires a separate COM-registered C++ / .NET project. This phase delivers the data model and verification surface, leaving icon decoration for Phase 5AO-shell.

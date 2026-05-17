@@ -366,6 +366,23 @@ public sealed class BoxWebhookEventEntity
     public DateTimeOffset ReceivedAtUtc { get; set; }
 }
 
+public sealed class TransparentProtectedFileEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public Guid OwnerUserId { get; set; }
+
+    public string OriginalFileName { get; set; } = string.Empty;
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public Guid? PolicyTemplateId { get; set; }
+
+    public DateTimeOffset RegisteredAtUtc { get; set; }
+}
+
 public sealed class FileTagEntity
 {
     public Guid TenantId { get; set; }

@@ -95,7 +95,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void Window_Drop(object sender, DragEventArgs e)
+    private async void Window_Drop(object sender, DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop))
         {
@@ -110,15 +110,68 @@ public partial class MainWindow : Window
         var firstDrmx = paths.FirstOrDefault(path =>
             File.Exists(path) && path.EndsWith(".drmx", StringComparison.OrdinalIgnoreCase));
 
-        if (firstDrmx is null)
+        if (firstDrmx is not null)
         {
-            StatusText.Text = "Drop a .drmx protected file to open.";
+            ProtectedPathBox.Text = firstDrmx;
+            StatusText.Text = $"Ready to open: {Path.GetFileName(firstDrmx)}";
+            e.Handled = true;
             return;
         }
 
-        ProtectedPathBox.Text = firstDrmx;
-        StatusText.Text = $"Ready to open: {Path.GetFileName(firstDrmx)}";
-        e.Handled = true;
+        var firstFile = paths.FirstOrDefault(File.Exists);
+        if (firstFile is not null)
+        {
+            await TryShowTransparentBannerAsync(firstFile);
+            e.Handled = true;
+        }
+        else
+        {
+            StatusText.Text = "Drop a .drmx protected file or a transparent-protected file.";
+        }
+    }
+
+    private async Task TryShowTransparentBannerAsync(string filePath)
+    {
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(filePath);
+            var serverUrl = ServerUrlBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(serverUrl) || !Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri))
+            {
+                StatusText.Text = "Set Server URL to verify transparent trailers.";
+                return;
+            }
+
+            using var http = new System.Net.Http.HttpClient { BaseAddress = uri };
+            http.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+            using var secretResp = await http.GetAsync("/api/admin/transparent-files/secret");
+            if (!secretResp.IsSuccessStatusCode)
+            {
+                StatusText.Text = $"Could not fetch trailer secret (HTTP {(int)secretResp.StatusCode}).";
+                return;
+            }
+            var secretJson = await secretResp.Content.ReadAsStringAsync();
+            using var secretDoc = System.Text.Json.JsonDocument.Parse(secretJson);
+            var secret = secretDoc.RootElement.GetProperty("secret").GetString() ?? "";
+            var hmacKey = System.Text.Encoding.UTF8.GetBytes(secret);
+
+            if (Drm.Crypto.TransparentEnvelope.TryReadTrailer(bytes, hmacKey, out var metadata, out var originalLength))
+            {
+                TransparentBanner.Visibility = Visibility.Visible;
+                TransparentBannerText.Text = $"Transparent DRM file detected · Tenant {metadata!.TenantId:D} · File {metadata.FileId:D} · Registered {metadata.RegisteredAtUtc:O} · Original size {originalLength:N0} bytes.";
+                StatusText.Text = $"Transparent trailer valid. Open file in its native application: {filePath}";
+            }
+            else
+            {
+                TransparentBanner.Visibility = Visibility.Collapsed;
+                StatusText.Text = "No DRM transparent trailer found (or HMAC mismatch).";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Transparent trailer check failed: {ex.Message}";
+        }
     }
 
     private void BrowseButton_Click(object sender, RoutedEventArgs e)

@@ -174,6 +174,22 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_FileTags_TenantId_Tag"
             ON "FileTags" ("TenantId", "Tag");
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TransparentProtectedFiles" (
+                "TenantId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "OwnerUserId" TEXT NOT NULL,
+                "OriginalFileName" TEXT NOT NULL DEFAULT '',
+                "ContentType" TEXT NOT NULL DEFAULT '',
+                "PolicyTemplateId" TEXT NULL,
+                "RegisteredAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_TransparentProtectedFiles" PRIMARY KEY ("TenantId", "FileId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TransparentProtectedFiles_TenantId"
+            ON "TransparentProtectedFiles" ("TenantId");
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;
@@ -402,6 +418,7 @@ app.MapOutlookAddInEndpoints();
 app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
 app.MapAdminFileZipEndpoints();
+app.MapAdminTransparentFilesEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

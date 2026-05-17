@@ -27,6 +27,7 @@
         <a href="#siem">SIEM</a>
         <a href="#audit">Audit</a>
         <a href="#status">Status</a>
+        <a href="#transparent">Transparent</a>
         <a href="/admin/cases/" target="_blank">Use cases ↗</a>
       </nav>
     </aside>
@@ -760,6 +761,46 @@
         </div>
         <button id="checkHealth" type="button">Check /healthz</button>
         <pre id="healthOutput">No check run.</pre>
+      </section>
+
+      <section class="panel" id="transparent">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Format</p>
+            <h3>Transparent-encryption files</h3>
+          </div>
+          <button id="refreshTransparentFiles" type="button">Refresh</button>
+        </div>
+
+        <p class="hint">Transparent files keep their original extension (<code>.xlsx</code> stays <code>.xlsx</code>) by appending a tamper-evident DRM trailer. They open in their native application; DRM-aware tools surface tenant + policy metadata.</p>
+
+        <form class="grant-row" id="registerTransparentForm">
+          <input id="transparentFileId" autocomplete="off" placeholder="File ID (GUID)">
+          <input id="transparentOwner" autocomplete="off" placeholder="Owner user ID">
+          <input id="transparentFileName" autocomplete="off" placeholder="Original file name (foo.xlsx)">
+          <input id="transparentContentType" autocomplete="off" placeholder="MIME type (optional)">
+          <button type="submit">Register</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>File ID</th>
+                <th>File name</th>
+                <th>Content type</th>
+                <th>Owner</th>
+                <th>Registered</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="transparentFilesBody">
+              <tr>
+                <td colspan="6" class="empty">Click Refresh to load transparent files.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="panel compact" id="license">

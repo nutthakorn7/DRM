@@ -519,6 +519,59 @@ async function refreshTagChips() {
   });
 }
 
+// Transparent files
+document.querySelector("#refreshTransparentFiles").addEventListener("click", refreshTransparentFiles);
+document.querySelector("#registerTransparentForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    fileId: document.querySelector("#transparentFileId").value.trim(),
+    ownerUserId: document.querySelector("#transparentOwner").value.trim(),
+    originalFileName: document.querySelector("#transparentFileName").value.trim(),
+    contentType: document.querySelector("#transparentContentType").value.trim() || null,
+    policyTemplateId: null
+  };
+  await apiFetch("/api/admin/transparent-files", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+  setStatus("Transparent file registered", "ok");
+  event.target.reset();
+  await refreshTransparentFiles();
+});
+
+async function refreshTransparentFiles() {
+  const tenantId = requireTenantId();
+  const files = await apiFetch(`/api/admin/transparent-files?tenantId=${encodeURIComponent(tenantId)}`);
+  const body = document.querySelector("#transparentFilesBody");
+  if (!files.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">No transparent files registered yet.</td></tr>';
+    setStatus("No transparent files", "ok");
+    return;
+  }
+  body.innerHTML = files.map((f) => `
+    <tr>
+      <td><code>${escapeHtml(f.fileId)}</code></td>
+      <td>${escapeHtml(f.originalFileName)}</td>
+      <td>${escapeHtml(f.contentType || "")}</td>
+      <td><code>${escapeHtml(f.ownerUserId)}</code></td>
+      <td>${escapeHtml(formatDate(f.registeredAtUtc))}</td>
+      <td><button class="danger" type="button" data-deregister-transparent="${escapeHtml(f.fileId)}">Deregister</button></td>
+    </tr>
+  `).join("");
+  body.querySelectorAll("[data-deregister-transparent]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const fileId = btn.dataset.deregisterTransparent;
+      await apiFetch(`/api/admin/transparent-files/${encodeURIComponent(fileId)}?tenantId=${encodeURIComponent(tenantId)}`, {
+        method: "DELETE"
+      });
+      await refreshTransparentFiles();
+      setStatus("Transparent file deregistered", "ok");
+    });
+  });
+  setStatus(`${files.length} transparent file${files.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
 // License
 document.querySelector("#loadLicense").addEventListener("click", async () => {
   const license = await apiFetch("/api/admin/license");
