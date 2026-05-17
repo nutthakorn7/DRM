@@ -62,39 +62,53 @@ select {
   padding: 28px 10px;
 }
 
-.rail .brand {
+.rail-head {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  justify-content: flex-end;
 }
 
-.rail .brand-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+.workspace[data-rail-collapsed="true"] .rail-head {
+  justify-content: center;
 }
 
-.rail .brand-logo {
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-header .brand-logo {
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   background: #a45b13;
   color: #fff;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 10px;
+  font-size: 20px;
+  flex: 0 0 40px;
 }
 
-.rail .brand-text {
-  flex: 1;
-  min-width: 0;
+.page-header .brand-text h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
-.rail .brand .hint {
-  color: #c7bda9;
+.page-header .brand-text .hint {
+  margin: 2px 0 0;
   font-size: 12px;
-  margin: 4px 0 0 0;
+  color: var(--muted);
 }
 
 .rail-toggle {
@@ -123,16 +137,9 @@ select {
   display: inline-block;
 }
 
-.workspace[data-rail-collapsed="true"] .rail .brand-text,
 .workspace[data-rail-collapsed="true"] .rail .nav-label,
 .workspace[data-rail-collapsed="true"] .rail .rail-secondary .eyebrow {
   display: none;
-}
-
-.workspace[data-rail-collapsed="true"] .rail .brand-row {
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
 }
 
 .workspace[data-rail-collapsed="true"] .rail nav a {
