@@ -19,9 +19,15 @@ public static class AdminSecureContainersEndpoints
 
     private static async Task<Results<Created<ContainerResponse>, Conflict, BadRequest<ErrorResponse>>> RegisterAsync(
         RegisterRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty || request.ContainerId == Guid.Empty || request.OwnerUserId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_identifiers"));
@@ -113,12 +119,18 @@ public static class AdminSecureContainersEndpoints
         return TypedResults.Ok(await BuildResponseAsync(dbContext, tenantId, containerId, cancellationToken));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeleteAsync(
+    private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> DeleteAsync(
         Guid containerId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var container = await dbContext.SecureContainers
             .SingleOrDefaultAsync(c => c.TenantId == tenantId && c.ContainerId == containerId, cancellationToken);
         if (container is null)

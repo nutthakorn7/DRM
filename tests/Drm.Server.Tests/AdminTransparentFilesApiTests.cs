@@ -193,4 +193,31 @@ public sealed class AdminTransparentFilesApiTests : IDisposable
         DateTimeOffset RegisteredAtUtc);
 
     private sealed record SecretResponse(string Secret);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Register_transparent_file_with_mismatched_header_returns_400()
+    {
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/transparent-files")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(),
+                fileId = Guid.NewGuid(),
+                ownerUserId = Guid.NewGuid(),
+                originalFileName = "x.docx",
+                contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            })
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
 }

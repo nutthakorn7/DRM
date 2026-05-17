@@ -100,9 +100,17 @@ right after parameter validation** — that's now the project convention.
 | 2026-05-18 | `POST /api/admin/files/{id}/tags` | `AdminFileTagsEndpoints.cs` |
 | 2026-05-18 | `DELETE /api/admin/files/{id}/tags/{tag}` | `AdminFileTagsEndpoints.cs` |
 | 2026-05-18 | `POST /api/admin/devices/{id}/disable` | `AdminDevicesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/secure-containers` (register) | `AdminSecureContainersEndpoints.cs` |
+| 2026-05-18 | `DELETE /api/admin/secure-containers/{id}` | `AdminSecureContainersEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/transparent-files` (register) | `AdminTransparentFilesEndpoints.cs` |
+| 2026-05-18 | `DELETE /api/admin/transparent-files/{id}` (deregister) | `AdminTransparentFilesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/transparent-files/stamp` | `AdminTransparentFilesEndpoints.cs` |
 
-**Still on the list** (~20 mutating admin endpoints): file-zip, transparent-files
-register/deregister, secure-containers register/delete, folder-watcher config,
+**Endpoints with no tenant context** (not migrated, by design):
+- `POST /api/admin/transparent-files/verify` — request body is only `FileBytesBase64`;
+  the HMAC trailer carries its own tenant info that's verified server-side.
+
+**Still on the list** (~15 mutating admin endpoints): folder-watcher config,
 SIEM webhook CRUD, Box / Outlook / Directory integration upsert, external-share
 settings, license updates, audit ingest. Migrate one file at a time per session;
 test coverage = at least one `tenant_mismatch` assertion per new file.

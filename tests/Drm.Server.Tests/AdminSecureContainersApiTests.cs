@@ -122,4 +122,31 @@ public sealed class AdminSecureContainersApiTests : IDisposable
         IReadOnlyList<ContainerFile> Files);
 
     private sealed record ContainerFile(int OrdinalIndex, string RelativePath, long Size);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Register_secure_container_with_mismatched_header_returns_400()
+    {
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/secure-containers")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(),
+                containerId = Guid.NewGuid(),
+                ownerUserId = Guid.NewGuid(),
+                displayName = "Q4 financials",
+                files = new[] { new { ordinalIndex = 0, relativePath = "a.pdf", size = 100L } },
+            })
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
 }

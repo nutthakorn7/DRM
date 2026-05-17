@@ -26,9 +26,15 @@ public static class AdminTransparentFilesEndpoints
 
     private static async Task<Results<Created<TransparentFileResponse>, Conflict, BadRequest<ErrorResponse>>> RegisterAsync(
         RegisterRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty || request.FileId == Guid.Empty || request.OwnerUserId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_identifiers"));
@@ -103,12 +109,18 @@ public static class AdminTransparentFilesEndpoints
             : TypedResults.Ok(TransparentFileResponse.From(entity));
     }
 
-    private static async Task<Results<NoContent, NotFound>> DeregisterAsync(
+    private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> DeregisterAsync(
         Guid fileId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var entity = await dbContext.TransparentProtectedFiles
             .SingleOrDefaultAsync(t => t.TenantId == tenantId && t.FileId == fileId, cancellationToken);
         if (entity is null)
@@ -192,8 +204,14 @@ public static class AdminTransparentFilesEndpoints
 
     private static Results<Ok<StampResponse>, BadRequest<ErrorResponse>> StampAsync(
         StampRequest request,
+        HttpContext httpContext,
         IConfiguration configuration)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty || request.OwnerUserId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_identifiers"));
