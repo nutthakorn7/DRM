@@ -183,6 +183,15 @@ button.primary {
 }
 
 button.primary:hover:not(:disabled) { background: var(--accent-dark); }
+button:focus-visible,
+a:focus-visible,
+input:focus,
+select:focus,
+textarea:focus,
+.drop-zone:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 button.primary:disabled { background: #9ca3af; cursor: not-allowed; }
 button.primary.big { padding: 16px; font-size: 1.05rem; }
 

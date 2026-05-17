@@ -207,6 +207,40 @@
 }
 
 /*
+ * Empty-state card — drop into any panel when there's nothing to show.
+ * Renders an icon + title + hint inside a dashed-border card. Use the
+ * emptyStateRow() helper in admin/app.js to embed inside a <td>.
+ */
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--page);
+  color: var(--muted);
+}
+
+.empty-state .empty-icon {
+  font-size: 28px;
+  opacity: 0.6;
+}
+
+.empty-state .empty-title {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+
+.empty-state .empty-hint {
+  font-size: var(--text-sm);
+  max-width: 320px;
+  line-height: var(--leading-body);
+}
+
+/*
  * Default heading scale — applied globally so every surface inherits the
  * 1.25 ratio. Surface CSS can still override with a more specific selector
  * when a particular context calls for a larger or smaller heading.

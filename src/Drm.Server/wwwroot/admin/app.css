@@ -404,8 +404,8 @@ select {
 
 .rail .rail-secondary a {
   font-size: 13px;
-  padding: 10px 0;
-  min-height: 40px;
+  padding: 12px 0;
+  min-height: var(--touch-target);
 }
 
 .rail h1,
@@ -874,36 +874,8 @@ button.ghost:hover {
   border-color: var(--accent);
 }
 
-/* Empty-state utility — panels can drop this in when their list is
-   empty to give the user something better than a blank table. */
-.empty-state {
-  display: grid;
-  place-items: center;
-  gap: 8px;
-  padding: 28px 16px;
-  text-align: center;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  background: var(--page);
-  color: var(--muted);
-}
-
-.empty-state .empty-icon {
-  font-size: 28px;
-  opacity: 0.6;
-}
-
-.empty-state .empty-title {
-  font-weight: 600;
-  color: var(--ink);
-  font-size: 14px;
-}
-
-.empty-state .empty-hint {
-  font-size: 12px;
-  max-width: 320px;
-  line-height: 1.5;
-}
+/* Empty-state utility now lives in /static/tokens.css so /me, /share, and
+   /admin/ all share the same look. */
 
 .subtab-nav {
   display: flex;

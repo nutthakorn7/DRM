@@ -87,9 +87,16 @@
         <div class="watermark-stamp" id="previewWatermark">Verified viewer only</div>
       </div>
 
-      <div class="preview-details">
+      <div class="preview-details" data-has-session="false">
         <p class="eyebrow">Viewer session</p>
         <h2 id="documentTitle">Waiting for verification</h2>
+
+        <div class="preview-empty empty-state" aria-hidden="true">
+          <div class="empty-icon">🔒</div>
+          <div class="empty-title">Document preview will appear here</div>
+          <div class="empty-hint">Finish verification on the left and the file metadata, expiry, and watermark show up in this panel.</div>
+        </div>
+
         <dl>
           <div>
             <dt>File ID</dt>

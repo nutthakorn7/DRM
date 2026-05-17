@@ -190,6 +190,16 @@ button:hover:not(:disabled) {
   background: var(--accent-dark);
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: var(--field-border-focus);
+}
+
 button:disabled {
   border-color: var(--line);
   background: #eef0f2;
@@ -277,6 +287,15 @@ button:disabled {
 
 .preview-details h2 {
   font-size: 24px;
+}
+
+.preview-details[data-has-session="false"] dl,
+.preview-details[data-has-session="false"] + .viewer-actions { /* hide actions block during empty state */
+  display: none;
+}
+
+.preview-details[data-has-session="true"] .preview-empty {
+  display: none;
 }
 
 dl {

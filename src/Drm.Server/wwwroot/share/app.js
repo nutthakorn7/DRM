@@ -120,6 +120,7 @@
   }
 
   function renderViewerSession(payload) {
+    document.querySelector(".preview-details")?.setAttribute("data-has-session", "true");
     document.getElementById("documentTitle").textContent = "Verified metadata session";
     document.getElementById("fileIdValue").textContent = payload.fileId || "-";
     document.getElementById("contentTypeValue").textContent = payload.contentType || "-";
