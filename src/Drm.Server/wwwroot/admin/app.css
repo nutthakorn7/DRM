@@ -32,6 +32,8 @@ select {
   font: inherit;
 }
 
+.welcome-screen[hidden] { display: none !important; }
+
 .welcome-screen {
   position: fixed;
   inset: 0;
