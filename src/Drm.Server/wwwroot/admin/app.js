@@ -25,6 +25,8 @@ const healthOutput = document.querySelector("#healthOutput");
 const syncOutput = document.querySelector("#syncOutput");
 const boxOutput = document.querySelector("#boxOutput");
 const boxEventsBody = document.querySelector("#boxEventsBody");
+const outlookOutput = document.querySelector("#outlookOutput");
+const outlookEventsBody = document.querySelector("#outlookEventsBody");
 
 tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
@@ -325,6 +327,74 @@ document.querySelector("#refreshBoxEvents").addEventListener("click", async () =
   `).join("");
   setStatus(`${events.length} Box event${events.length === 1 ? "" : "s"} loaded`, "ok");
 });
+
+// Outlook integration handlers
+document.querySelector("#outlookConfigForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = {
+    tenantId: requireTenantId(),
+    enabled: document.querySelector("#outlookEnabled").checked,
+    autoEncryptOutgoingAttachments: document.querySelector("#outlookAutoEncrypt").checked,
+    minAttachmentSizeKb: Number(document.querySelector("#outlookMinSize").value || "0"),
+    skipDomainsCsv: document.querySelector("#outlookSkipDomains").value.trim(),
+    defaultPolicyTemplateId: document.querySelector("#outlookDefaultTemplate").value.trim() || null
+  };
+  await apiFetch("/api/admin/outlook/config", { method: "PUT", body: JSON.stringify(body) });
+  setStatus("Outlook config saved", "ok");
+});
+
+document.querySelector("#refreshOutlookConfig").addEventListener("click", async () => {
+  // Render manifest URL with the current origin so admins can copy it.
+  document.querySelector("#outlookManifestUrl").textContent = `${location.origin}/outlook-addin/manifest.xml`;
+  try {
+    const config = await apiFetch(`/api/admin/outlook/config?tenantId=${encodeURIComponent(requireTenantId())}`);
+    if (config) {
+      document.querySelector("#outlookEnabled").checked = !!config.enabled;
+      document.querySelector("#outlookAutoEncrypt").checked = !!config.autoEncryptOutgoingAttachments;
+      document.querySelector("#outlookMinSize").value = config.minAttachmentSizeKb ?? 0;
+      document.querySelector("#outlookSkipDomains").value = config.skipDomainsCsv ?? "";
+      document.querySelector("#outlookDefaultTemplate").value = config.defaultPolicyTemplateId ?? "";
+      outlookOutput.textContent = JSON.stringify({
+        enabled: config.enabled,
+        autoEncrypt: config.autoEncryptOutgoingAttachments,
+        minSizeKb: config.minAttachmentSizeKb,
+        lifetimeProtected: config.lifetimeProtectedCount,
+        updatedAtUtc: config.updatedAtUtc
+      }, null, 2);
+    }
+    setStatus("Outlook config loaded", "ok");
+  } catch (err) {
+    outlookOutput.textContent = `No config: ${err.message}`;
+  }
+});
+
+document.querySelector("#refreshOutlookEvents").addEventListener("click", async () => {
+  const events = await apiFetch(`/api/admin/outlook/events?tenantId=${encodeURIComponent(requireTenantId())}`);
+  if (!events.length) {
+    outlookEventsBody.innerHTML = '<tr><td colspan="7" class="empty">No Outlook events yet.</td></tr>';
+    setStatus("No Outlook events", "ok");
+    return;
+  }
+  outlookEventsBody.innerHTML = events.map((e) => `
+    <tr>
+      <td>${escapeHtml(formatDate(e.occurredAtUtc))}</td>
+      <td>${escapeHtml(e.senderEmail)}</td>
+      <td>${escapeHtml(e.recipientCsv)}</td>
+      <td>${escapeHtml(e.attachmentName)}</td>
+      <td>${formatBytes(e.attachmentSizeBytes)}</td>
+      <td>${escapeHtml(e.status)}</td>
+      <td>${e.protectedFileId ? `<code>${escapeHtml(e.protectedFileId)}</code>` : ""}</td>
+    </tr>
+  `).join("");
+  setStatus(`${events.length} Outlook event${events.length === 1 ? "" : "s"} loaded`, "ok");
+});
+
+function formatBytes(bytes) {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 document.querySelector("#loadNotificationConfig").addEventListener("click", async () => {
   const config = await apiFetch(`/api/admin/notification-config?tenantId=${requireTenantId()}`);

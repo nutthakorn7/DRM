@@ -16,6 +16,7 @@
       </div>
       <nav>
         <a href="#box">Box</a>
+        <a href="#outlook">Outlook</a>
         <a class="active" href="#users">Users</a>
         <a href="#groups">Groups</a>
         <a href="#devices">Devices</a>
@@ -140,6 +141,58 @@
             <tbody id="boxEventsBody">
               <tr>
                 <td colspan="5" class="empty">Click "Refresh events" to load recent Box webhook events.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="outlook">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Email gateway</p>
+            <h3>Outlook add-in</h3>
+          </div>
+          <button id="refreshOutlookConfig" type="button">Load</button>
+        </div>
+
+        <p class="hint">Sideload the Office add-in manifest at <code id="outlookManifestUrl">/outlook-addin/manifest.xml</code> from <strong>Outlook → Get add-ins → My add-ins → Add a custom add-in → Add from file</strong> (replace <code>${SERVER_BASE_URL}</code> with your DRM server URL first).</p>
+
+        <form class="create-row" id="outlookConfigForm">
+          <label class="inline-check">
+            <input id="outlookEnabled" type="checkbox"> Enabled
+          </label>
+          <label class="inline-check">
+            <input id="outlookAutoEncrypt" type="checkbox" checked> Auto-encrypt outgoing
+          </label>
+          <input id="outlookMinSize" type="number" min="0" max="100000" value="0" placeholder="Min size (KB, 0 = always)">
+          <input id="outlookSkipDomains" autocomplete="off" placeholder="Skip domains (comma sep)">
+          <input id="outlookDefaultTemplate" autocomplete="off" placeholder="Default policy template ID">
+          <button type="submit">Save config</button>
+        </form>
+
+        <div class="create-row">
+          <button id="refreshOutlookEvents" type="button">Refresh events</button>
+        </div>
+
+        <pre id="outlookOutput" class="output-block">Outlook status appears here.</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Sender</th>
+                <th>Recipients</th>
+                <th>Attachment</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>File ID</th>
+              </tr>
+            </thead>
+            <tbody id="outlookEventsBody">
+              <tr>
+                <td colspan="7" class="empty">Click "Refresh events" to load recent attachment events.</td>
               </tr>
             </tbody>
           </table>

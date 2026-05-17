@@ -358,6 +358,46 @@ public sealed class BoxWebhookEventEntity
     public DateTimeOffset ReceivedAtUtc { get; set; }
 }
 
+public sealed class TenantOutlookIntegrationConfigEntity
+{
+    public Guid TenantId { get; set; }
+
+    public bool Enabled { get; set; }
+
+    public bool AutoEncryptOutgoingAttachments { get; set; } = true;
+
+    public int MinAttachmentSizeKb { get; set; }
+
+    public string SkipDomainsCsv { get; set; } = string.Empty;
+
+    public string? DefaultPolicyTemplateId { get; set; }
+
+    public int LifetimeProtectedCount { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class OutlookAttachmentEventEntity
+{
+    public long Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string SenderEmail { get; set; } = string.Empty;
+
+    public string RecipientCsv { get; set; } = string.Empty;
+
+    public string AttachmentName { get; set; } = string.Empty;
+
+    public long AttachmentSizeBytes { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public string? ProtectedFileId { get; set; }
+
+    public DateTimeOffset OccurredAtUtc { get; set; }
+}
+
 public sealed class TenantAdminNotificationConfigEntity
 {
     public Guid TenantId { get; set; }

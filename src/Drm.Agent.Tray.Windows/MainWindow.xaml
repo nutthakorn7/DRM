@@ -1,7 +1,7 @@
 <Window x:Class="Drm.Agent.Tray.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DRM Agent" Height="620" Width="720" MinHeight="600" MinWidth="680"
+        Title="DRM Agent" Height="660" Width="720" MinHeight="640" MinWidth="680"
         Background="#F7F8FA"
         AllowDrop="True"
         DragEnter="Window_DragEnter"
@@ -131,6 +131,23 @@
                             Margin="14,0,0,0"
                             Padding="10,2"
                             Click="CheckBoxStatusButton_Click" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Outlook:" Foreground="#6B7280" Margin="0,0,6,0" />
+                    <Ellipse x:Name="OutlookStatusDot"
+                             Width="10" Height="10"
+                             Fill="#9CA3AF"
+                             VerticalAlignment="Center"
+                             Margin="0,0,6,0" />
+                    <TextBlock x:Name="OutlookStatusText"
+                               Text="Not checked"
+                               Foreground="#374151"
+                               VerticalAlignment="Center" />
+                    <Button x:Name="CheckOutlookStatusButton"
+                            Content="Check"
+                            Margin="14,0,0,0"
+                            Padding="10,2"
+                            Click="CheckOutlookStatusButton_Click" />
                 </StackPanel>
             </StackPanel>
         </Border>

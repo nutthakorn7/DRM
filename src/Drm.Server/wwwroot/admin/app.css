@@ -376,6 +376,19 @@ button.danger:hover {
   color: var(--ink);
 }
 
+.hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 4px 0 12px 0;
+}
+
+.hint code {
+  background: rgba(0,0,0,0.04);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
 .simulator-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;

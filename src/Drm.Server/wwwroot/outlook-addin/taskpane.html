@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DRM Protect Attachments</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" defer></script>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; padding: 14px; color: #1f2937; background: #f9fafb; }
+    h2 { font-size: 14px; margin: 0 0 8px 0; }
+    p { font-size: 13px; line-height: 1.4; margin: 0 0 10px 0; color: #374151; }
+    .row { margin-bottom: 10px; }
+    label { font-size: 12px; color: #4b5563; }
+    input { width: 100%; padding: 6px 8px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; }
+    button { padding: 8px 12px; background: #a45b13; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    button:disabled { background: #9ca3af; cursor: default; }
+    .status { font-size: 12px; padding: 8px; border-radius: 4px; background: #f3f4f6; margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
+    .ok { background: #ecfdf5; color: #047857; }
+    .err { background: #fef2f2; color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h2>DRM Protect Attachments</h2>
+  <p>Scans the current message and registers each attachment with the DRM server so a policy + audit trail are attached before send.</p>
+
+  <div class="row">
+    <label for="serverUrl">Server URL</label>
+    <input id="serverUrl" type="url" placeholder="https://drm.example.com" />
+  </div>
+  <div class="row">
+    <label for="tenantId">Tenant ID</label>
+    <input id="tenantId" type="text" placeholder="GUID" />
+  </div>
+  <div class="row">
+    <label for="clientKey">Client API key</label>
+    <input id="clientKey" type="password" placeholder="DRM client key" />
+  </div>
+
+  <button id="scanButton" type="button" disabled>Scan & register attachments</button>
+  <div id="status" class="status">Awaiting Office.js…</div>
+
+  <script>
+    (function () {
+      const statusEl = document.getElementById("status");
+      const scanButton = document.getElementById("scanButton");
+      function setStatus(text, level) {
+        statusEl.textContent = text;
+        statusEl.className = "status" + (level ? " " + level : "");
+      }
+
+      // Persist last-used values in localStorage for convenience.
+      const fields = ["serverUrl", "tenantId", "clientKey"];
+      fields.forEach((id) => {
+        const el = document.getElementById(id);
+        const saved = localStorage.getItem("drm.outlook." + id);
+        if (saved) el.value = saved;
+        el.addEventListener("change", () => localStorage.setItem("drm.outlook." + id, el.value));
+      });
+
+      function waitForOffice() {
+        if (typeof Office === "undefined" || !Office.onReady) {
+          return setTimeout(waitForOffice, 50);
+        }
+        Office.onReady(() => {
+          setStatus("Office add-in ready. Open a message with attachments and click Scan.", "ok");
+          scanButton.disabled = false;
+        });
+      }
+      waitForOffice();
+
+      scanButton.addEventListener("click", async () => {
+        scanButton.disabled = true;
+        setStatus("Scanning attachments…");
+        try {
+          const serverUrl = document.getElementById("serverUrl").value.trim().replace(/\/+$/, "");
+          const tenantId = document.getElementById("tenantId").value.trim();
+          const clientKey = document.getElementById("clientKey").value;
+          if (!serverUrl || !tenantId || !clientKey) {
+            throw new Error("Server URL, Tenant ID, and Client API key are required.");
+          }
+
+          const item = Office.context.mailbox.item;
+          if (!item) throw new Error("No mail item open.");
+          const attachments = item.attachments || [];
+          if (!attachments.length) {
+            setStatus("No attachments on this message.", "ok");
+            return;
+          }
+
+          const senderEmail = (item.from && item.from.emailAddress) || "";
+          const toRecipients = await readRecipients(item);
+
+          const lines = [];
+          for (const a of attachments) {
+            const body = {
+              tenantId,
+              senderEmail,
+              recipients: toRecipients,
+              attachmentName: a.name,
+              attachmentSizeBytes: a.size || 1
+            };
+            const res = await fetch(serverUrl + "/api/outlook/protect-attachment", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-DRM-Client-Key": clientKey
+              },
+              body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+              const errText = await res.text();
+              lines.push("✗ " + a.name + " (" + res.status + "): " + errText);
+              continue;
+            }
+            const data = await res.json();
+            lines.push("✓ " + a.name + " — " + data.status + (data.protectedFileId ? " (" + data.protectedFileId + ")" : ""));
+          }
+          setStatus(lines.join("\n"), "ok");
+        } catch (err) {
+          setStatus("Error: " + err.message, "err");
+        } finally {
+          scanButton.disabled = false;
+        }
+      });
+
+      function readRecipients(item) {
+        return new Promise((resolve) => {
+          if (!item.to || typeof item.to.getAsync !== "function") {
+            // Read mode — to is an array directly.
+            const arr = Array.isArray(item.to) ? item.to.map((r) => r.emailAddress) : [];
+            resolve(arr);
+            return;
+          }
+          item.to.getAsync((result) => {
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+              resolve(result.value.map((r) => r.emailAddress));
+            } else {
+              resolve([]);
+            }
+          });
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

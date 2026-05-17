@@ -42,6 +42,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<BoxWebhookEventEntity> BoxWebhookEvents => Set<BoxWebhookEventEntity>();
 
+    public DbSet<TenantOutlookIntegrationConfigEntity> TenantOutlookIntegrationConfigs => Set<TenantOutlookIntegrationConfigEntity>();
+
+    public DbSet<OutlookAttachmentEventEntity> OutlookAttachmentEvents => Set<OutlookAttachmentEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -197,6 +201,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.SourceItemId).HasMaxLength(64);
             entity.Property(e => e.SourceItemName).HasMaxLength(512);
             entity.Property(e => e.CreatedByEmail).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<TenantOutlookIntegrationConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+            entity.Property(c => c.SkipDomainsCsv).HasMaxLength(1024);
+            entity.Property(c => c.DefaultPolicyTemplateId).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<OutlookAttachmentEventEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Id });
+            entity.Property(e => e.SenderEmail).HasMaxLength(256);
+            entity.Property(e => e.RecipientCsv).HasMaxLength(2048);
+            entity.Property(e => e.AttachmentName).HasMaxLength(512);
+            entity.Property(e => e.Status).HasMaxLength(64);
+            entity.Property(e => e.ProtectedFileId).HasMaxLength(64);
         });
     }
 }

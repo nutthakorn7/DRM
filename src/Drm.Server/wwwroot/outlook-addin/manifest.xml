@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DRM Outlook add-in manifest. Replace the placeholder values inside ${...}
+  before sideloading or publishing to the Microsoft 365 admin center.
+
+  Sideload steps:
+    1. Save this file as drm-outlook-manifest.xml
+    2. Open Outlook → Get Add-ins → My add-ins → Add a custom add-in → Add from file
+    3. Or upload via M365 admin center → Integrated apps → Upload custom apps
+-->
+<OfficeApp
+    xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+    xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+    xsi:type="MailApp">
+
+  <Id>00000000-0000-0000-0000-DEADBEEFC0DE</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>DRM</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="DRM Protect Attachments" />
+  <Description DefaultValue="Auto-encrypts outgoing email attachments using your DRM policy." />
+  <IconUrl DefaultValue="${SERVER_BASE_URL}/outlook-addin/icon-64.png" />
+  <HighResolutionIconUrl DefaultValue="${SERVER_BASE_URL}/outlook-addin/icon-128.png" />
+  <SupportUrl DefaultValue="${SERVER_BASE_URL}/outlook-addin/" />
+  <AppDomains>
+    <AppDomain>${SERVER_BASE_URL}</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5" />
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="${SERVER_BASE_URL}/outlook-addin/taskpane.html" />
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadWriteMailbox</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" />
+    <Rule xsi:type="ItemIs" ItemType="AppointmentAttendee" />
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+</OfficeApp>

@@ -548,3 +548,36 @@ Server-side integration with Box (cloud storage) lets administrators connect a B
 Webhook signatures use `HMAC-SHA256(secret, raw-body)` base64-encoded, compared with `CryptographicOperations.FixedTimeEquals` to prevent timing attacks. The webhook endpoint reads the raw request body before any framework parsing to ensure the signature applies to the exact bytes Box sent.
 
 This phase delivers the data and admin plane for Box integration. The Box file-content download → encrypt → re-upload data plane is deferred to a follow-up phase (configuration and webhook surface ship now so the admin workflow is visible).
+
+## Phase 5AK Outlook Add-in Integration
+
+Delivers an Office Web Add-in that scans outgoing email attachments and registers each one with the DRM server. Auto-encryption policy is configured per tenant from the admin console; the add-in itself is a standard Office 365 manifest sideloadable across Outlook desktop, web, and mobile.
+
+### Capabilities
+
+- **Per-tenant Outlook config** — Enabled flag, auto-encrypt toggle, minimum attachment size in KB, comma-separated skip domains, optional default policy template, lifetime protected counter
+- **Skip-domain rules** — recipient domains in the skip list short-circuit protection (e.g., internal-only addresses)
+- **Size threshold** — attachments smaller than the configured floor are passed through unchanged
+- **Activity feed** — every scanned attachment generates an `OutlookAttachmentEventEntity` row with sender, recipient list, file name + size, status, and optional protected file ID
+- **Manifest endpoint** — `GET /outlook-addin/manifest.xml` returns a sideload-ready Office manifest (`${SERVER_BASE_URL}` placeholder must be replaced with the deployment URL)
+- **Task pane** — `GET /outlook-addin/taskpane.html` hosts a 250 px Office.js panel with Scan button and credential inputs persisted in `localStorage`
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` | `/api/admin/outlook/config` | Upsert per-tenant configuration |
+| `GET` | `/api/admin/outlook/config?tenantId=...` | Retrieve configuration including lifetime protected counter |
+| `GET` | `/api/admin/outlook/events?tenantId=...&limit=N` | Recent attachment events newest-first (max 200) |
+| `POST` | `/api/outlook/protect-attachment` | Add-in calls this with attachment metadata; returns one of `protected`, `skipped_recipient_domain`, `skipped_below_min_size`, `skipped_auto_disabled`. Requires the standard client API key header. |
+| `GET` | `/api/outlook/status?tenantId=...` | Public-by-design status check for the add-in (enabled, auto-encrypt, min size, lifetime count) |
+
+### Sideload instructions
+
+1. In the DRM admin console open **Outlook** panel, click **Load**, and copy the manifest URL shown
+2. Download the manifest, replace every `${SERVER_BASE_URL}` token with your DRM server URL (e.g., `https://drm.example.com`)
+3. In Outlook: **Get Add-ins → My add-ins → Add a custom add-in → Add from file**, select the edited manifest
+4. Open the **DRM Protect Attachments** task pane and enter Server URL, Tenant ID, and Client API key (values are cached in `localStorage` for the next session)
+5. Click **Scan & register attachments** on any composed message — every attachment generates an event row visible in the admin events table
+
+This phase ships the configuration plane, classification logic, manifest, and task pane. The attachment-content upload + encrypted .drmx replacement data plane is deferred to a follow-up — current behaviour registers metadata so administrators can audit attachment flow end-to-end.

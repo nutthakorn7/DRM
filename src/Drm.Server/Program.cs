@@ -132,6 +132,35 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_BoxWebhookEvents_TenantId_ReceivedAtUtc"
             ON "BoxWebhookEvents" ("TenantId", "ReceivedAtUtc");
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantOutlookIntegrationConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantOutlookIntegrationConfigs" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "AutoEncryptOutgoingAttachments" INTEGER NOT NULL DEFAULT 1,
+                "MinAttachmentSizeKb" INTEGER NOT NULL DEFAULT 0,
+                "SkipDomainsCsv" TEXT NOT NULL DEFAULT '',
+                "DefaultPolicyTemplateId" TEXT NULL,
+                "LifetimeProtectedCount" INTEGER NOT NULL DEFAULT 0,
+                "UpdatedAtUtc" TEXT NOT NULL DEFAULT ''
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OutlookAttachmentEvents" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_OutlookAttachmentEvents" PRIMARY KEY AUTOINCREMENT,
+                "TenantId" TEXT NOT NULL,
+                "SenderEmail" TEXT NOT NULL DEFAULT '',
+                "RecipientCsv" TEXT NOT NULL DEFAULT '',
+                "AttachmentName" TEXT NOT NULL DEFAULT '',
+                "AttachmentSizeBytes" INTEGER NOT NULL DEFAULT 0,
+                "Status" TEXT NOT NULL DEFAULT '',
+                "ProtectedFileId" TEXT NULL,
+                "OccurredAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OutlookAttachmentEvents_TenantId_Id"
+            ON "OutlookAttachmentEvents" ("TenantId", "Id");
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;
@@ -351,6 +380,8 @@ app.MapAdminExternalShareSettingsEndpoints();
 app.MapAdminDirectorySyncEndpoints();
 app.MapAdminBoxIntegrationEndpoints();
 app.MapBoxWebhookEndpoints();
+app.MapAdminOutlookIntegrationEndpoints();
+app.MapOutlookAddInEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

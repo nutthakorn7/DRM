@@ -232,6 +232,68 @@ public partial class MainWindow : Window
         StatusText.Text = message;
     }
 
+    private async void CheckOutlookStatusButton_Click(object sender, RoutedEventArgs e)
+    {
+        CheckOutlookStatusButton.IsEnabled = false;
+        OutlookStatusText.Text = "Checking…";
+        OutlookStatusDot.Fill = System.Windows.Media.Brushes.Gold;
+
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+
+            using var response = await httpClient.GetAsync(
+                $"/api/admin/outlook/config?tenantId={tenantId}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                OutlookStatusText.Text = "Not configured";
+                OutlookStatusDot.Fill = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                OutlookStatusText.Text = $"Error {(int)response.StatusCode}";
+                OutlookStatusDot.Fill = System.Windows.Media.Brushes.IndianRed;
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            var enabled = document.RootElement.TryGetProperty("enabled", out var enEl) && enEl.GetBoolean();
+            var lifetime = document.RootElement.TryGetProperty("lifetimeProtectedCount", out var lpEl)
+                ? lpEl.GetInt32()
+                : 0;
+
+            if (enabled)
+            {
+                OutlookStatusText.Text = $"Enabled • {lifetime} protected";
+                OutlookStatusDot.Fill = System.Windows.Media.Brushes.MediumSeaGreen;
+            }
+            else
+            {
+                OutlookStatusText.Text = "Disabled";
+                OutlookStatusDot.Fill = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x9C, 0xA3, 0xAF));
+            }
+        }
+        catch (Exception exception)
+        {
+            OutlookStatusText.Text = $"Error: {exception.Message}";
+            OutlookStatusDot.Fill = System.Windows.Media.Brushes.IndianRed;
+        }
+        finally
+        {
+            CheckOutlookStatusButton.IsEnabled = true;
+        }
+    }
+
     private async void CheckBoxStatusButton_Click(object sender, RoutedEventArgs e)
     {
         CheckBoxStatusButton.IsEnabled = false;
