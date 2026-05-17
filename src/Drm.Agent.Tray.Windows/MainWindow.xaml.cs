@@ -784,10 +784,42 @@ public partial class MainWindow : Window
 
     private void PrefillSourcePathFromCommandLine()
     {
-        var sourcePath = TryGetCommandLineValue("--protect", Environment.GetCommandLineArgs());
+        var args = Environment.GetCommandLineArgs();
+        var sourcePath = TryGetCommandLineValue("--protect", args);
         if (!string.IsNullOrWhiteSpace(sourcePath))
         {
             SourcePathBox.Text = sourcePath;
+        }
+
+        // Phase 5AS-shell: the Windows Explorer right-click entries
+        // ("DRM → Protect…" / "DRM → Transparent protect" /
+        // "DRM → Quick send") pass the dropped file via these flags.
+        var quickProtectPath = TryGetCommandLineValue("--quick-protect", args);
+        if (!string.IsNullOrWhiteSpace(quickProtectPath) && File.Exists(quickProtectPath))
+        {
+            quickPickedFile = quickProtectPath;
+            if (QuickDropFile != null)
+            {
+                QuickDropFile.Text = Path.GetFileName(quickProtectPath);
+            }
+        }
+
+        var transparentProtectPath = TryGetCommandLineValue("--transparent-protect", args);
+        if (!string.IsNullOrWhiteSpace(transparentProtectPath) && File.Exists(transparentProtectPath))
+        {
+            SourcePathBox.Text = transparentProtectPath;
+            // Also pre-load the transparent drop hint so the operator sees
+            // which file the shell handed over.
+            if (TransparentDropHint != null)
+            {
+                TransparentDropHint.Text = $"Ready: {Path.GetFileName(transparentProtectPath)} — fill server info and click Protect.";
+            }
+        }
+
+        var quickSendRecipient = TryGetCommandLineValue("--quick-send-to", args);
+        if (!string.IsNullOrWhiteSpace(quickSendRecipient) && QuickRecipientBox != null)
+        {
+            QuickRecipientBox.Text = quickSendRecipient;
         }
     }
 

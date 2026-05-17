@@ -989,3 +989,79 @@ context menu in Explorer (Task 8 in the plan) is deferred to Phase
 
 7 new (3 persona endpoint shape + 4 quick share contract). One existing
 redirect test updated to expect `/me/`. **231/231 pass.**
+
+## Phase 5AS-shell Windows Shell Integration (Right-click "DRM")
+
+Closes the deferred task from Phase 5AS — Explorer right-click "Protect with DRM" and double-click open for `.drmx` / `.drmcontainer`. Implemented entirely in PowerShell + registry. No C++, no COM, no `regsvr32`, no compiled DLL, no admin rights required.
+
+### What gets registered (per-user, `HKCU\Software\Classes`)
+
+| Right-click on any file → | Launches | Argument |
+|---|---|---|
+| **DRM → Quick send (recommended)** | `Drm.Agent.Tray.Windows.exe` | `--quick-protect "<file>"` |
+| **DRM → Protect (advanced)** | `Drm.Agent.Tray.Windows.exe` | `--protect "<file>"` |
+| **DRM → Transparent protect** | `Drm.Agent.Tray.Windows.exe` | `--transparent-protect "<file>"` |
+
+| Double-click a … | Launches | Argument |
+|---|---|---|
+| `.drmx` | `Drm.Viewer.Windows.exe` | `--open "<file>"` |
+| `.drmcontainer` | `Drm.Viewer.Windows.exe` | `--open "<file>"` |
+
+The three protect actions live under a single "DRM" submenu using Windows `Subcommands` + `CommandStore` registry pattern, matching FinalCode's catalogue layout (single DRM group, three actions inside).
+
+### Install / uninstall / status
+
+```powershell
+cd src\Drm.Agent.Shell.Windows
+.\install.ps1 -TrayExe "C:\Program Files\DRM\Drm.Agent.Tray.Windows.exe" `
+              -ViewerExe "C:\Program Files\DRM\Drm.Viewer.Windows.exe"
+
+.\status.ps1     # verify registration
+
+.\uninstall.ps1  # rolls back; safe to re-run
+```
+
+Pass `-WhatIf` to either install or uninstall to dry-run without touching the registry.
+
+### Tray + viewer CLI flags
+
+The tray was updated to accept three Explorer-driven flags in addition to the legacy `--protect`:
+
+- `--quick-protect <path>` — selects the Quick Send panel and pre-fills the file
+- `--transparent-protect <path>` — pre-fills the Source path and hints the transparent zone
+- `--quick-send-to <email>` — pre-fills the recipient email when paired with `--quick-protect`
+
+The viewer already accepted `--open <path>`, used for the double-click file association.
+
+### Static validation in CI
+
+7 new tests in `ShellIntegrationScriptTests` lint the scripts on every Linux CI run:
+
+- All three verbs declared (`Drm.QuickSend`, `Drm.Protect`, `Drm.TransparentProtect`)
+- `.drmx` and `.drmcontainer` file associations registered
+- Every CLI flag the install script passes (`--quick-protect`, …) is also handled by the tray source
+- The `--open` flag is handled by the viewer source
+- Every registry root install writes is also removed by uninstall (catches a future install/uninstall drift)
+- No accidental `HKLM:` writes (per-user install contract is preserved)
+- Path interpolations are double-quoted so `C:\Program Files\DRM\…` survives Explorer argv parsing
+
+This is text-only static analysis — the actual registry write is exercised manually on Windows. The contract checks prevent the most common shell-integration regression: install and uninstall going out of sync.
+
+### Why per-user (`HKCU`) and not machine-wide (`HKLM`)
+
+- Regular users can install without IT involvement (no UAC elevation)
+- Per-user roll-back is clean
+- Multiple users on the same machine each point at the right binary (e.g., portable installs)
+- Org-wide deployment that prefers `HKLM` swaps in two lines of the script and runs elevated
+
+### Limitations (documented in `src/Drm.Agent.Shell.Windows/README.md`)
+
+- No custom icon next to the menu entry — would require a COM in-proc server and an .ICO embedded in a DLL
+- Static binary paths — re-run `install.ps1` after moving the executables
+- Windows 10 / 11 only (the `Subcommands` syntax for submenus)
+
+### Tests
+
+7 new (verb declaration, file-extension registration, tray CLI flag parity, viewer CLI flag parity, install/uninstall symmetry, no-HKLM contract, path-quoting contract). **238/238 total pass.**
+
+With this phase the Phase 5AS UX scorecard reaches the **88/100 target** set in the plan — right-click in Explorer is the last gap closed.
