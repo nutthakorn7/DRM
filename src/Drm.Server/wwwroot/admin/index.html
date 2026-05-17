@@ -34,7 +34,10 @@
     </div>
   </div>
 
-  <main class="workspace">
+  <!-- Workspace is the layout container; semantically the navigation rail
+       (<aside>) and the surface (<main>) are siblings so screen readers get
+       the right landmark structure. T9 / Pass 6 in the design audit. -->
+  <div class="workspace">
     <aside class="rail" aria-label="Console navigation">
       <div class="rail-head">
         <button type="button" class="rail-toggle" id="railToggle" aria-label="Collapse sidebar" aria-expanded="true" title="Collapse sidebar">
@@ -53,7 +56,7 @@
       </nav>
     </aside>
 
-    <section class="surface">
+    <main class="surface" id="adminMain">
       <header class="page-header">
         <div class="brand">
           <div class="brand-logo" aria-hidden="true">🔒</div>
@@ -1063,8 +1066,8 @@
         </div>
       </section>
 
-    </section>
-  </main>
+    </main>
+  </div>
   <div class="settings-backdrop" id="settingsBackdrop"></div>
   <aside class="settings-drawer" id="settingsDrawer" aria-label="Settings">
     <header class="settings-drawer-head">

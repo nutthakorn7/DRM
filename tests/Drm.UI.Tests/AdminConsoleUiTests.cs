@@ -131,6 +131,83 @@ public sealed class AdminConsoleUiTests
         status.Should().Contain("bob@guest.test");
     }
 
+    [Fact]
+    public async Task Admin_console_at_375px_renders_with_collapsed_rail_and_no_h1_wrap()
+    {
+        await using var context = await playwright.Browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            ViewportSize = new() { Width = 375, Height = 812 },
+        });
+        var page = await context.NewPageAsync();
+
+        await page.GotoAsync($"{server.BaseUrl}/admin/");
+        await SkipWelcomeAsync(page);
+
+        // Workspace grid collapses the rail to an icon-only column on mobile.
+        // (Either the mobile @media 56px rule or the data-rail-collapsed 64px
+        // rule wins depending on CSS specificity — both count as "icon only".)
+        var railWidth = await page.Locator(".rail").EvaluateAsync<int>("e => e.offsetWidth");
+        railWidth.Should().BeLessThan(100, "rail must collapse to icon-only width on mobile");
+
+        // Page-header h1 should be exactly one line (line-height ~1.2 × 20px ≈ 24px).
+        var h1Height = await page.Locator(".page-header .brand-text h1")
+            .EvaluateAsync<int>("e => e.offsetHeight");
+        h1Height.Should().BeLessThan(30, "h1 must fit on one line on a 375px viewport");
+
+        // "Admin console" subtitle should hide on mobile to free horizontal space.
+        var hintHeight = await page.Locator(".page-header .brand-text .hint")
+            .EvaluateAsync<int>("e => e.offsetHeight");
+        hintHeight.Should().Be(0, "admin-console hint is hidden on mobile");
+    }
+
+    [Fact]
+    public async Task Me_send_form_is_immediately_usable_with_no_blocking_modals()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+
+        await page.GotoAsync($"{server.BaseUrl}/me/");
+
+        // No persona modal, no tour overlay on first visit.
+        var modalCount = await page.Locator(".role-picker-overlay, .tour-overlay").CountAsync();
+        modalCount.Should().Be(0, "/me/ should not greet a new user with any blocking modal");
+
+        // The send form is rendered and the Personalize escape hatch is present.
+        var dropZoneHeight = await page.Locator("#dropZone").EvaluateAsync<int>("e => e.offsetHeight");
+        dropZoneHeight.Should().BeGreaterThan(0, "drop zone is visible on first visit");
+
+        var personalizeVisible = await page.Locator("#personalizeLink").IsVisibleAsync();
+        personalizeVisible.Should().BeTrue("Personalize topbar link is the opt-in path for the persona picker");
+    }
+
+    [Fact]
+    public async Task Share_viewer_step2_form_is_pointer_events_none_until_step1_completes()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+
+        await page.GotoAsync($"{server.BaseUrl}/share/");
+
+        // On a fresh load (no JS-driven success yet), step 2 is muted + un-clickable.
+        var step2 = page.Locator("#confirmStep");
+        var pointerEvents = await step2.EvaluateAsync<string>("e => getComputedStyle(e).pointerEvents");
+        pointerEvents.Should().Be("none", "step 2 must be pointer-events:none until step 1 success");
+
+        var opacity = await step2.EvaluateAsync<double>("e => parseFloat(getComputedStyle(e).opacity)");
+        opacity.Should().BeLessThan(0.6, "step 2 must look visually muted");
+
+        // Simulate the step-1 success transition that the JS does, then assert step 2
+        // becomes interactive. We don't actually call the API — we just flip the
+        // class the way startVerification() does — because that's the bit the UI
+        // contract guarantees.
+        await page.EvaluateAsync(
+            "() => { document.getElementById('startStep').classList.add('complete'); "
+            + "document.getElementById('confirmStep').classList.add('active'); }");
+
+        var pointerEventsAfter = await step2.EvaluateAsync<string>("e => getComputedStyle(e).pointerEvents");
+        pointerEventsAfter.Should().Be("auto", "step 2 becomes interactive once it has .active");
+    }
+
     /// <summary>
     /// Walks past the welcome screen by setting the localStorage flag and the
     /// pre-populated tenant ID, then reloading. Mirrors the "I already have
