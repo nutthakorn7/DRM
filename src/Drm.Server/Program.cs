@@ -440,6 +440,7 @@ using (var scope = app.Services.CreateScope())
 app.UseAdminApiKeyAuthentication();
 app.UseScimBearerAuthentication();
 app.UseClientApiKeyAuthentication();
+app.UseTenantHeaderContext();
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.Equals("/", StringComparison.OrdinalIgnoreCase))

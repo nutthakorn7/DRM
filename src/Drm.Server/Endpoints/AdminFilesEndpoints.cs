@@ -128,6 +128,11 @@ public static class AdminFilesEndpoints
         IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var file = await dbContext.ProtectedFiles
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -252,14 +257,20 @@ public static class AdminFilesEndpoints
         return TypedResults.Ok(ExternalShareLinkResponse.From(shareLink));
     }
 
-    private static async Task<Results<Ok<RevokeFileResponse>, NotFound>> RevokeFileAsync(
+    private static async Task<Results<Ok<RevokeFileResponse>, BadRequest<ErrorResponse>, NotFound>> RevokeFileAsync(
         Guid fileId,
         RevokeFileRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         ISiemDispatcher siemDispatcher,
         IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var file = await dbContext.ProtectedFiles
             .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId, cancellationToken);
 
@@ -299,9 +310,15 @@ public static class AdminFilesEndpoints
     private static async Task<Results<Created<FileGrantResponse>, BadRequest<ErrorResponse>, NotFound>> UpsertGrantAsync(
         Guid fileId,
         UpsertFileGrantRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (!Enum.TryParse<GrantSubjectType>(request.SubjectType, ignoreCase: true, out var subjectType)
             || !Enum.IsDefined(subjectType))
         {

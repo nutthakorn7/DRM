@@ -43,7 +43,13 @@ public sealed class QuickShareEndpointsTests : IDisposable
         var result = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
         result.Should().NotBeNull();
         result!.FileId.Should().NotBe(Guid.Empty);
-        result.ShareUrl.Should().Contain("/share/?token=");
+        // Share URL now mirrors AdminFilesEndpoints' BuildExternalShareUrl
+        // shape so recipients land on a pre-filled /share/ form without
+        // typing a tenant GUID. See SECURITY.md and the share UX commit.
+        result.ShareUrl.Should().Contain("/share/?");
+        result.ShareUrl.Should().Contain("tenantId=");
+        result.ShareUrl.Should().Contain("accessToken=");
+        result.ShareUrl.Should().Contain("guestEmail=");
         result.RecipientEmail.Should().Be("bob@example.com");
         result.Permissions.Should().Be("View");
         result.OriginalFileSizeBytes.Should().Be("PITCH DECK BYTES"u8.Length);

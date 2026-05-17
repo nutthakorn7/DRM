@@ -607,7 +607,7 @@ async function refreshStatusDashboard() {
     probe("directory", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/directory/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -617,7 +617,7 @@ async function refreshStatusDashboard() {
     probe("box", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/box/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -627,7 +627,7 @@ async function refreshStatusDashboard() {
     probe("outlook", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/outlook/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -637,7 +637,7 @@ async function refreshStatusDashboard() {
     probe("folder-watcher", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/folder-watcher/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -648,7 +648,7 @@ async function refreshStatusDashboard() {
     }),
     probe("license", async () => {
       const r = await fetch("/api/admin/license", {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
       const c = await r.json();
@@ -664,7 +664,7 @@ async function refreshStatusDashboard() {
     probe("containers", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/secure-containers?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value }
+        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
       const list = await r.json();
@@ -1672,11 +1672,16 @@ async function disableDevice(deviceId) {
 
 async function apiFetch(url, options = {}) {
   const adminKey = requireAdminKey();
+  // Pass tenant ID via X-DRM-Tenant-Id so the server can cross-check it
+  // against whatever the request body carries. Body-side tenantId is still
+  // accepted today; the header is the long-term canonical source.
+  const tenantHeader = (tenantIdInput?.value || "").trim();
   const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       "X-DRM-Admin-Key": adminKey,
+      ...(tenantHeader ? { "X-DRM-Tenant-Id": tenantHeader } : {}),
       ...(options.headers || {})
     }
   });
@@ -1695,10 +1700,12 @@ async function apiFetch(url, options = {}) {
 
 async function apiFetchBlob(url, options = {}) {
   const adminKey = requireAdminKey();
+  const tenantHeader = (tenantIdInput?.value || "").trim();
   const response = await fetch(url, {
     ...options,
     headers: {
       "X-DRM-Admin-Key": adminKey,
+      ...(tenantHeader ? { "X-DRM-Tenant-Id": tenantHeader } : {}),
       ...(options.headers || {})
     }
   });

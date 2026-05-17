@@ -1067,4 +1067,70 @@ public sealed class AdminFilesApiTests : IDisposable
         string ReasonCode,
         string? WatermarkTemplate,
         DateTimeOffset? OfflineLeaseExpiresAtUtc = null);
+
+    // ─── X-DRM-Tenant-Id header assertion (see SECURITY.md) ────────────
+
+    [Fact]
+    public async Task Tenant_header_matches_body_grant_succeeds()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var granteeUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, ownerUserId, permissions: "View");
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var grantRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/admin/files/{fileId}/grants")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId,
+                subjectType = "User",
+                subjectId = granteeUserId,
+                permissions = "View"
+            })
+        };
+        grantRequest.Headers.Add("X-DRM-Tenant-Id", tenantId.ToString());
+
+        using var response = await client.SendAsync(grantRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Tenant_header_mismatch_body_grant_rejected_as_tenant_mismatch()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+
+        using var register = await RegisterFileAsync(client, tenantId, fileId, ownerUserId, permissions: "View");
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var grantRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/admin/files/{fileId}/grants")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId,                         // body says tenantId
+                subjectType = "User",
+                subjectId = Guid.NewGuid(),
+                permissions = "View"
+            })
+        };
+        grantRequest.Headers.Add("X-DRM-Tenant-Id", otherTenantId.ToString()); // header says otherTenantId
+
+        using var response = await client.SendAsync(grantRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var error = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        error!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
 }
