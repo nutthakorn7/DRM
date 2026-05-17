@@ -41,10 +41,37 @@ select {
 .rail {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 28px;
   padding: 28px 24px;
   color: #f4f1ea;
   background: #20201d;
+}
+
+.rail .brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rail .brand .hint {
+  color: #c7bda9;
+  font-size: 12px;
+  margin: 4px 0 0 0;
+}
+
+.rail .rail-secondary {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #3a3a36;
+}
+
+.rail .rail-secondary .eyebrow {
+  margin-bottom: 6px;
+}
+
+.rail .rail-secondary a {
+  font-size: 13px;
+  padding: 6px 0;
 }
 
 .rail h1,
