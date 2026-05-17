@@ -69,6 +69,66 @@ if (forgetSessionBtn) {
   });
 }
 
+// Tab navigation: 5 tabs (overview, identity, policy, files, integrations)
+// collapsing the 19-panel /admin/ console into one tab at a time.
+(function initTabs() {
+  const VALID_TABS = new Set(["overview", "identity", "policy", "files", "integrations"]);
+  const TAB_KEY = "drm:adminActiveTab";
+
+  function readDesiredTab() {
+    const hash = (location.hash || "").replace(/^#/, "");
+    if (hash.startsWith("tab-")) {
+      const candidate = hash.slice(4);
+      if (VALID_TABS.has(candidate)) return candidate;
+    }
+    const stored = localStorage.getItem(TAB_KEY);
+    return VALID_TABS.has(stored) ? stored : "overview";
+  }
+
+  function setActiveTab(name, { fromHash = false } = {}) {
+    if (!VALID_TABS.has(name)) name = "overview";
+    document.body.dataset.activeTab = name;
+    document.querySelectorAll(".tab-link").forEach((btn) => {
+      const isActive = btn.dataset.tabLink === name;
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    localStorage.setItem(TAB_KEY, name);
+    if (!fromHash) {
+      const newHash = `#tab-${name}`;
+      if (location.hash !== newHash) {
+        history.replaceState(null, "", newHash);
+      }
+    }
+  }
+
+  document.querySelectorAll(".tab-link").forEach((btn) => {
+    btn.addEventListener("click", () => setActiveTab(btn.dataset.tabLink));
+  });
+
+  // Sidebar anchors like <a href="#users"> point at panel IDs; auto-switch
+  // to the owning tab before the browser scrolls to the target so the
+  // panel is actually visible.
+  document.querySelectorAll('aside.sidebar a[href^="#"], nav a[href^="#"]').forEach((link) => {
+    link.addEventListener("click", (event) => {
+      const id = link.getAttribute("href").slice(1);
+      if (!id) return;
+      const target = document.getElementById(id);
+      const owningTab = target?.dataset.tab;
+      if (owningTab && VALID_TABS.has(owningTab)) {
+        setActiveTab(owningTab);
+        // Wait one frame so the now-visible panel can be scrolled into view.
+        requestAnimationFrame(() => target.scrollIntoView({ behavior: "smooth", block: "start" }));
+        event.preventDefault();
+      }
+    });
+  });
+
+  window.addEventListener("hashchange", () => setActiveTab(readDesiredTab(), { fromHash: true }));
+  setActiveTab(readDesiredTab(), { fromHash: true });
+
+  window.__drmSetActiveTab = setActiveTab; // expose for search-bar use
+})();
+
 // Global search: hit `/` anywhere to jump to the panel-filter input.
 const globalSearch = document.querySelector("#globalSearch");
 if (globalSearch) {
@@ -87,6 +147,14 @@ if (globalSearch) {
   });
   globalSearch.addEventListener("input", () => {
     const q = globalSearch.value.trim().toLowerCase();
+    if (q) {
+      // While searching, show panels from every tab — search trumps tab.
+      document.body.dataset.activeTab = "all";
+    } else if (window.__drmSetActiveTab) {
+      // Empty query — restore the user's last tab choice.
+      const stored = localStorage.getItem("drm:adminActiveTab") || "overview";
+      window.__drmSetActiveTab(stored, { fromHash: true });
+    }
     document.querySelectorAll("section.panel").forEach((panel) => {
       if (!q) { panel.hidden = false; return; }
       const haystack = (panel.querySelector("h3, h4")?.textContent ?? "").toLowerCase() +

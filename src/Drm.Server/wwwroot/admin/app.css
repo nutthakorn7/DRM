@@ -421,6 +421,74 @@ button.ghost:hover {
   margin: 12px 0;
 }
 
+.tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 18px 0;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.tab-nav .tab-link {
+  flex: 1 1 0;
+  min-width: 120px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 80ms, color 80ms, border-color 80ms;
+}
+
+.tab-nav .tab-link:hover {
+  background: rgba(164, 91, 19, 0.08);
+  color: var(--accent-dark);
+}
+
+.tab-nav .tab-link[aria-selected="true"] {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.tab-nav .tab-link[aria-selected="true"]:hover {
+  background: var(--accent-dark);
+  color: white;
+}
+
+.tab-nav .tab-icon { font-size: 1.05em; }
+
+/* Hide panels that don't match the active tab. The body carries a
+   data-active-tab attribute that the JS sets on load and toggle. */
+body[data-active-tab="overview"]     section.panel:not([data-tab="overview"]),
+body[data-active-tab="identity"]     section.panel:not([data-tab="identity"]),
+body[data-active-tab="policy"]       section.panel:not([data-tab="policy"]),
+body[data-active-tab="files"]        section.panel:not([data-tab="files"]),
+body[data-active-tab="integrations"] section.panel:not([data-tab="integrations"]) {
+  display: none;
+}
+
+/* When the user types into the global-search box, we set data-active-tab
+   to "all" so every panel is visible and the search-filter logic alone
+   decides what shows. */
+body[data-active-tab="all"] section.panel {
+  display: block;
+}
+
 .global-search-row .search-label {
   flex: 1 1 100%;
 }

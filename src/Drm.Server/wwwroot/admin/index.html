@@ -68,7 +68,25 @@
         </label>
       </section>
 
-      <section class="panel" id="notifications">
+      <nav class="tab-nav" aria-label="Section tabs" role="tablist">
+        <button type="button" class="tab-link" data-tab-link="overview" role="tab" aria-selected="true">
+          <span class="tab-icon">📊</span><span class="tab-label">Overview</span>
+        </button>
+        <button type="button" class="tab-link" data-tab-link="identity" role="tab" aria-selected="false">
+          <span class="tab-icon">👥</span><span class="tab-label">Identity</span>
+        </button>
+        <button type="button" class="tab-link" data-tab-link="policy" role="tab" aria-selected="false">
+          <span class="tab-icon">📋</span><span class="tab-label">Policy</span>
+        </button>
+        <button type="button" class="tab-link" data-tab-link="files" role="tab" aria-selected="false">
+          <span class="tab-icon">📁</span><span class="tab-label">Files</span>
+        </button>
+        <button type="button" class="tab-link" data-tab-link="integrations" role="tab" aria-selected="false">
+          <span class="tab-icon">🔌</span><span class="tab-label">Integrations</span>
+        </button>
+      </nav>
+
+      <section class="panel" id="notifications" data-tab="integrations">
         <div class="section-head">
           <div>
             <p class="eyebrow">Alerts</p>
@@ -91,7 +109,7 @@
         </form>
       </section>
 
-      <section class="panel" id="directory">
+      <section class="panel" id="directory" data-tab="identity">
         <div class="section-head">
           <div>
             <p class="eyebrow">Identity</p>
@@ -113,7 +131,7 @@
         <pre id="syncOutput" class="output-block"></pre>
       </section>
 
-      <section class="panel" id="box">
+      <section class="panel" id="box" data-tab="integrations">
         <div class="section-head">
           <div>
             <p class="eyebrow">Cloud storage</p>
@@ -160,7 +178,7 @@
         </div>
       </section>
 
-      <section class="panel" id="outlook">
+      <section class="panel" id="outlook" data-tab="integrations">
         <div class="section-head">
           <div>
             <p class="eyebrow">Email gateway</p>
@@ -213,7 +231,7 @@
         </div>
       </section>
 
-      <section class="panel" id="users">
+      <section class="panel" id="users" data-tab="identity">
         <div class="section-head">
           <div>
             <p class="eyebrow">Directory</p>
@@ -247,7 +265,7 @@
         </div>
       </section>
 
-      <section class="panel" id="groups">
+      <section class="panel" id="groups" data-tab="identity">
         <div class="section-head">
           <div>
             <p class="eyebrow">Directory</p>
@@ -285,7 +303,7 @@
         </div>
       </section>
 
-      <section class="panel" id="devices">
+      <section class="panel" id="devices" data-tab="identity">
         <div class="section-head">
           <div>
             <p class="eyebrow">Endpoint fleet</p>
@@ -355,7 +373,7 @@
         </div>
       </section>
 
-      <section class="panel" id="templates">
+      <section class="panel" id="templates" data-tab="policy">
         <div class="section-head">
           <div>
             <p class="eyebrow">Policy</p>
@@ -406,7 +424,7 @@
         </div>
       </section>
 
-      <section class="panel" id="watermarks">
+      <section class="panel" id="watermarks" data-tab="policy">
         <div class="section-head">
           <div>
             <p class="eyebrow">Policy</p>
@@ -490,7 +508,7 @@
         </div>
       </section>
 
-      <section class="panel" id="simulator">
+      <section class="panel" id="simulator" data-tab="policy">
         <div class="section-head">
           <div>
             <p class="eyebrow">Policy</p>
@@ -509,7 +527,7 @@
         <pre class="simulator-output" id="simulatorOutput">No simulation run.</pre>
       </section>
 
-      <section class="panel" id="files">
+      <section class="panel" id="files" data-tab="files">
         <div class="section-head">
           <div>
             <p class="eyebrow">Protection</p>
@@ -692,7 +710,7 @@
         </div>
       </section>
 
-      <section class="panel" id="siem">
+      <section class="panel" id="siem" data-tab="integrations">
         <div class="section-head">
           <div>
             <p class="eyebrow">Integrations</p>
@@ -730,7 +748,7 @@
         </div>
       </section>
 
-      <section class="panel" id="audit">
+      <section class="panel" id="audit" data-tab="overview">
         <div class="section-head">
           <div>
             <p class="eyebrow">Activity</p>
@@ -766,7 +784,7 @@
         </div>
       </section>
 
-      <section class="panel" id="dashboard">
+      <section class="panel" id="dashboard" data-tab="overview">
         <div class="section-head">
           <div>
             <p class="eyebrow">Server</p>
@@ -819,7 +837,7 @@
         </div>
       </section>
 
-      <section class="panel compact" id="status">
+      <section class="panel compact" id="status" data-tab="overview">
         <div>
           <p class="eyebrow">Server</p>
           <h3>Health</h3>
@@ -828,7 +846,7 @@
         <pre id="healthOutput">No check run.</pre>
       </section>
 
-      <section class="panel" id="transparent">
+      <section class="panel" id="transparent" data-tab="files">
         <div class="section-head">
           <div>
             <p class="eyebrow">Format</p>
@@ -868,7 +886,7 @@
         </div>
       </section>
 
-      <section class="panel" id="containers">
+      <section class="panel" id="containers" data-tab="files">
         <div class="section-head">
           <div>
             <p class="eyebrow">Format</p>
@@ -903,7 +921,7 @@
         <p class="hint">Drop a folder onto the Windows tray's "Create container" zone to seal it and register it here automatically.</p>
       </section>
 
-      <section class="panel" id="folder-watcher">
+      <section class="panel" id="folder-watcher" data-tab="integrations">
         <div class="section-head">
           <div>
             <p class="eyebrow">Server</p>
@@ -950,7 +968,7 @@
         </div>
       </section>
 
-      <section class="panel compact" id="license">
+      <section class="panel compact" id="license" data-tab="overview">
         <div>
           <p class="eyebrow">Subscription</p>
           <h3>License usage</h3>
