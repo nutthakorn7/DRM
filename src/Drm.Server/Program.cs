@@ -190,6 +190,37 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_TransparentProtectedFiles_TenantId"
             ON "TransparentProtectedFiles" ("TenantId");
             """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SecureContainers" (
+                "TenantId" TEXT NOT NULL,
+                "ContainerId" TEXT NOT NULL,
+                "OwnerUserId" TEXT NOT NULL,
+                "DisplayName" TEXT NOT NULL DEFAULT '',
+                "FileCount" INTEGER NOT NULL DEFAULT 0,
+                "TotalBytes" INTEGER NOT NULL DEFAULT 0,
+                "PolicyTemplateId" TEXT NULL,
+                "CreatedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_SecureContainers" PRIMARY KEY ("TenantId", "ContainerId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_SecureContainers_TenantId"
+            ON "SecureContainers" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SecureContainerFiles" (
+                "TenantId" TEXT NOT NULL,
+                "ContainerId" TEXT NOT NULL,
+                "OrdinalIndex" INTEGER NOT NULL,
+                "RelativePath" TEXT NOT NULL DEFAULT '',
+                "Size" INTEGER NOT NULL DEFAULT 0,
+                CONSTRAINT "PK_SecureContainerFiles" PRIMARY KEY ("TenantId", "ContainerId", "OrdinalIndex")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_SecureContainerFiles_TenantId_ContainerId"
+            ON "SecureContainerFiles" ("TenantId", "ContainerId");
+            """);
 
         var connection = dbContext.Database.GetDbConnection();
         var openedHere = connection.State != System.Data.ConnectionState.Open;
@@ -419,6 +450,7 @@ app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();
+app.MapAdminSecureContainersEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

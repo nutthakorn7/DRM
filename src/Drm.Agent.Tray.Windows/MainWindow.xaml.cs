@@ -333,6 +333,104 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ContainerDropZone_DragEnter(object sender, System.Windows.DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            e.Effects = System.Windows.DragDropEffects.Copy;
+            ContainerDropZone.BorderBrush = System.Windows.Media.Brushes.SteelBlue;
+            ContainerDropZone.Background = System.Windows.Media.Brushes.AliceBlue;
+        }
+        else
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void ContainerDropZone_DragLeave(object sender, System.Windows.DragEventArgs e)
+    {
+        ContainerDropZone.BorderBrush = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0xD1, 0xD5, 0xDB));
+        ContainerDropZone.Background = System.Windows.Media.Brushes.White;
+    }
+
+    private async void ContainerDropZone_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        ContainerDropZone_DragLeave(sender, e);
+        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) return;
+        if (e.Data.GetData(System.Windows.DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+
+        var folder = paths.FirstOrDefault(Directory.Exists);
+        if (folder is null)
+        {
+            SetStatus("Drop a folder (not a single file).");
+            return;
+        }
+
+        var passphrase = ContainerPassphraseBox.Password;
+        if (string.IsNullOrEmpty(passphrase) || passphrase.Length < 6)
+        {
+            SetStatus("Container passphrase must be at least 6 characters.");
+            return;
+        }
+
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            var ownerUserId = ParseRequiredGuid(UserIdBox.Text, "User ID");
+            var containerId = Guid.NewGuid();
+
+            var entries = new List<Drm.Crypto.SecureContainerEntry>();
+            foreach (var filePath in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(folder, filePath).Replace('\\', '/');
+                var bytes = await File.ReadAllBytesAsync(filePath);
+                entries.Add(new Drm.Crypto.SecureContainerEntry(rel, bytes));
+            }
+
+            if (entries.Count == 0)
+            {
+                SetStatus("Folder contains no files.");
+                return;
+            }
+
+            var key = Drm.Crypto.SecureContainer.DeriveKey(passphrase, containerId);
+            var container = Drm.Crypto.SecureContainer.Pack(containerId, entries, key);
+            var displayName = Path.GetFileName(folder);
+            if (string.IsNullOrWhiteSpace(displayName)) displayName = "secure-container";
+            var outPath = Path.Combine(Path.GetDirectoryName(folder.TrimEnd(Path.DirectorySeparatorChar))!, $"{displayName}.drmcontainer");
+            await File.WriteAllBytesAsync(outPath, container);
+
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+            var registerBody = new
+            {
+                tenantId,
+                containerId,
+                ownerUserId,
+                displayName,
+                policyTemplateId = (Guid?)null,
+                files = entries.Select(e => new { relativePath = e.RelativePath, size = (long)e.Content.Length }).ToList()
+            };
+            using var registerContent = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(registerBody),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            using var registerResponse = await httpClient.PostAsync("/api/admin/secure-containers", registerContent);
+            var registered = registerResponse.IsSuccessStatusCode;
+
+            SetStatus($"Container created: {outPath} ({entries.Count} files, {container.Length:N0} bytes). Server register: {(registered ? "ok" : (int)registerResponse.StatusCode)}.");
+            ContainerDropHint.Text = $"Last sealed: {displayName} ({entries.Count} files → {Path.GetFileName(outPath)})";
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Container create failed: {ex.Message}");
+        }
+    }
+
     private async void CheckLicenseButton_Click(object sender, RoutedEventArgs e)
     {
         CheckLicenseButton.IsEnabled = false;

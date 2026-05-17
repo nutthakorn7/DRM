@@ -50,6 +50,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TransparentProtectedFileEntity> TransparentProtectedFiles => Set<TransparentProtectedFileEntity>();
 
+    public DbSet<SecureContainerEntity> SecureContainers => Set<SecureContainerEntity>();
+
+    public DbSet<SecureContainerFileEntity> SecureContainerFiles => Set<SecureContainerFileEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -240,6 +244,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(t => t.TenantId);
             entity.Property(t => t.OriginalFileName).HasMaxLength(512);
             entity.Property(t => t.ContentType).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<SecureContainerEntity>(entity =>
+        {
+            entity.HasKey(c => new { c.TenantId, c.ContainerId });
+            entity.HasIndex(c => c.TenantId);
+            entity.Property(c => c.DisplayName).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<SecureContainerFileEntity>(entity =>
+        {
+            entity.HasKey(c => new { c.TenantId, c.ContainerId, c.OrdinalIndex });
+            entity.HasIndex(c => new { c.TenantId, c.ContainerId });
+            entity.Property(c => c.RelativePath).HasMaxLength(1024);
         });
     }
 }

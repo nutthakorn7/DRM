@@ -366,6 +366,38 @@ public sealed class BoxWebhookEventEntity
     public DateTimeOffset ReceivedAtUtc { get; set; }
 }
 
+public sealed class SecureContainerEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid ContainerId { get; set; }
+
+    public Guid OwnerUserId { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public int FileCount { get; set; }
+
+    public long TotalBytes { get; set; }
+
+    public Guid? PolicyTemplateId { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class SecureContainerFileEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid ContainerId { get; set; }
+
+    public int OrdinalIndex { get; set; }
+
+    public string RelativePath { get; set; } = string.Empty;
+
+    public long Size { get; set; }
+}
+
 public sealed class TransparentProtectedFileEntity
 {
     public Guid TenantId { get; set; }

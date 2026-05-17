@@ -751,3 +751,58 @@ Dropping any file (not just `.drmx`) onto the viewer fetches the trailer secret 
 ### Deferred to a follow-up phase
 
 The Windows shell extension that draws a lock-overlay badge on Explorer icons is intentionally deferred — it requires a separate COM-registered C++ / .NET project. This phase delivers the data model and verification surface, leaving icon decoration for Phase 5AO-shell.
+
+## Phase 5AP Secure Container (Folder-Level Encryption)
+
+FinalCode's "セキュアコンテナ" — encrypt an entire folder tree as one sealed `.drmcontainer` file. Internal files keep their relative paths so cross-file references (Illustrator linking to Photoshop assets, etc.) survive sealing.
+
+### Container format
+
+`Drm.Crypto.SecureContainer` produces a single binary file with this layout:
+
+```
+[magic            ]  8 B  "DRMSCONT"
+[version          ]  1 B  = 1
+[container id     ] 16 B  GUID
+[nonce            ] 12 B  AES-GCM nonce
+[tag              ] 16 B  AES-GCM auth tag
+[ciphertext length]  4 B  little-endian
+[ciphertext       ]  N B  AES-GCM ciphertext of the inner ZIP archive
+```
+
+The inner ZIP holds `manifest.json` plus every source file at its original relative path. Cross-file links inside the archive resolve naturally because relative paths are preserved.
+
+`Drm.Crypto.SecureContainer.DeriveKey(passphrase, containerId)` uses PBKDF2-HMAC-SHA256 with the container ID as salt and 100 000 iterations to turn a human passphrase into a 32-byte AES-GCM key. Wrong passphrase produces an `AuthenticationTagMismatchException` on unpack; tampering does the same.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/secure-containers` | Register a sealed container (metadata + file list, sizes only) |
+| `GET` | `/api/admin/secure-containers?tenantId=...` | List containers for a tenant |
+| `GET` | `/api/admin/secure-containers/{id}?tenantId=...` | Get container with file inventory |
+| `DELETE` | `/api/admin/secure-containers/{id}?tenantId=...` | Deregister |
+
+Every registration writes a `secure_container_registered` audit event. The server holds metadata only — the encrypted bytes stay on the operator's filesystem.
+
+### Admin console
+
+A new **Containers** nav link reveals the **Secure containers** panel listing each container with display name, owner, file count, total bytes, and delete action.
+
+### Windows tray
+
+Beside the existing **Transparent protect** drop zone, a new **Create secure container** zone takes a dropped *folder*. The tray:
+
+1. Reads every file in the folder recursively
+2. Derives an AES key from the operator's passphrase plus a fresh container GUID
+3. Calls `SecureContainer.Pack` to seal everything into a `.drmcontainer`
+4. Writes the container next to the original folder
+5. Registers metadata with the admin server
+
+### Windows viewer
+
+Dropping a `.drmcontainer` onto the viewer triggers a blue banner. The user enters the passphrase and clicks **Open container**; the viewer derives the key from the container's GUID + passphrase, unpacks via `SecureContainer.Unpack`, and lists every contained file with size.
+
+### Tests
+
+5 new crypto tests (round-trip, wrong-key auth failure, bad magic, key size validation, KDF determinism) + 3 admin API tests (full lifecycle + empty files + duplicate conflict) = 8 new, **208/208 total pass**.

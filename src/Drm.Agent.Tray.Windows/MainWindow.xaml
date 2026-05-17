@@ -1,7 +1,7 @@
 <Window x:Class="Drm.Agent.Tray.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DRM Agent" Height="900" Width="720" MinHeight="860" MinWidth="680"
+        Title="DRM Agent" Height="1040" Width="760" MinHeight="980" MinWidth="700"
         Background="#F7F8FA"
         AllowDrop="True"
         DragEnter="Window_DragEnter"
@@ -190,6 +190,36 @@
                                        Foreground="#9CA3AF"
                                        TextWrapping="Wrap" />
                         </Border>
+                    </StackPanel>
+                </Border>
+                <Border BorderBrush="#D1D5DB" BorderThickness="1" Background="#F9FAFB"
+                        Padding="10" Margin="0,10,0,0" CornerRadius="4">
+                    <StackPanel>
+                        <TextBlock Text="Create secure container (folder)"
+                                   FontWeight="SemiBold" Foreground="#374151" />
+                        <TextBlock Text="Drop an entire folder onto the box below. Every file becomes a single sealed .drmcontainer."
+                                   Foreground="#6B7280" TextWrapping="Wrap" Margin="0,4,0,8" />
+                        <Border x:Name="ContainerDropZone"
+                                Background="#FFFFFF"
+                                BorderBrush="#D1D5DB"
+                                BorderThickness="2"
+                                CornerRadius="6"
+                                Padding="12"
+                                AllowDrop="True"
+                                MinHeight="44"
+                                DragEnter="ContainerDropZone_DragEnter"
+                                DragLeave="ContainerDropZone_DragLeave"
+                                DragOver="ContainerDropZone_DragEnter"
+                                Drop="ContainerDropZone_Drop">
+                            <TextBlock x:Name="ContainerDropHint"
+                                       Text="Drop a folder here to seal it into a .drmcontainer"
+                                       Foreground="#9CA3AF"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBlock Text="Container passphrase:" Foreground="#6B7280" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <PasswordBox x:Name="ContainerPassphraseBox" Width="240" Height="22" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </StackPanel>

@@ -572,6 +572,42 @@ async function refreshTransparentFiles() {
   setStatus(`${files.length} transparent file${files.length === 1 ? "" : "s"} loaded`, "ok");
 }
 
+// Secure containers
+document.querySelector("#refreshSecureContainers").addEventListener("click", refreshSecureContainers);
+
+async function refreshSecureContainers() {
+  const tenantId = requireTenantId();
+  const items = await apiFetch(`/api/admin/secure-containers?tenantId=${encodeURIComponent(tenantId)}`);
+  const body = document.querySelector("#secureContainersBody");
+  if (!items.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">No secure containers yet.</td></tr>';
+    setStatus("No secure containers", "ok");
+    return;
+  }
+  body.innerHTML = items.map((c) => `
+    <tr>
+      <td>${escapeHtml(c.displayName)}</td>
+      <td><code>${escapeHtml(c.containerId)}</code></td>
+      <td><code>${escapeHtml(c.ownerUserId)}</code></td>
+      <td>${c.fileCount}</td>
+      <td>${formatBytes(c.totalBytes)}</td>
+      <td>${escapeHtml(formatDate(c.createdAtUtc))}</td>
+      <td><button class="danger" type="button" data-delete-container="${escapeHtml(c.containerId)}">Delete</button></td>
+    </tr>
+  `).join("");
+  body.querySelectorAll("[data-delete-container]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const cid = btn.dataset.deleteContainer;
+      await apiFetch(`/api/admin/secure-containers/${encodeURIComponent(cid)}?tenantId=${encodeURIComponent(tenantId)}`, {
+        method: "DELETE"
+      });
+      await refreshSecureContainers();
+      setStatus("Container deleted", "ok");
+    });
+  });
+  setStatus(`${items.length} secure container${items.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
 // License
 document.querySelector("#loadLicense").addEventListener("click", async () => {
   const license = await apiFetch("/api/admin/license");

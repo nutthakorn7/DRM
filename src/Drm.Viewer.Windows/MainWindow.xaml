@@ -66,6 +66,22 @@
             <TextBlock x:Name="TransparentBannerText" Foreground="#92400E"
                        TextWrapping="Wrap" FontSize="12" />
         </Border>
+        <Border Grid.Row="0" VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
+                Background="#DBEAFE" BorderBrush="#60A5FA" BorderThickness="0,1,0,0"
+                Padding="14,6" x:Name="ContainerBanner" Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock x:Name="ContainerBannerHeader" Foreground="#1E3A8A"
+                           TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="Passphrase:" Foreground="#1E3A8A" Margin="0,0,6,0" VerticalAlignment="Center" />
+                    <PasswordBox x:Name="ContainerOpenPassphraseBox" Width="220" Height="22" />
+                    <Button Content="Open container" Margin="8,0,0,0" Padding="10,2"
+                            Click="OpenContainerButton_Click" />
+                </StackPanel>
+                <ListBox x:Name="ContainerFilesList" Height="120" Margin="0,6,0,0"
+                         FontSize="11" Visibility="Collapsed" />
+            </StackPanel>
+        </Border>
 
         <DockPanel Grid.Row="1" Background="#1F2937" LastChildFill="True">
             <StackPanel DockPanel.Dock="Right"

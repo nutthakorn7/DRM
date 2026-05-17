@@ -95,6 +95,9 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private byte[]? droppedContainerBytes;
+    private string? droppedContainerPath;
+
     private async void Window_Drop(object sender, DragEventArgs e)
     {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -104,6 +107,15 @@ public partial class MainWindow : Window
 
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0)
         {
+            return;
+        }
+
+        var firstContainer = paths.FirstOrDefault(p =>
+            File.Exists(p) && p.EndsWith(".drmcontainer", StringComparison.OrdinalIgnoreCase));
+        if (firstContainer is not null)
+        {
+            await PrepareContainerAsync(firstContainer);
+            e.Handled = true;
             return;
         }
 
@@ -126,7 +138,63 @@ public partial class MainWindow : Window
         }
         else
         {
-            StatusText.Text = "Drop a .drmx protected file or a transparent-protected file.";
+            StatusText.Text = "Drop a .drmx, .drmcontainer, or transparent-protected file.";
+        }
+    }
+
+    private async Task PrepareContainerAsync(string path)
+    {
+        try
+        {
+            droppedContainerBytes = await File.ReadAllBytesAsync(path);
+            droppedContainerPath = path;
+            ContainerBanner.Visibility = Visibility.Visible;
+            ContainerFilesList.Visibility = Visibility.Collapsed;
+            ContainerBannerHeader.Text = $"Secure container detected: {Path.GetFileName(path)} ({droppedContainerBytes.Length:N0} bytes). Enter passphrase to list contents.";
+            StatusText.Text = $"Container ready: {Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Container load failed: {ex.Message}";
+        }
+    }
+
+    private void OpenContainerButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (droppedContainerBytes is null)
+        {
+            StatusText.Text = "Drop a .drmcontainer onto the window first.";
+            return;
+        }
+        var passphrase = ContainerOpenPassphraseBox.Password;
+        if (string.IsNullOrEmpty(passphrase))
+        {
+            StatusText.Text = "Enter the container passphrase.";
+            return;
+        }
+        try
+        {
+            // Sniff containerId from header to derive the key.
+            var headerOffset = Drm.Crypto.SecureContainer.Magic.Length + 1;
+            var containerIdBytes = droppedContainerBytes.AsSpan(headerOffset, 16).ToArray();
+            var containerId = new Guid(containerIdBytes);
+            var key = Drm.Crypto.SecureContainer.DeriveKey(passphrase, containerId);
+            var unpacked = Drm.Crypto.SecureContainer.Unpack(droppedContainerBytes, key);
+
+            ContainerFilesList.ItemsSource = unpacked.Manifest.Entries
+                .Select(e => $"{e.RelativePath}  ({e.Size:N0} bytes)")
+                .ToList();
+            ContainerFilesList.Visibility = Visibility.Visible;
+            ContainerBannerHeader.Text = $"Container opened: {unpacked.Entries.Count} files, container ID {containerId}";
+            StatusText.Text = $"Container unpacked ({unpacked.Entries.Count} files).";
+        }
+        catch (System.Security.Cryptography.AuthenticationTagMismatchException)
+        {
+            StatusText.Text = "Wrong passphrase or container has been tampered with.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Container open failed: {ex.Message}";
         }
     }
 

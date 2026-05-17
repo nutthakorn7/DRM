@@ -28,6 +28,7 @@
         <a href="#audit">Audit</a>
         <a href="#status">Status</a>
         <a href="#transparent">Transparent</a>
+        <a href="#containers">Containers</a>
         <a href="/admin/cases/" target="_blank">Use cases ↗</a>
       </nav>
     </aside>
@@ -801,6 +802,41 @@
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panel" id="containers">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Format</p>
+            <h3>Secure containers</h3>
+          </div>
+          <button id="refreshSecureContainers" type="button">Refresh</button>
+        </div>
+
+        <p class="hint">A secure container (<code>.drmcontainer</code>) seals an entire folder tree behind a single AES-GCM key. Files inside keep their relative paths and can cross-reference each other (e.g. Illustrator → linked Photoshop assets).</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Display name</th>
+                <th>Container ID</th>
+                <th>Owner</th>
+                <th>Files</th>
+                <th>Total bytes</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="secureContainersBody">
+              <tr>
+                <td colspan="7" class="empty">Click Refresh to load containers.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="hint">Drop a folder onto the Windows tray's "Create container" zone to seal it and register it here automatically.</p>
       </section>
 
       <section class="panel compact" id="license">
