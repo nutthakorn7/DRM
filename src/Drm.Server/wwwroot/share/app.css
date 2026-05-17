@@ -30,10 +30,50 @@ input {
   font: inherit;
 }
 
+.share-topbar {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.share-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-brand .share-logo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.share-brand strong {
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+}
+
+.share-brand .share-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  margin-left: 4px;
+}
+
 .viewer-shell {
   display: grid;
   grid-template-columns: minmax(360px, 0.86fr) minmax(420px, 1.14fr);
-  min-height: 100vh;
+  min-height: calc(100vh - 55px);
 }
 
 .workflow {

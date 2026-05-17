@@ -29,10 +29,28 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
+.topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar .brand::before {
+  content: "🔒";
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
 .topbar .brand strong {
   font-size: 1.1rem;
   letter-spacing: 0.04em;
-  margin-right: 12px;
+  margin-right: 4px;
 }
 
 .topbar .brand .badge {
