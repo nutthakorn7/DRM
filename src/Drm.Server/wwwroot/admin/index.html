@@ -58,7 +58,12 @@
             <p class="hint" id="railPersonaHint">Admin console</p>
           </div>
         </div>
-        <div class="status-line" id="connectionState">Not connected</div>
+        <div class="page-header-right">
+          <div class="status-line" id="connectionState">Not connected</div>
+          <button type="button" class="settings-trigger" id="settingsTrigger" aria-label="Open settings drawer" aria-expanded="false" title="Server health &amp; license">
+            <span aria-hidden="true">⚙</span>
+          </button>
+        </div>
       </header>
 
       <header class="topbar">
@@ -932,15 +937,6 @@
         </div>
       </section>
 
-      <section class="panel compact" id="status" data-tab="overview">
-        <div>
-          <p class="eyebrow">Server</p>
-          <h3>Health</h3>
-        </div>
-        <button id="checkHealth" type="button">Check /healthz</button>
-        <pre id="healthOutput">No check run.</pre>
-      </section>
-
       <section class="panel" id="transparent" data-tab="files">
         <div class="section-head">
           <div>
@@ -1063,7 +1059,29 @@
         </div>
       </section>
 
-      <section class="panel compact" id="license" data-tab="overview">
+    </section>
+  </main>
+  <div class="settings-backdrop" id="settingsBackdrop"></div>
+  <aside class="settings-drawer" id="settingsDrawer" aria-label="Settings">
+    <header class="settings-drawer-head">
+      <div>
+        <p class="eyebrow">Settings</p>
+        <h2>Server &amp; license</h2>
+      </div>
+      <button type="button" class="settings-close" id="settingsClose" aria-label="Close settings">×</button>
+    </header>
+
+    <div class="settings-drawer-body">
+      <section class="panel compact" id="status">
+        <div>
+          <p class="eyebrow">Server</p>
+          <h3>Health</h3>
+        </div>
+        <button id="checkHealth" type="button">Check /healthz</button>
+        <pre id="healthOutput">No check run.</pre>
+      </section>
+
+      <section class="panel compact" id="license">
         <div>
           <p class="eyebrow">Subscription</p>
           <h3>License usage</h3>
@@ -1072,8 +1090,9 @@
         <div id="licenseTiers" class="license-tiers"></div>
         <p class="hint">Free viewers = paid encrypters × 9. Configure tiers in <code>Drm:License:EnabledTiers</code>.</p>
       </section>
-    </section>
-  </main>
+    </div>
+  </aside>
+
   <script src="/admin/app.js" defer></script>
 </body>
 </html>

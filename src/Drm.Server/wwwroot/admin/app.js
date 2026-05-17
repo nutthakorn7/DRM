@@ -401,6 +401,34 @@ if (forgetSessionBtn) {
   if (skipBtn) skipBtn.addEventListener("click", dismiss);
 })();
 
+(function initSettingsDrawer() {
+  const trigger  = document.getElementById("settingsTrigger");
+  const drawer   = document.getElementById("settingsDrawer");
+  const backdrop = document.getElementById("settingsBackdrop");
+  const closeBtn = document.getElementById("settingsClose");
+  if (!trigger || !drawer || !backdrop) return;
+
+  function setOpen(open) {
+    drawer.dataset.open   = open ? "true" : "false";
+    backdrop.dataset.open = open ? "true" : "false";
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    document.body.style.overflow = open ? "hidden" : "";
+  }
+
+  trigger.addEventListener("click", () => {
+    const open = drawer.dataset.open !== "true";
+    setOpen(open);
+  });
+  closeBtn?.addEventListener("click", () => setOpen(false));
+  backdrop.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawer.dataset.open === "true") setOpen(false);
+  });
+
+  // Initialize closed but elements present in DOM so transitions work on first open.
+  setOpen(false);
+})();
+
 (function initRailToggle() {
   const KEY = "drm:railCollapsed";
   const workspace = document.querySelector(".workspace");
