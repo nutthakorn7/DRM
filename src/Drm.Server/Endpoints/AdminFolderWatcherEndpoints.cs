@@ -21,9 +21,15 @@ public static class AdminFolderWatcherEndpoints
 
     private static async Task<Results<Created<FolderWatcherConfigResponse>, Ok<FolderWatcherConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
         UpsertConfigRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
@@ -68,9 +74,15 @@ public static class AdminFolderWatcherEndpoints
 
     private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> ReportAsync(
         ServiceReportRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
@@ -92,9 +104,15 @@ public static class AdminFolderWatcherEndpoints
 
     private static async Task<Results<Created, BadRequest<ErrorResponse>>> PostEventAsync(
         ServiceEventRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));

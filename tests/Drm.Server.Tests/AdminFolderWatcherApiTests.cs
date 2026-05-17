@@ -141,4 +141,29 @@ public sealed class AdminFolderWatcherApiTests : IDisposable
         string Status,
         Guid? FileId,
         DateTimeOffset OccurredAtUtc);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Upsert_folder_watcher_config_with_mismatched_header_returns_400()
+    {
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Put, "/api/admin/folder-watcher/config")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(),
+                watchedFolders = Array.Empty<object>(),
+                enabled = true,
+            })
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
 }

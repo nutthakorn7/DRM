@@ -474,4 +474,30 @@ public sealed class AdminSiemWebhookTests : IDisposable
     }
 
     private sealed record SiemDelivery(SiemWebhookEntity Webhook, AuditEventEntity AuditEvent);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Create_siem_webhook_with_mismatched_header_returns_400()
+    {
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/siem-webhooks")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(),
+                webhookId = Guid.NewGuid(),
+                url = "https://siem.example.com/ingest",
+                enabled = true,
+            })
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
 }

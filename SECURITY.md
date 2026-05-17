@@ -105,15 +105,30 @@ right after parameter validation** — that's now the project convention.
 | 2026-05-18 | `POST /api/admin/transparent-files` (register) | `AdminTransparentFilesEndpoints.cs` |
 | 2026-05-18 | `DELETE /api/admin/transparent-files/{id}` (deregister) | `AdminTransparentFilesEndpoints.cs` |
 | 2026-05-18 | `POST /api/admin/transparent-files/stamp` | `AdminTransparentFilesEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/folder-watcher/config` | `AdminFolderWatcherEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/folder-watcher/report` | `AdminFolderWatcherEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/folder-watcher/events` | `AdminFolderWatcherEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/box/config` | `AdminBoxIntegrationEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/box/test-connection` | `AdminBoxIntegrationEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/outlook/config` | `AdminOutlookIntegrationEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/directory/config` | `AdminDirectorySyncEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/directory/sync` | `AdminDirectorySyncEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/siem-webhooks` | `AdminSiemEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/notification-config` | `AdminNotificationConfigEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/external-share-settings` (upsert) | `AdminExternalShareSettingsEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/external-share-settings/lockdown` | `AdminExternalShareSettingsEndpoints.cs` |
 
 **Endpoints with no tenant context** (not migrated, by design):
 - `POST /api/admin/transparent-files/verify` — request body is only `FileBytesBase64`;
   the HMAC trailer carries its own tenant info that's verified server-side.
 
-**Still on the list** (~15 mutating admin endpoints): folder-watcher config,
-SIEM webhook CRUD, Box / Outlook / Directory integration upsert, external-share
-settings, license updates, audit ingest. Migrate one file at a time per session;
-test coverage = at least one `tenant_mismatch` assertion per new file.
+**Migration complete.** All 33 mutating admin endpoints are now opted in.
+Body-side `tenantId` is still accepted for backwards compatibility on every
+endpoint, but every mutation rejects mismatches between the header and body
+with 400 `tenant_mismatch`. The web admin console always sends the header
+automatically via `apiFetch`. Direct-curl callers should start setting
+`X-DRM-Tenant-Id` so cross-tenant typos surface as deterministic 400s
+instead of silent data corruption.
 
 ---
 

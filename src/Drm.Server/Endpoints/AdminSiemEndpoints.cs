@@ -19,9 +19,15 @@ public static class AdminSiemEndpoints
 
     private static async Task<Results<Created<SiemWebhookResponse>, Conflict, BadRequest<ErrorResponse>>> CreateWebhookAsync(
         CreateSiemWebhookRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var validationError = await ValidateCreateRequestAsync(request, cancellationToken);
         if (validationError is not null)
         {

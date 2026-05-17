@@ -16,11 +16,17 @@ public static class AdminOutlookIntegrationEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<OutlookConfigResponse>, Ok<OutlookConfigResponse>>> UpsertConfigAsync(
+    private static async Task<Results<Created<OutlookConfigResponse>, Ok<OutlookConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
         OutlookConfigRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var existing = await dbContext.TenantOutlookIntegrationConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
 
@@ -118,4 +124,6 @@ public static class AdminOutlookIntegrationEndpoints
         string Status,
         string? ProtectedFileId,
         DateTimeOffset OccurredAtUtc);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

@@ -16,11 +16,17 @@ public static class AdminDirectorySyncEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<DirectorySyncConfigResponse>, Ok<DirectorySyncConfigResponse>>> UpsertConfigAsync(
+    private static async Task<Results<Created<DirectorySyncConfigResponse>, Ok<DirectorySyncConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
         DirectorySyncConfigRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var existing = await dbContext.TenantDirectorySyncConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
 
@@ -59,11 +65,17 @@ public static class AdminDirectorySyncEndpoints
             : TypedResults.Ok(DirectorySyncConfigResponse.From(config));
     }
 
-    private static async Task<Results<Ok<SyncResultResponse>, NotFound>> TriggerSyncAsync(
+    private static async Task<Results<Ok<SyncResultResponse>, NotFound, BadRequest<ErrorResponse>>> TriggerSyncAsync(
         TriggerSyncRequest request,
+        HttpContext httpContext,
         IDirectorySyncService syncService,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         try
         {
             var result = await syncService.SyncAsync(request.TenantId, cancellationToken);
@@ -101,4 +113,6 @@ public static class AdminDirectorySyncEndpoints
     }
 
     private sealed record SyncResultResponse(int UsersUpserted, int GroupsUpserted, int MembershipsUpserted);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

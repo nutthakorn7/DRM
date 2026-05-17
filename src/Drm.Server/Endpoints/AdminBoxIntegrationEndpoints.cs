@@ -17,11 +17,17 @@ public static class AdminBoxIntegrationEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<BoxConfigResponse>, Ok<BoxConfigResponse>>> UpsertConfigAsync(
+    private static async Task<Results<Created<BoxConfigResponse>, Ok<BoxConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
         BoxConfigRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var existing = await dbContext.TenantBoxIntegrationConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
 
@@ -61,11 +67,17 @@ public static class AdminBoxIntegrationEndpoints
             : TypedResults.Ok(BoxConfigResponse.From(config));
     }
 
-    private static async Task<Ok<BoxConnectionResponse>> TestConnectionAsync(
+    private static async Task<Results<Ok<BoxConnectionResponse>, BadRequest<ErrorResponse>>> TestConnectionAsync(
         TestConnectionRequest request,
+        HttpContext httpContext,
         IBoxIntegrationService boxService,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var result = await boxService.TestConnectionAsync(request.TenantId, cancellationToken);
         return TypedResults.Ok(new BoxConnectionResponse(result.Success, result.Status, result.ErrorMessage));
     }
@@ -121,4 +133,6 @@ public static class AdminBoxIntegrationEndpoints
         string SourceItemName,
         string? CreatedByEmail,
         DateTimeOffset ReceivedAtUtc);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

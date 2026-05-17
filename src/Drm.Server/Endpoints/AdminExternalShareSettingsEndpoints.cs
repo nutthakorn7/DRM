@@ -1458,9 +1458,15 @@ public static class AdminExternalShareSettingsEndpoints
 
     private static async Task<Results<Ok<ExternalShareSettingsResponse>, BadRequest<ErrorResponse>>> UpsertSettingsAsync(
         UpsertExternalShareSettingsRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
@@ -1587,9 +1593,15 @@ public static class AdminExternalShareSettingsEndpoints
 
     private static async Task<Results<Ok<ExternalShareLockdownResponse>, BadRequest<ErrorResponse>>> LockdownTenantExternalSharingAsync(
         LockdownExternalShareRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));

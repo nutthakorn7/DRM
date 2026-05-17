@@ -15,11 +15,17 @@ public static class AdminNotificationConfigEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<NotificationConfigResponse>, Ok<NotificationConfigResponse>>> UpsertConfigAsync(
+    private static async Task<Results<Created<NotificationConfigResponse>, Ok<NotificationConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
         NotificationConfigRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var existing = await dbContext.TenantAdminNotificationConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
 
@@ -81,4 +87,6 @@ public static class AdminNotificationConfigEndpoints
             => new(c.TenantId, c.AdminEmailsCsv, c.NotifyOnExternalShareViewed,
                    c.NotifyOnFileRevoked, c.NotifyOnAccessDenied, c.NotifyOnShareLinkCreated, c.UpdatedAtUtc);
     }
+
+    private sealed record ErrorResponse(string ReasonCode);
 }
