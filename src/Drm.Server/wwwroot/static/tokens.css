@@ -1,0 +1,59 @@
+/*
+ * DRM design tokens — shared by /admin, /me, /share, and reference pages.
+ * Source of truth for color, type scale, spacing, and surface chrome.
+ *
+ * Palette is teal-on-slate (descended from /share/'s scheme) — the design
+ * direction picked after this session's design audit.
+ *
+ * Surface-specific app.css files MAY override any token but should prefer
+ * inheriting from here so brand stays consistent.
+ */
+:root {
+  color-scheme: light;
+
+  /* Type */
+  --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-h1: 28px;
+  --text-h2: 22px;
+  --text-h3: 18px;
+  --text-body: 14px;
+  --text-small: 12px;
+  --text-xs: 11px;
+
+  /* Color — neutrals */
+  --ink: #16171a;
+  --muted: #666d75;
+  --line: #d9dde3;
+  --surface: #ffffff;
+  --page: #f3f4f6;
+  --rail: #20242a;
+  --rail-ink: #f4f1ea;
+  --rail-muted: #c7bda9;
+  --rail-line: #3a3a36;
+
+  /* Color — brand */
+  --accent: #275d72;
+  --accent-dark: #17485a;
+  --accent-soft: #eef5f7;
+  --accent-tint-12: rgba(39, 93, 114, 0.12);
+  --accent-tint-06: rgba(39, 93, 114, 0.06);
+
+  /* Color — semantic */
+  --ok: #1f7a47;
+  --ok-bg: #eaf6ee;
+  --error: #a02e2e;
+  --warning-bg: #fff4e5;
+  --warning-ink: #7a3f00;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 6px rgba(20, 30, 40, 0.04);
+  --shadow-drawer: -16px 0 48px -16px rgba(20, 30, 40, 0.18);
+}

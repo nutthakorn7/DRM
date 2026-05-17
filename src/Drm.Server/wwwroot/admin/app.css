@@ -1,18 +1,5 @@
-:root {
-  color-scheme: light;
-  --ink: #171717;
-  --muted: #666666;
-  --line: #dddddd;
-  --surface: #ffffff;
-  --page: #f5f5f2;
-  --accent: #a45b13;
-  --accent-dark: #6f3a08;
-  --ok: #1f7a47;
-  --error: #a02e2e;
-  --warning-bg: #fff4e5;
-  --warning-ink: #7a3f00;
-  --ok-bg: #eaf6ee;
-}
+/* Color + type tokens now live in /static/tokens.css.
+   This file overrides only what's specific to /admin/. */
 
 * {
   box-sizing: border-box;
@@ -46,7 +33,7 @@ select {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: radial-gradient(circle at 30% 20%, #fff7eb 0%, #f5f5f2 55%, #ece8df 100%);
+  background: radial-gradient(circle at 30% 20%, #f0f5f7 0%, var(--page) 55%, #dde3e8 100%);
   animation: welcomeFadeIn 220ms ease;
 }
 
@@ -113,7 +100,7 @@ select {
   height: 24px;
   display: grid;
   place-items: center;
-  background: #f5f5f2;
+  background: var(--page);
   border: 1px solid var(--line);
   border-radius: 50%;
   font-size: 12px;
@@ -179,8 +166,8 @@ select {
   flex-direction: column;
   gap: 28px;
   padding: 28px 24px;
-  color: #f4f1ea;
-  background: #20201d;
+  color: var(--rail-ink);
+  background: var(--rail);
   position: sticky;
   top: 0;
   align-self: start;
@@ -222,7 +209,7 @@ select {
   height: 40px;
   display: grid;
   place-items: center;
-  background: #a45b13;
+  background: var(--accent);
   color: #fff;
   border-radius: 10px;
   font-size: 20px;
@@ -363,8 +350,8 @@ select {
   display: grid;
   place-items: center;
   background: transparent;
-  color: #c7bda9;
-  border: 1px solid #3a3a36;
+  color: var(--rail-muted);
+  border: 1px solid var(--rail-line);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -408,7 +395,7 @@ select {
 .rail .rail-secondary {
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px solid #3a3a36;
+  border-top: 1px solid var(--rail-line);
 }
 
 .rail .rail-secondary .eyebrow {
@@ -443,7 +430,7 @@ select {
 }
 
 .rail .eyebrow {
-  color: #c7bda9;
+  color: var(--rail-muted);
 }
 
 nav {
@@ -452,7 +439,7 @@ nav {
 }
 
 nav a {
-  color: #d9d2c6;
+  color: var(--rail-muted);
   padding: 12px 0;
   min-height: 44px;
   display: flex;
@@ -791,7 +778,7 @@ button.ghost {
 }
 
 button.ghost:hover {
-  background: rgba(164, 91, 19, 0.08);
+  background: rgba(39, 93, 114, 0.08);
 }
 
 .global-search-row {
@@ -833,7 +820,7 @@ button.ghost:hover {
 }
 
 .tab-nav .tab-link:hover {
-  background: rgba(164, 91, 19, 0.08);
+  background: rgba(39, 93, 114, 0.08);
   color: var(--accent-dark);
 }
 
@@ -929,9 +916,9 @@ button.ghost:hover {
 }
 
 .subtab-nav .subtab-link:hover {
-  background: rgba(164, 91, 19, 0.08);
+  background: rgba(39, 93, 114, 0.08);
   color: var(--accent-dark);
-  border-color: rgba(164, 91, 19, 0.25);
+  border-color: rgba(39, 93, 114, 0.25);
 }
 
 .subtab-nav .subtab-link[aria-selected="true"] {
@@ -1207,14 +1194,14 @@ body[data-active-tab="all"] section.panel {
   align-items: center;
   padding: 2px 10px;
   border-radius: 999px;
-  background: rgba(164, 91, 19, 0.12);
+  background: rgba(39, 93, 114, 0.12);
   color: var(--accent-dark);
   font-size: 0.78rem;
   cursor: pointer;
-  border: 1px solid rgba(164, 91, 19, 0.3);
+  border: 1px solid rgba(39, 93, 114, 0.3);
 }
 
-.tag-chip:hover { background: rgba(164, 91, 19, 0.2); }
+.tag-chip:hover { background: rgba(39, 93, 114, 0.2); }
 
 .tag-chip.active {
   background: var(--accent);
@@ -1226,7 +1213,7 @@ body[data-active-tab="all"] section.panel {
   padding: 1px 8px;
   margin-right: 4px;
   border-radius: 999px;
-  background: rgba(164, 91, 19, 0.15);
+  background: rgba(39, 93, 114, 0.15);
   color: var(--accent-dark);
   font-size: 0.72rem;
 }

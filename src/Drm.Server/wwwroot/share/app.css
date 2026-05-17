@@ -1,16 +1,8 @@
+/* Color + type tokens now live in /static/tokens.css. */
 :root {
-  color-scheme: light;
-  --ink: #16171a;
-  --muted: #666d75;
-  --line: #d9dde3;
-  --surface: #ffffff;
-  --page: #f3f4f6;
-  --rail: #20242a;
-  --accent: #275d72;
-  --accent-dark: #17485a;
-  --ok: #1f7a47;
-  --error: #a02e2e;
-  --soft: #eef5f7;
+  /* /share/ uses --soft for the locked-preview backdrop; keep the legacy
+     alias so existing rules still resolve. */
+  --soft: var(--accent-soft);
 }
 
 * {

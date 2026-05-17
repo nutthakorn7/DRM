@@ -294,7 +294,7 @@ function maybeShowRolePicker() {
       <div style="font-size:24px;line-height:1">${role.icon}</div>
       <div style="margin-top:6px;font-weight:600;color:#111827">${role.title}</div>
       <div style="margin-top:4px;font-size:0.85rem;color:#6b7280;line-height:1.4">${role.blurb}</div>`;
-    btn.onmouseover = () => { btn.style.borderColor = "#a45b13"; btn.style.background = "#fff8f0"; };
+    btn.onmouseover = () => { btn.style.borderColor = "#275d72"; btn.style.background = "#eef5f7"; };
     btn.onmouseout = () => { btn.style.borderColor = "#e5e7eb"; btn.style.background = "#fff"; };
     btn.onclick = () => {
       localStorage.setItem(ROLE_PICKER_KEY, role.id);
@@ -342,7 +342,7 @@ function maybeShowTour() {
     const anchor = document.querySelector(stop.selector);
     card.innerHTML = `
       <p style="margin:0 0 12px 0;font-size:0.95rem;color:#111827">${stop.text}</p>
-      <button type="button" class="primary" style="padding:8px 18px;border-radius:6px;background:#a45b13;color:#fff;border:none;font-weight:600;cursor:pointer">${idx === stops.length - 1 ? "Finish" : "Next"}</button>
+      <button type="button" class="primary" style="padding:8px 18px;border-radius:6px;background:#275d72;color:#fff;border:none;font-weight:600;cursor:pointer">${idx === stops.length - 1 ? "Finish" : "Next"}</button>
       <button type="button" class="skip" style="margin-left:8px;padding:8px 12px;background:transparent;border:none;color:#6b7280;cursor:pointer">Skip</button>`;
     if (anchor) anchor.scrollIntoView({ block: "center" });
     card.querySelector(".primary").onclick = () => { idx++; render(); };
