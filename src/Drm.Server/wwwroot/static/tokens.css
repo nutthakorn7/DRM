@@ -1,59 +1,226 @@
 /*
  * DRM design tokens — shared by /admin, /me, /share, and reference pages.
- * Source of truth for color, type scale, spacing, and surface chrome.
  *
- * Palette is teal-on-slate (descended from /share/'s scheme) — the design
- * direction picked after this session's design audit.
+ * Three-tier token system:
+ *   1. Primitives  — raw values (color-teal-700, space-4, …)
+ *   2. Aliases     — semantic intent (--accent, --page, --text-h1, …)
+ *   3. Components  — component-scoped (--btn-bg, --field-border, …)
  *
- * Surface-specific app.css files MAY override any token but should prefer
- * inheriting from here so brand stays consistent.
+ * Surface CSS should consume aliases or component tokens whenever possible.
+ * Touch primitives only when designing a new system-level token.
+ *
+ * Brand direction: teal on slate. Picked after the 2026-05-17 design audit
+ * — /share/'s palette was judged the most polished, so it became the spine.
  */
 :root {
   color-scheme: light;
+
+  /* ───────────────────────────────────────────────────────────
+   * 1. PRIMITIVES — raw, unopinionated values.
+   * ─────────────────────────────────────────────────────────── */
+
+  /* Teal scale (brand) */
+  --color-teal-50:  #eef5f7;
+  --color-teal-100: #d4e3e9;
+  --color-teal-200: #aac9d3;
+  --color-teal-400: #4f7d8e;
+  --color-teal-600: #275d72;
+  --color-teal-700: #1f4d5f;
+  --color-teal-800: #17485a;
+  --color-teal-900: #0e2f3c;
+
+  /* Neutral scale (cool slate) */
+  --color-slate-50:  #f8f9fb;
+  --color-slate-100: #f3f4f6;
+  --color-slate-200: #e6e9ed;
+  --color-slate-300: #d9dde3;
+  --color-slate-500: #666d75;
+  --color-slate-700: #2d333a;
+  --color-slate-800: #20242a;
+  --color-slate-900: #16171a;
+
+  /* Warm neutrals (for the dark rail's text — kept for legibility on dark bg) */
+  --color-cream-50:  #f4f1ea;
+  --color-cream-200: #c7bda9;
+
+  /* Status scale */
+  --color-success-50:  #eaf6ee;
+  --color-success-500: #1f7a47;
+  --color-warning-50:  #fff4e5;
+  --color-warning-700: #7a3f00;
+  --color-danger-500:  #a02e2e;
+  --color-danger-700:  #7f1f1f;
+
+  /* Pure */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Spacing scale — 4px base, perceptual ratio */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  48px;
+  --space-10: 64px;
+
+  /* Type scale — 1.25 major third */
+  --text-xs:    11px;
+  --text-sm:    12px;
+  --text-body:  14px;
+  --text-lg:    16px;
+  --text-h3:    18px;
+  --text-h2:    22px;
+  --text-h1:    28px;
+  --text-hero:  36px;
+
+  /* Line heights */
+  --leading-tight: 1.15;
+  --leading-snug:  1.3;
+  --leading-body:  1.5;
+
+  /* Font weights */
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:    700;
+
+  /* Border widths */
+  --border-hair:   1px;
+  --border-medium: 2px;
+  --border-thick:  3px;
+
+  /* Radii */
+  --radius-sm:   6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-xs:     0 1px 2px rgba(20, 30, 40, 0.04);
+  --shadow-card:   0 2px 6px rgba(20, 30, 40, 0.04);
+  --shadow-pop:    0 8px 24px -8px rgba(20, 30, 40, 0.12);
+  --shadow-drawer: -16px 0 48px -16px rgba(20, 30, 40, 0.18);
+  --shadow-modal:  0 20px 60px -20px rgba(20, 30, 40, 0.25);
+
+  /* Motion */
+  --duration-fast:  120ms;
+  --duration-base:  180ms;
+  --duration-slow:  280ms;
+  --ease-out:       cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:    cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-index scale */
+  --z-base:      1;
+  --z-sticky:   50;
+  --z-backdrop: 80;
+  --z-drawer:   90;
+  --z-modal:   100;
+  --z-toast:   200;
+
+  /* Touch targets */
+  --touch-target: 44px;       /* WCAG/Apple HIG minimum */
+  --touch-target-sm: 36px;    /* secondary nav, pills */
+
+  /* Container widths (apply to docs / hero) */
+  --container-sm:   640px;
+  --container-md:   920px;
+  --container-lg:  1100px;
+  --container-xl:  1280px;
 
   /* Type */
   --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --text-h1: 28px;
-  --text-h2: 22px;
-  --text-h3: 18px;
-  --text-body: 14px;
-  --text-small: 12px;
-  --text-xs: 11px;
+  /* ───────────────────────────────────────────────────────────
+   * 2. ALIASES — semantic intent. Refer to these in surface CSS.
+   * ─────────────────────────────────────────────────────────── */
 
-  /* Color — neutrals */
-  --ink: #16171a;
-  --muted: #666d75;
-  --line: #d9dde3;
-  --surface: #ffffff;
-  --page: #f3f4f6;
-  --rail: #20242a;
-  --rail-ink: #f4f1ea;
-  --rail-muted: #c7bda9;
-  --rail-line: #3a3a36;
+  --ink:     var(--color-slate-900);
+  --muted:   var(--color-slate-500);
+  --line:    var(--color-slate-300);
+  --surface: var(--color-white);
+  --page:    var(--color-slate-100);
 
-  /* Color — brand */
-  --accent: #275d72;
-  --accent-dark: #17485a;
-  --accent-soft: #eef5f7;
+  --accent:        var(--color-teal-600);
+  --accent-dark:   var(--color-teal-800);
+  --accent-soft:   var(--color-teal-50);
   --accent-tint-12: rgba(39, 93, 114, 0.12);
   --accent-tint-06: rgba(39, 93, 114, 0.06);
 
-  /* Color — semantic */
-  --ok: #1f7a47;
-  --ok-bg: #eaf6ee;
-  --error: #a02e2e;
-  --warning-bg: #fff4e5;
-  --warning-ink: #7a3f00;
+  --rail:        var(--color-slate-800);
+  --rail-ink:    var(--color-cream-50);
+  --rail-muted:  var(--color-cream-200);
+  --rail-line:   #3a3f48;
 
-  /* Radii */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-pill: 999px;
+  --ok:         var(--color-success-500);
+  --ok-bg:      var(--color-success-50);
+  --error:      var(--color-danger-500);
+  --warning-bg: var(--color-warning-50);
+  --warning-ink: var(--color-warning-700);
 
-  /* Shadows */
-  --shadow-card: 0 2px 6px rgba(20, 30, 40, 0.04);
-  --shadow-drawer: -16px 0 48px -16px rgba(20, 30, 40, 0.18);
+  --focus-ring: 0 0 0 3px rgba(39, 93, 114, 0.35);
+
+  /* ───────────────────────────────────────────────────────────
+   * 3. COMPONENT TOKENS — component-scoped. Tweak these to retheme
+   *    a single control without touching the surface CSS.
+   * ─────────────────────────────────────────────────────────── */
+
+  /* Buttons */
+  --btn-padding-y:        var(--space-3);
+  --btn-padding-x:        var(--space-4);
+  --btn-radius:           var(--radius-sm);
+  --btn-min-height:       var(--touch-target);
+  --btn-primary-bg:       var(--accent);
+  --btn-primary-bg-hover: var(--accent-dark);
+  --btn-primary-fg:       var(--color-white);
+  --btn-ghost-fg:         var(--accent);
+  --btn-ghost-border:     var(--accent);
+  --btn-danger-bg:        var(--color-danger-500);
+  --btn-danger-bg-hover:  var(--color-danger-700);
+
+  /* Fields */
+  --field-padding-y:    var(--space-2);
+  --field-padding-x:    var(--space-3);
+  --field-radius:       var(--radius-sm);
+  --field-border:       var(--line);
+  --field-border-focus: var(--accent);
+  --field-bg:           var(--surface);
+  --field-min-height:   var(--touch-target);
+
+  /* Cards / panels */
+  --card-bg:      var(--surface);
+  --card-border:  var(--line);
+  --card-radius:  var(--radius-md);
+  --card-padding: var(--space-5);
+  --card-shadow:  var(--shadow-card);
+
+  /* Pills */
+  --pill-padding-y: var(--space-2);
+  --pill-padding-x: var(--space-4);
+  --pill-radius:    var(--radius-pill);
+  --pill-min-height: var(--touch-target-sm);
+}
+
+/*
+ * Reduced-motion: respect the OS preference globally. Collapses both
+ * token-based timings AND any hardcoded transition/animation durations
+ * that haven't been migrated to tokens yet. Belt-and-suspenders.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
