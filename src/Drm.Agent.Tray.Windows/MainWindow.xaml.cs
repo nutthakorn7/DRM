@@ -14,6 +14,91 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         PrefillSourcePathFromCommandLine();
+        SourcePathBox.TextChanged += (_, _) => UpdateDropZoneHint();
+        UpdateDropZoneHint();
+    }
+
+    private void UpdateDropZoneHint()
+    {
+        if (DropZoneHint is null)
+        {
+            return;
+        }
+
+        DropZoneHint.Visibility = string.IsNullOrWhiteSpace(SourcePathBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void Window_DragEnter(object sender, System.Windows.DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)
+            ? System.Windows.DragDropEffects.Copy
+            : System.Windows.DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void Window_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        TrySetSourceFromDrop(e);
+    }
+
+    private void DropZone_DragEnter(object sender, System.Windows.DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            e.Effects = System.Windows.DragDropEffects.Copy;
+            DropZone.BorderBrush = System.Windows.Media.Brushes.SteelBlue;
+            DropZone.Background = System.Windows.Media.Brushes.AliceBlue;
+        }
+        else
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+        }
+
+        e.Handled = true;
+    }
+
+    private void DropZone_DragLeave(object sender, System.Windows.DragEventArgs e)
+    {
+        ResetDropZoneStyle();
+    }
+
+    private void DropZone_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        ResetDropZoneStyle();
+        TrySetSourceFromDrop(e);
+    }
+
+    private void ResetDropZoneStyle()
+    {
+        DropZone.BorderBrush = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0xD1, 0xD5, 0xDB));
+        DropZone.Background = System.Windows.Media.Brushes.White;
+    }
+
+    private void TrySetSourceFromDrop(System.Windows.DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        if (e.Data.GetData(System.Windows.DataFormats.FileDrop) is not string[] paths || paths.Length == 0)
+        {
+            return;
+        }
+
+        var firstFile = paths.FirstOrDefault(File.Exists);
+        if (firstFile is null)
+        {
+            SetStatus("Folders are not supported; drop a single file.");
+            return;
+        }
+
+        SourcePathBox.Text = firstFile;
+        SetStatus($"Ready to protect: {Path.GetFileName(firstFile)}");
+        e.Handled = true;
     }
 
     private void BrowseButton_Click(object sender, RoutedEventArgs e)

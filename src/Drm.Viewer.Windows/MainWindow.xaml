@@ -6,7 +6,11 @@
         Height="780"
         MinWidth="920"
         MinHeight="640"
-        Background="#111827">
+        Background="#111827"
+        AllowDrop="True"
+        DragEnter="Window_DragEnter"
+        DragOver="Window_DragEnter"
+        Drop="Window_Drop">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

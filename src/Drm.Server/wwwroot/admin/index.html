@@ -398,6 +398,42 @@
           <button type="submit">Apply policy template</button>
         </form>
 
+        <details class="protect-wizard-block">
+          <summary>Protect file in one step — apply template, grant recipient, create share link</summary>
+          <form id="protectWizardForm" class="protect-wizard-form">
+            <label>File ID
+              <input id="wizardFileId" autocomplete="off" placeholder="File ID">
+            </label>
+            <label>Policy template ID
+              <input id="wizardPolicyTemplateId" autocomplete="off" placeholder="Optional template ID">
+            </label>
+            <label>Recipient type
+              <select id="wizardRecipientType">
+                <option value="">(skip grant)</option>
+                <option value="User">User</option>
+                <option value="Group">Group</option>
+              </select>
+            </label>
+            <label>Recipient ID
+              <input id="wizardRecipientId" autocomplete="off" placeholder="User or Group ID">
+            </label>
+            <label>Permissions
+              <input id="wizardPermissions" autocomplete="off" placeholder="View, Print" value="View">
+            </label>
+            <label>Share with guest email
+              <input id="wizardGuestEmail" type="email" autocomplete="off" placeholder="Optional — leave blank to skip">
+            </label>
+            <label>Share expires at
+              <input id="wizardShareExpires" type="datetime-local" autocomplete="off">
+            </label>
+            <label>Max uses
+              <input id="wizardShareMaxUses" type="number" min="1" max="1000" value="1">
+            </label>
+            <button type="submit">Run protect wizard</button>
+          </form>
+          <pre class="token-output" id="protectWizardOutput">Wizard results appear here.</pre>
+        </details>
+
         <form class="delete-copy-row" id="deleteCopyForm">
           <input id="deleteCopyFileId" autocomplete="off" placeholder="File ID">
           <input id="deleteCopyDeviceId" autocomplete="off" placeholder="Target device ID">

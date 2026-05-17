@@ -1,8 +1,12 @@
 <Window x:Class="Drm.Agent.Tray.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DRM Agent" Height="560" Width="720" MinHeight="540" MinWidth="680"
-        Background="#F7F8FA">
+        Title="DRM Agent" Height="620" Width="720" MinHeight="600" MinWidth="680"
+        Background="#F7F8FA"
+        AllowDrop="True"
+        DragEnter="Window_DragEnter"
+        DragOver="Window_DragEnter"
+        Drop="Window_Drop">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -74,8 +78,31 @@
                      VerticalContentAlignment="Center" />
 
             <TextBlock Grid.Row="14" Grid.Column="0" VerticalAlignment="Center" Text="Source file" Foreground="#374151" />
-            <TextBox x:Name="SourcePathBox" Grid.Row="14" Grid.Column="1" Height="32" Margin="0,0,8,0"
-                     VerticalContentAlignment="Center" />
+            <Border x:Name="DropZone"
+                    Grid.Row="14"
+                    Grid.Column="1"
+                    Margin="0,0,8,0"
+                    Background="#FFFFFF"
+                    BorderBrush="#D1D5DB"
+                    BorderThickness="2"
+                    CornerRadius="6"
+                    Padding="10,6"
+                    AllowDrop="True"
+                    DragEnter="DropZone_DragEnter"
+                    DragLeave="DropZone_DragLeave"
+                    DragOver="DropZone_DragEnter"
+                    Drop="DropZone_Drop">
+                <Grid>
+                    <TextBox x:Name="SourcePathBox" BorderThickness="0" Background="Transparent"
+                             VerticalContentAlignment="Center" />
+                    <TextBlock x:Name="DropZoneHint"
+                               IsHitTestVisible="False"
+                               Foreground="#9CA3AF"
+                               VerticalAlignment="Center"
+                               Text="Drag a file here, or click Browse →"
+                               Margin="2,0,0,0" />
+                </Grid>
+            </Border>
             <Button Grid.Row="14" Grid.Column="2" Width="92" Height="32" Content="Browse" Click="BrowseButton_Click" />
 
             <CheckBox x:Name="DeleteOriginalBox" Grid.Row="16" Grid.Column="1" Grid.ColumnSpan="2"

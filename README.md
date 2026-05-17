@@ -492,3 +492,24 @@ The **Watermarks** panel now includes an expandable **Anti-camera capture settin
 ### Windows viewer
 
 Replaces the single centered text overlay with a 4×4 `UniformGrid` of tiled diagonal watermarks plus a `DispatcherTimer` that refreshes the rendered timestamp and applies a random ±6 px offset each second, making a photographic capture identify both the user and the exact moment of the capture.
+
+## Phase 5AJ-UX FinalCode-Style UX Polish
+
+Three visible UX changes inspired by FinalCode workflow patterns:
+
+### 1. Drag-and-drop file source — Windows tray protect form
+
+The `Drm.Agent.Tray.Windows` window now accepts file drops. Drop any file onto the window or onto the highlighted Source-file area to populate the path — no Browse click required. The drop zone tints blue on hover and shows a placeholder hint when empty. Folders are rejected with a status message.
+
+### 2. Drag-and-drop open — Windows viewer
+
+`Drm.Viewer.Windows` accepts a dropped `.drmx` file anywhere on the window and populates the **File** field with status `Ready to open: <name>`. Non-`.drmx` drops are politely rejected.
+
+### 3. Protect-in-one-step wizard — admin console
+
+The **Protected files** panel gains an expandable wizard that runs three steps in sequence from a single form:
+1. Apply policy template (optional)
+2. Grant `View`/`Print`/… to a User or Group recipient (optional)
+3. Create an external share link with guest email + expiry (optional)
+
+Each step is skipped when its inputs are blank, producing a checked-step output log instead of separate panel hops. This matches FinalCode\047s single-form recipient + expiry workflow.

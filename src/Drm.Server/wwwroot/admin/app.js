@@ -322,6 +322,11 @@ document.querySelector("#createShareLinkForm").addEventListener("submit", async 
   await createShareLink();
 });
 
+document.querySelector("#protectWizardForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await runProtectWizard();
+});
+
 filesBody.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-revoke-file-id]");
   if (!button) {
@@ -530,6 +535,79 @@ async function deleteProtectedCopy() {
   });
 
   setStatus("Delete command queued", "ok");
+}
+
+async function runProtectWizard() {
+  const fileId = document.querySelector("#wizardFileId").value.trim();
+  const policyTemplateId = document.querySelector("#wizardPolicyTemplateId").value.trim();
+  const recipientType = document.querySelector("#wizardRecipientType").value;
+  const recipientId = document.querySelector("#wizardRecipientId").value.trim();
+  const permissions = document.querySelector("#wizardPermissions").value.trim() || "View";
+  const guestEmail = document.querySelector("#wizardGuestEmail").value.trim();
+  const shareExpiresValue = document.querySelector("#wizardShareExpires").value;
+  const shareMaxUses = Number(document.querySelector("#wizardShareMaxUses").value || "1");
+  const output = document.querySelector("#protectWizardOutput");
+  const steps = [];
+
+  if (!fileId) {
+    setStatus("File ID required for wizard", "error");
+    output.textContent = "ERR: File ID is required.";
+    return;
+  }
+
+  const tenantId = requireTenantId();
+  const adminUserId = requireAdminUserId();
+
+  try {
+    if (policyTemplateId) {
+      await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/apply-policy-template`, {
+        method: "POST",
+        body: JSON.stringify({ tenantId, templateId: policyTemplateId, adminUserId })
+      });
+      steps.push(`✓ Applied policy template ${policyTemplateId}`);
+    } else {
+      steps.push("· Skipped policy template (none specified)");
+    }
+
+    if (recipientType && recipientId) {
+      await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/grants`, {
+        method: "POST",
+        body: JSON.stringify({ tenantId, subjectType: recipientType, subjectId: recipientId, permissions })
+      });
+      steps.push(`✓ Granted ${permissions} to ${recipientType} ${recipientId}`);
+    } else {
+      steps.push("· Skipped recipient grant (none specified)");
+    }
+
+    if (guestEmail && shareExpiresValue) {
+      const shareExpires = new Date(shareExpiresValue);
+      if (Number.isNaN(shareExpires.getTime())) {
+        throw new Error("Invalid share expiry date");
+      }
+      const created = await apiFetch(`/api/admin/files/${encodeURIComponent(fileId)}/share-links`, {
+        method: "POST",
+        body: JSON.stringify({
+          tenantId,
+          adminUserId,
+          guestEmail,
+          expiresAtUtc: shareExpires.toISOString(),
+          maxUses: shareMaxUses
+        })
+      });
+      steps.push(`✓ Share link created for ${guestEmail}`);
+      steps.push(`  token: ${created.shareToken || created.token || "(see Share Links table)"}`);
+    } else {
+      steps.push("· Skipped share link (email + expiry both required)");
+    }
+
+    output.textContent = steps.join("\n");
+    setStatus("Protect wizard finished", "ok");
+    await refreshFiles();
+  } catch (error) {
+    steps.push(`✗ ${error.message}`);
+    output.textContent = steps.join("\n");
+    throw error;
+  }
 }
 
 async function createShareLink() {

@@ -87,6 +87,40 @@ public partial class MainWindow : Window
         WatermarkOffset.Y = jitterY;
     }
 
+    private void Window_DragEnter(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            return;
+        }
+
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0)
+        {
+            return;
+        }
+
+        var firstDrmx = paths.FirstOrDefault(path =>
+            File.Exists(path) && path.EndsWith(".drmx", StringComparison.OrdinalIgnoreCase));
+
+        if (firstDrmx is null)
+        {
+            StatusText.Text = "Drop a .drmx protected file to open.";
+            return;
+        }
+
+        ProtectedPathBox.Text = firstDrmx;
+        StatusText.Text = $"Ready to open: {Path.GetFileName(firstDrmx)}";
+        e.Handled = true;
+    }
+
     private void BrowseButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog

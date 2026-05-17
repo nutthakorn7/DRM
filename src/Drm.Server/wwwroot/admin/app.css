@@ -312,7 +312,8 @@ button.danger:hover {
   gap: 10px;
 }
 
-.anti-capture-block {
+.anti-capture-block,
+.protect-wizard-block {
   margin: 16px 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -320,25 +321,29 @@ button.danger:hover {
   background: var(--surface);
 }
 
-.anti-capture-block > summary {
+.anti-capture-block > summary,
+.protect-wizard-block > summary {
   cursor: pointer;
   font-weight: 600;
   color: var(--ink);
   padding: 2px 0;
 }
 
-.anti-capture-block[open] > summary {
+.anti-capture-block[open] > summary,
+.protect-wizard-block[open] > summary {
   margin-bottom: 12px;
 }
 
-.watermark-anti-capture-form {
+.watermark-anti-capture-form,
+.protect-wizard-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px 14px;
   align-items: end;
 }
 
-.watermark-anti-capture-form label {
+.watermark-anti-capture-form label,
+.protect-wizard-form label {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -353,9 +358,14 @@ button.danger:hover {
   color: var(--ink);
 }
 
-.watermark-anti-capture-form button {
+.watermark-anti-capture-form button,
+.protect-wizard-form button {
   grid-column: 1 / -1;
   justify-self: start;
+}
+
+.protect-wizard-block .token-output {
+  margin-top: 12px;
 }
 
 .simulator-row {
