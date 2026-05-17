@@ -481,6 +481,7 @@ app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();
 app.MapAdminSecureContainersEndpoints();
 app.MapAdminFolderWatcherEndpoints();
+app.MapCompatibilityEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

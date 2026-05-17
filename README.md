@@ -850,3 +850,34 @@ A new status line **Folder watcher:** with a coloured dot (green = running, ambe
 ### Tests
 
 4 new admin API tests (save/retrieve, 404, report updates status, event writes audit row) + 3 tracker unit tests (new path, size/time change, increment + snapshot) = 7 new, **215/215 total pass**.
+
+## Phase 5AR Compatibility Matrix + Final Polish
+
+The DRM viewer and protect workflow have been validated against an explicit roster of document, design, CAD, video, and simulation applications. Phase 5AR ships that roster as a code-resident compatibility matrix, an admin reference page, viewer-side guidance for known issues, and a small client library.
+
+### Categories covered
+
+- **Documents**: Microsoft Word / Excel / PowerPoint 2019-2024, Adobe Acrobat Reader/Pro DC 2024, JustSystems Ichitaro Pro 4 / 2024, Fujifilm BI DocuWorks Viewer 9.x / 10.x, WordPad, Notepad
+- **Design / Image**: Adobe Illustrator / Photoshop / InDesign CC 2024, Microsoft Paint
+- **CAD**: AutoCAD / AutoCAD LT 2020-2025, DWG TrueView, ZWCAD 2020, SolidWorks 2024/2025 + Composer Player + eDrawings, Siemens Solid Edge 2022, Cadence OrCad Capture CIS 17.4, Lattice XVL Studio Pro & Player, iCAD SX V7L7/V8L1/V8L2, FILDER Cube V1.62, iCADMX V7L6
+- **Video**: Windows Media Player (wma/wmv/avi/mpg/mpeg/mp3/mp4)
+- **Simulation**: MathWorks Simulink R2015aSP1
+- **Known issues**: Adobe InCopy cross-container links, AutoCAD LISP plugin handle bypass, Word Open-and-Repair trailer strip
+
+### Endpoint
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/compatibility-matrix` | Returns the curated matrix (categories + known issues + generation timestamp) |
+
+### Admin docs page
+
+`/admin/compatibility/` serves a static page with a paste-your-admin-key control. After loading, every category renders as its own table with status badges (`verified` / `warn` / `broken`) and notes. The admin nav gains a `Compatibility ↗` external link.
+
+### Windows viewer
+
+`CompatibilityNotices` is a static mirror of the known-issue table used by the viewer. When a protected file with a flagged content type opens, the status line prefixes a one-line notice so the end user knows the supported workflow before they hit a real failure.
+
+### Tests
+
+3 new tests (endpoint returns categories + known issues, known-issue entries always carry notes, `IsBlocked` is false for v1 to pin the contract). 218/218 total pass.

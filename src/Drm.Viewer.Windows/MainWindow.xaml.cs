@@ -282,6 +282,12 @@ public partial class MainWindow : Window
             var opened = await new OpenProtectedFileWorkflow(serverClient, keyStore, decisionCache)
                 .OpenAsync(protectedPath, userId, deviceId, CancellationToken.None);
 
+            var compatNotice = CompatibilityNotices.ForContentType(opened.ContentType);
+            if (compatNotice is not null)
+            {
+                StatusText.Text = $"Compatibility notice: {compatNotice}";
+            }
+
             if (string.Equals(opened.ContentType, PdfContentType, StringComparison.OrdinalIgnoreCase))
             {
                 var tempPath = Path.Combine(Path.GetTempPath(), $"drm-viewer-{Guid.NewGuid():N}.pdf");
