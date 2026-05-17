@@ -937,11 +937,11 @@ body[data-active-tab="all"] section.panel.subtab-hidden { display: block; }
 
 /* Hide panels that don't match the active tab. The body carries a
    data-active-tab attribute that the JS sets on load and toggle. */
-body[data-active-tab="overview"]     section.panel:not([data-tab="overview"]),
-body[data-active-tab="identity"]     section.panel:not([data-tab="identity"]),
-body[data-active-tab="policy"]       section.panel:not([data-tab="policy"]),
-body[data-active-tab="files"]        section.panel:not([data-tab="files"]),
-body[data-active-tab="integrations"] section.panel:not([data-tab="integrations"]) {
+body[data-active-tab="overview"]     .surface section.panel:not([data-tab="overview"]),
+body[data-active-tab="identity"]     .surface section.panel:not([data-tab="identity"]),
+body[data-active-tab="policy"]       .surface section.panel:not([data-tab="policy"]),
+body[data-active-tab="files"]        .surface section.panel:not([data-tab="files"]),
+body[data-active-tab="integrations"] .surface section.panel:not([data-tab="integrations"]) {
   display: none;
 }
 
