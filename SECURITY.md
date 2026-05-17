@@ -60,10 +60,10 @@ when they don't.
 
 - The header is **optional**. Endpoints that don't check it behave as
   before.
-- Endpoints that **do** check it (currently the 3 highest-impact admin
-  file endpoints: revoke, grants, share-links) act on body `tenantId`
-  if the header is absent, and reject the request if the header is
-  present with a different value.
+- Endpoints that **do** check it (the **13** admin endpoints listed in
+  the migration log below) act on body `tenantId` if the header is
+  absent, and reject the request if the header is present with a
+  different value.
 - The web admin console sends the header automatically on every call,
   via the `apiFetch` / `apiFetchBlob` wrappers in `admin/app.js`.
   Tenant ID comes from the field at the top of the page, so a typo
@@ -79,6 +79,33 @@ when they don't.
 
 If you're adding a new admin endpoint today, **add `httpContext.MatchesHeader`
 right after parameter validation** — that's now the project convention.
+
+### Migration log
+
+| Date | Endpoint | File |
+|---|---|---|
+| 2026-05-17 | `POST /api/admin/files/{id}/revoke` | `AdminFilesEndpoints.cs` |
+| 2026-05-17 | `POST /api/admin/files/{id}/grants` | `AdminFilesEndpoints.cs` |
+| 2026-05-17 | `POST /api/admin/files/{id}/share-links` | `AdminFilesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/files/{id}/commands/delete-protected-copy` | `AdminFilesEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/files/{id}/grants` (replace) | `AdminFilesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/files/{id}/apply-policy-template` | `AdminFilesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/files/{id}/share-links/{linkId}/revoke` | `AdminFilesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/users` | `AdminUsersEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/groups` | `AdminGroupsEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/groups/{id}/members` | `AdminGroupsEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/policy-templates` | `AdminPolicyTemplatesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/watermark-templates` | `AdminWatermarkTemplatesEndpoints.cs` |
+| 2026-05-18 | `PUT  /api/admin/watermark-templates/{id}` | `AdminWatermarkTemplatesEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/files/{id}/tags` | `AdminFileTagsEndpoints.cs` |
+| 2026-05-18 | `DELETE /api/admin/files/{id}/tags/{tag}` | `AdminFileTagsEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/devices/{id}/disable` | `AdminDevicesEndpoints.cs` |
+
+**Still on the list** (~20 mutating admin endpoints): file-zip, transparent-files
+register/deregister, secure-containers register/delete, folder-watcher config,
+SIEM webhook CRUD, Box / Outlook / Directory integration upsert, external-share
+settings, license updates, audit ingest. Migrate one file at a time per session;
+test coverage = at least one `tenant_mismatch` assertion per new file.
 
 ---
 

@@ -77,12 +77,18 @@ public static class AdminFilesEndpoints
             .ToList());
     }
 
-    private static async Task<Results<Created<AgentCommandResponse>, NotFound>> EnqueueDeleteProtectedCopyCommandAsync(
+    private static async Task<Results<Created<AgentCommandResponse>, NotFound, BadRequest<ErrorResponse>>> EnqueueDeleteProtectedCopyCommandAsync(
         Guid fileId,
         EnqueueDeleteProtectedCopyCommandRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (!await FileExistsAsync(dbContext, request.TenantId, fileId, cancellationToken) ||
             !await DeviceExistsAsync(dbContext, request.TenantId, request.DeviceId, cancellationToken))
         {
@@ -220,13 +226,19 @@ public static class AdminFilesEndpoints
             .ToList());
     }
 
-    private static async Task<Results<Ok<ExternalShareLinkResponse>, NotFound>> RevokeExternalShareLinkAsync(
+    private static async Task<Results<Ok<ExternalShareLinkResponse>, NotFound, BadRequest<ErrorResponse>>> RevokeExternalShareLinkAsync(
         Guid fileId,
         Guid shareLinkId,
         RevokeExternalShareLinkRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var shareLink = await dbContext.ExternalShareLinks
             .SingleOrDefaultAsync(
                 candidate =>
@@ -412,9 +424,15 @@ public static class AdminFilesEndpoints
     private static async Task<Results<Ok<IReadOnlyList<FileGrantResponse>>, BadRequest<ErrorResponse>, NotFound>> ReplaceGrantsAsync(
         Guid fileId,
         ReplaceGrantsRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var file = await dbContext.ProtectedFiles
             .SingleOrDefaultAsync(candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId, cancellationToken);
 
@@ -486,12 +504,18 @@ public static class AdminFilesEndpoints
             .ToList());
     }
 
-    private static async Task<Results<Ok<FileResponse>, NotFound>> ApplyPolicyTemplateAsync(
+    private static async Task<Results<Ok<FileResponse>, NotFound, BadRequest<ErrorResponse>>> ApplyPolicyTemplateAsync(
         Guid fileId,
         ApplyPolicyTemplateRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var file = await dbContext.ProtectedFiles
             .SingleOrDefaultAsync(
                 candidate => candidate.TenantId == request.TenantId && candidate.Id == fileId,

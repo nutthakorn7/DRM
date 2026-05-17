@@ -15,11 +15,17 @@ public static class AdminUsersEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<UserResponse>, Conflict>> CreateUserAsync(
+    private static async Task<Results<Created<UserResponse>, Conflict, BadRequest<ErrorResponse>>> CreateUserAsync(
         CreateUserRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
         {
             return TypedResults.Conflict();
@@ -83,6 +89,8 @@ public static class AdminUsersEndpoints
     }
 
     private sealed record CreateUserRequest(Guid TenantId, Guid UserId, string Email, string DisplayName);
+
+    private sealed record ErrorResponse(string ReasonCode);
 
     private sealed record UserResponse(Guid UserId, Guid TenantId, string Email, string DisplayName)
     {

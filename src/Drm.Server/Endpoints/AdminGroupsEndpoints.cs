@@ -16,11 +16,17 @@ public static class AdminGroupsEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<GroupResponse>, Conflict>> CreateGroupAsync(
+    private static async Task<Results<Created<GroupResponse>, Conflict, BadRequest<ErrorResponse>>> CreateGroupAsync(
         CreateGroupRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (await GroupExistsAsync(dbContext, request.TenantId, request.GroupId, cancellationToken))
         {
             return TypedResults.Conflict();
@@ -54,12 +60,18 @@ public static class AdminGroupsEndpoints
         return TypedResults.Created($"/api/admin/groups/{group.GroupId}", GroupResponse.From(group));
     }
 
-    private static async Task<Results<Created<GroupMemberResponse>, Conflict, NotFound>> AddMemberAsync(
+    private static async Task<Results<Created<GroupMemberResponse>, Conflict, NotFound, BadRequest<ErrorResponse>>> AddMemberAsync(
         Guid groupId,
         AddMemberRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (!await GroupExistsAsync(dbContext, request.TenantId, groupId, cancellationToken))
         {
             return TypedResults.NotFound();
@@ -142,6 +154,8 @@ public static class AdminGroupsEndpoints
     private sealed record CreateGroupRequest(Guid TenantId, Guid GroupId, string Name);
 
     private sealed record AddMemberRequest(Guid TenantId, Guid UserId);
+
+    private sealed record ErrorResponse(string ReasonCode);
 
     private sealed record GroupResponse(Guid TenantId, Guid GroupId, string Name)
     {

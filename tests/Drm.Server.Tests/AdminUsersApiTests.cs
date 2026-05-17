@@ -122,4 +122,33 @@ public sealed class AdminUsersApiTests : IDisposable
     }
 
     private sealed record UserResponse(Guid UserId, Guid TenantId, string Email, string DisplayName);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Create_user_with_mismatched_tenant_header_returns_400_tenant_mismatch()
+    {
+        using var client = factory.CreateClient();
+        var bodyTenant = Guid.NewGuid();
+        var headerTenant = Guid.NewGuid();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/users")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = bodyTenant,
+                userId = Guid.NewGuid(),
+                email = "drift@example.com",
+                displayName = "Drift",
+            })
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", headerTenant.ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
 }

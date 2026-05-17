@@ -24,9 +24,15 @@ public static class AdminFileTagsEndpoints
     private static async Task<Results<Created, Conflict, BadRequest<ErrorResponse>>> AddTagAsync(
         Guid fileId,
         AddTagRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (request.TenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
@@ -71,9 +77,15 @@ public static class AdminFileTagsEndpoints
         Guid fileId,
         string tag,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (tenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));

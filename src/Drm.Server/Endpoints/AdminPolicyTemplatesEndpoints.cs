@@ -22,9 +22,15 @@ public static class AdminPolicyTemplatesEndpoints
 
     private static async Task<Results<Created<PolicyTemplateResponse>, Conflict, BadRequest<ErrorResponse>>> CreatePolicyTemplateAsync(
         CreatePolicyTemplateRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var validationError = ValidateCreateRequest(request);
         if (validationError is not null)
         {

@@ -87,9 +87,15 @@ public static class AdminDevicesEndpoints
     private static async Task<IResult> DisableDeviceAsync(
         Guid deviceId,
         DisableDeviceRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
             return Results.BadRequest(new ErrorResponse("invalid_disable_reason"));

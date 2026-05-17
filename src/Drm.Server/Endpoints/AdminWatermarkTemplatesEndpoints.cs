@@ -32,9 +32,15 @@ public static class AdminWatermarkTemplatesEndpoints
 
     private static async Task<Results<Created<WatermarkTemplateResponse>, Conflict, BadRequest<ErrorResponse>>> CreateWatermarkTemplateAsync(
         CreateWatermarkTemplateRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var validationError = ValidateCreateRequest(request);
         if (validationError is not null)
         {
@@ -100,9 +106,15 @@ public static class AdminWatermarkTemplatesEndpoints
     private static async Task<Results<Ok<WatermarkTemplateResponse>, NotFound, BadRequest<ErrorResponse>>> UpdateWatermarkTemplateAsync(
         Guid watermarkTemplateId,
         UpdateWatermarkTemplateRequest request,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var validationError = ValidateUpdateRequest(request);
         if (validationError is not null)
         {
