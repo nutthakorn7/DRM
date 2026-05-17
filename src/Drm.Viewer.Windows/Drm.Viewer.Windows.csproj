@@ -4,6 +4,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+    <PackageReference Include="PdfSharp" Version="6.2.1" />
   </ItemGroup>
   <PropertyGroup>
     <OutputType>WinExe</OutputType>

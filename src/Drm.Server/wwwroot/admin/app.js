@@ -183,7 +183,11 @@ document.querySelector("#updateWatermarkTemplateForm").addEventListener("submit"
     includeTimestamp: document.querySelector("#acIncludeTimestamp").checked,
     includeIpAddress: document.querySelector("#acIncludeIp").checked,
     includeSessionId: document.querySelector("#acIncludeSession").checked,
-    rollingEnabled: document.querySelector("#acRolling").checked
+    rollingEnabled: document.querySelector("#acRolling").checked,
+    printWatermarkEnabled: document.querySelector("#acPrintEnabled").checked,
+    printWatermarkPattern: document.querySelector("#acPrintPattern").value.trim(),
+    printWatermarkOpacityPercent: Number(document.querySelector("#acPrintOpacity").value || "33"),
+    printWatermarkPosition: document.querySelector("#acPrintPosition").value
   };
 
   await apiFetch(`/api/admin/watermark-templates/${encodeURIComponent(templateId)}`, {
@@ -1038,6 +1042,7 @@ function formatAntiCapture(template) {
   if (template.includeIpAddress) flags.push("ip");
   if (template.includeSessionId) flags.push("sid");
   if (template.rollingEnabled) flags.push("rolling");
+  if (template.printWatermarkEnabled) flags.push(`print(${template.printWatermarkPosition})`);
   if (flags.length) parts.push(flags.join("+"));
   return parts.join(" · ");
 }

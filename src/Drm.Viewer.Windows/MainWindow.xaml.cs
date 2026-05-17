@@ -245,9 +245,34 @@ public partial class MainWindow : Window
 
         try
         {
+            if (PrintWmEnabledBox.IsChecked == true && !string.IsNullOrWhiteSpace(PrintWmPatternBox.Text)
+                && CurrentFileIsPdf() && currentContent is not null)
+            {
+                var pattern = PrintWmPatternBox.Text.Trim();
+                var resolved = PrintWatermarkComposer.ResolveTokens(
+                    pattern,
+                    currentIdentity?.UserId,
+                    currentFileId);
+                var stamped = PrintWatermarkComposer.Stamp(
+                    currentContent,
+                    new PrintWatermarkOptions(resolved, 33, "diagonal"));
+                var stampedPath = Path.Combine(Path.GetTempPath(), $"drm-print-{Guid.NewGuid():N}.pdf");
+                await File.WriteAllBytesAsync(stampedPath, stamped);
+                PdfHost.Navigate(stampedPath);
+                StatusText.Text = $"Print watermark applied ({resolved.Length} chars). Triggering print…";
+                await Task.Delay(800);
+            }
+
             PdfHost.InvokeScript("print");
             await AuditViewerActionAsync(ViewerControlledAction.Print, allowed: true);
-            StatusText.Text = "Print requested.";
+            if (StatusText.Text.StartsWith("Print watermark", StringComparison.Ordinal))
+            {
+                StatusText.Text = $"{StatusText.Text} Print requested.";
+            }
+            else
+            {
+                StatusText.Text = "Print requested.";
+            }
         }
         catch (Exception exception)
         {

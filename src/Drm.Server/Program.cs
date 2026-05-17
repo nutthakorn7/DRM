@@ -329,6 +329,10 @@ using (var scope = app.Services.CreateScope())
             ("IncludeIpAddress", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"IncludeIpAddress\" INTEGER NOT NULL DEFAULT 0;"),
             ("IncludeSessionId", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"IncludeSessionId\" INTEGER NOT NULL DEFAULT 0;"),
             ("RollingEnabled", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"RollingEnabled\" INTEGER NOT NULL DEFAULT 0;"),
+            ("PrintWatermarkEnabled", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"PrintWatermarkEnabled\" INTEGER NOT NULL DEFAULT 0;"),
+            ("PrintWatermarkPattern", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"PrintWatermarkPattern\" TEXT NOT NULL DEFAULT '';"),
+            ("PrintWatermarkOpacityPercent", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"PrintWatermarkOpacityPercent\" INTEGER NOT NULL DEFAULT 33;"),
+            ("PrintWatermarkPosition", "ALTER TABLE \"WatermarkTemplates\" ADD COLUMN \"PrintWatermarkPosition\" TEXT NOT NULL DEFAULT 'diagonal';"),
         };
 
         foreach (var (name, ddl) in watermarkColumnDdl)

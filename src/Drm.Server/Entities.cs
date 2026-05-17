@@ -126,6 +126,14 @@ public sealed class WatermarkTemplateEntity
 
     public bool RollingEnabled { get; set; }
 
+    public bool PrintWatermarkEnabled { get; set; }
+
+    public string PrintWatermarkPattern { get; set; } = string.Empty;
+
+    public int PrintWatermarkOpacityPercent { get; set; } = 33;
+
+    public string PrintWatermarkPosition { get; set; } = "diagonal";
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
 

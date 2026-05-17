@@ -66,6 +66,17 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="0,0,12,0">
+                <CheckBox x:Name="PrintWmEnabledBox"
+                          Content="Print WM"
+                          Foreground="#D1D5DB"
+                          VerticalAlignment="Center"
+                          Margin="0,0,8,0" />
+                <TextBox x:Name="PrintWmPatternBox"
+                         Width="200"
+                         Height="24"
+                         Margin="0,0,8,0"
+                         VerticalContentAlignment="Center"
+                         ToolTip="Print watermark pattern. Tokens: {user} {time} {file}" />
                 <Button x:Name="CopyButton"
                         Width="70"
                         Height="28"

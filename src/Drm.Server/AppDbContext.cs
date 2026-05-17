@@ -102,6 +102,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(template => new { template.TenantId, template.WatermarkTemplateId });
             entity.Property(template => template.Name).HasMaxLength(256);
             entity.Property(template => template.Pattern).HasMaxLength(1024);
+            entity.Property(template => template.PrintWatermarkPattern).HasMaxLength(1024);
+            entity.Property(template => template.PrintWatermarkPosition).HasMaxLength(32);
         });
 
         modelBuilder.Entity<FileGrantEntity>(entity =>

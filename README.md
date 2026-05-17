@@ -628,3 +628,43 @@ The `freeViewerCount = paidEncrypterCount * 9` ratio comes from FinalCode's cata
 Blank or `All` enables every tier. Unknown tokens are ignored.
 
 Tests: 5 (tags CRUD/list/conflict/not-found) + 3 (license endpoint + tier parser) = 8 new, 186/186 pass.
+
+## Phase 5AM Print Watermark
+
+Adds a print-time watermark distinct from the on-screen anti-camera watermark. When a user prints a protected PDF, the configured pattern is stamped onto every page before the print dialog is invoked, so leaked photocopies carry the viewer's identity and timestamp.
+
+### Schema extensions to `WatermarkTemplateEntity`
+
+| Field | Range | Default | Purpose |
+|-------|-------|---------|---------|
+| `PrintWatermarkEnabled` | bool | false | Master toggle for the print overlay |
+| `PrintWatermarkPattern` | string ≤ 1024 chars | "" | Tokenized text (`{user}`, `{time}`, `{file}`) |
+| `PrintWatermarkOpacityPercent` | 5–100 | 33 | Stamp opacity |
+| `PrintWatermarkPosition` | `diagonal` / `top` / `bottom` / `all-pages` | `diagonal` | Where on each page the stamp appears |
+
+Invalid position values are normalized to `diagonal` on save.
+
+### Admin console
+
+The anti-capture form gains a **Print watermark** fieldset with enable checkbox, pattern input, opacity, and position dropdown. The templates table summary column now includes `print(<position>)` when print watermark is enabled.
+
+### Windows viewer
+
+The viewer toolbar gains a **Print WM** checkbox + pattern textbox. When the user prints a PDF with print watermark enabled and a non-empty pattern, the viewer:
+
+1. Reads the current PDF bytes
+2. Composites a stamped copy via the new `PrintWatermarkComposer` (PdfSharp 6.2.1)
+3. Loads the stamped PDF into the embedded WebView
+4. Invokes the browser print dialog
+
+Token resolution at print time substitutes `{user}` / `{userId}`, `{file}` / `{fileId}`, and `{time}` (UTC, `yyyy-MM-dd HH:mm:ss 'UTC'`).
+
+### Compositor positions
+
+- `diagonal` — single bold 36pt text rotated -28° at page center
+- `top` / `bottom` — 10pt centered band 24pt from the page edge
+- `all-pages` — top band + bottom band + diagonal center
+
+### Tests
+
+2 new (PUT persists print fields, invalid position normalizes to diagonal). 188/188 total pass.

@@ -199,6 +199,83 @@ public sealed class AdminWatermarkTemplatesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_update_persists_print_watermark_settings()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createResponse = await CreateWatermarkTemplateAsync(
+            client, tenantId, templateId, "Confidential", "user:{user}");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var update = new
+        {
+            tenantId,
+            name = "Confidential",
+            pattern = "user:{user}",
+            opacityPercent = 33,
+            densityTiles = 4,
+            diagonalAngleDegrees = -28,
+            includeUserId = true,
+            includeTimestamp = true,
+            includeIpAddress = false,
+            includeSessionId = false,
+            rollingEnabled = false,
+            printWatermarkEnabled = true,
+            printWatermarkPattern = "CONFIDENTIAL {user} {time}",
+            printWatermarkOpacityPercent = 55,
+            printWatermarkPosition = "all-pages"
+        };
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/admin/watermark-templates/{templateId}", update);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await response.Content.ReadFromJsonAsync<WatermarkTemplateResponse>();
+        updated!.PrintWatermarkEnabled.Should().BeTrue();
+        updated.PrintWatermarkPattern.Should().Be("CONFIDENTIAL {user} {time}");
+        updated.PrintWatermarkOpacityPercent.Should().Be(55);
+        updated.PrintWatermarkPosition.Should().Be("all-pages");
+    }
+
+    [Fact]
+    public async Task Admin_update_normalizes_invalid_print_position_to_diagonal()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using var createResponse = await CreateWatermarkTemplateAsync(
+            client, tenantId, templateId, "Confidential", "user:{user}");
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var update = new
+        {
+            tenantId,
+            name = "Confidential",
+            pattern = "user:{user}",
+            opacityPercent = 33,
+            densityTiles = 4,
+            diagonalAngleDegrees = -28,
+            includeUserId = true,
+            includeTimestamp = true,
+            includeIpAddress = false,
+            includeSessionId = false,
+            rollingEnabled = false,
+            printWatermarkEnabled = true,
+            printWatermarkPattern = "X",
+            printWatermarkOpacityPercent = 33,
+            printWatermarkPosition = "garbage"
+        };
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/admin/watermark-templates/{templateId}", update);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await response.Content.ReadFromJsonAsync<WatermarkTemplateResponse>();
+        updated!.PrintWatermarkPosition.Should().Be("diagonal");
+    }
+
+    [Fact]
     public async Task Admin_update_rejects_out_of_range_anti_capture_values()
     {
         using var client = factory.CreateClient();
@@ -286,6 +363,10 @@ public sealed class AdminWatermarkTemplatesApiTests : IDisposable
         bool IncludeIpAddress,
         bool IncludeSessionId,
         bool RollingEnabled,
+        bool PrintWatermarkEnabled,
+        string PrintWatermarkPattern,
+        int PrintWatermarkOpacityPercent,
+        string PrintWatermarkPosition,
         DateTimeOffset CreatedAtUtc);
 
     private sealed record AuditEventResponse(

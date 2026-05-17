@@ -13,6 +13,10 @@ public static class AdminWatermarkTemplatesEndpoints
     private const int MaxDensityTiles = 12;
     private const int MinAngleDegrees = -90;
     private const int MaxAngleDegrees = 90;
+    private static readonly HashSet<string> ValidPrintPositions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "diagonal", "top", "bottom", "all-pages"
+    };
 
     public static IEndpointRouteBuilder MapAdminWatermarkTemplatesEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -60,6 +64,10 @@ public static class AdminWatermarkTemplatesEndpoints
             IncludeIpAddress = request.IncludeIpAddress ?? false,
             IncludeSessionId = request.IncludeSessionId ?? false,
             RollingEnabled = request.RollingEnabled ?? false,
+            PrintWatermarkEnabled = request.PrintWatermarkEnabled ?? false,
+            PrintWatermarkPattern = (request.PrintWatermarkPattern ?? string.Empty).Trim(),
+            PrintWatermarkOpacityPercent = request.PrintWatermarkOpacityPercent ?? 33,
+            PrintWatermarkPosition = NormalizePosition(request.PrintWatermarkPosition),
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
 
@@ -122,6 +130,10 @@ public static class AdminWatermarkTemplatesEndpoints
         template.IncludeIpAddress = request.IncludeIpAddress;
         template.IncludeSessionId = request.IncludeSessionId;
         template.RollingEnabled = request.RollingEnabled;
+        template.PrintWatermarkEnabled = request.PrintWatermarkEnabled;
+        template.PrintWatermarkPattern = (request.PrintWatermarkPattern ?? string.Empty).Trim();
+        template.PrintWatermarkOpacityPercent = request.PrintWatermarkOpacityPercent;
+        template.PrintWatermarkPosition = NormalizePosition(request.PrintWatermarkPosition);
 
         dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "watermark_template_updated"));
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -249,6 +261,12 @@ public static class AdminWatermarkTemplatesEndpoints
         return null;
     }
 
+    private static string NormalizePosition(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "diagonal";
+        return ValidPrintPositions.Contains(value.Trim()) ? value.Trim().ToLowerInvariant() : "diagonal";
+    }
+
     private sealed record CreateWatermarkTemplateRequest(
         Guid TenantId,
         Guid WatermarkTemplateId,
@@ -261,7 +279,11 @@ public static class AdminWatermarkTemplatesEndpoints
         bool? IncludeTimestamp = null,
         bool? IncludeIpAddress = null,
         bool? IncludeSessionId = null,
-        bool? RollingEnabled = null);
+        bool? RollingEnabled = null,
+        bool? PrintWatermarkEnabled = null,
+        string? PrintWatermarkPattern = null,
+        int? PrintWatermarkOpacityPercent = null,
+        string? PrintWatermarkPosition = null);
 
     private sealed record UpdateWatermarkTemplateRequest(
         Guid TenantId,
@@ -274,7 +296,11 @@ public static class AdminWatermarkTemplatesEndpoints
         bool IncludeTimestamp,
         bool IncludeIpAddress,
         bool IncludeSessionId,
-        bool RollingEnabled);
+        bool RollingEnabled,
+        bool PrintWatermarkEnabled = false,
+        string? PrintWatermarkPattern = null,
+        int PrintWatermarkOpacityPercent = 33,
+        string? PrintWatermarkPosition = null);
 
     private sealed record WatermarkTemplateResponse(
         Guid TenantId,
@@ -289,6 +315,10 @@ public static class AdminWatermarkTemplatesEndpoints
         bool IncludeIpAddress,
         bool IncludeSessionId,
         bool RollingEnabled,
+        bool PrintWatermarkEnabled,
+        string PrintWatermarkPattern,
+        int PrintWatermarkOpacityPercent,
+        string PrintWatermarkPosition,
         DateTimeOffset CreatedAtUtc)
     {
         public static WatermarkTemplateResponse From(WatermarkTemplateEntity template)
@@ -305,6 +335,10 @@ public static class AdminWatermarkTemplatesEndpoints
                 template.IncludeIpAddress,
                 template.IncludeSessionId,
                 template.RollingEnabled,
+                template.PrintWatermarkEnabled,
+                template.PrintWatermarkPattern,
+                template.PrintWatermarkOpacityPercent,
+                template.PrintWatermarkPosition,
                 template.CreatedAtUtc);
     }
 

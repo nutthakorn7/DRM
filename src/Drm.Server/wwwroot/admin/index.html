@@ -434,6 +434,24 @@
             <label><input id="acIncludeIp" type="checkbox"> Include IP address</label>
             <label><input id="acIncludeSession" type="checkbox"> Include session ID</label>
             <label><input id="acRolling" type="checkbox"> Rolling watermark</label>
+            <fieldset class="print-wm-fieldset">
+              <legend>Print watermark (PDF overlay on printout)</legend>
+              <label><input id="acPrintEnabled" type="checkbox"> Enable print watermark</label>
+              <label>Print pattern
+                <input id="acPrintPattern" autocomplete="off" placeholder="e.g. CONFIDENTIAL {user} {time}">
+              </label>
+              <label>Print opacity %
+                <input id="acPrintOpacity" type="number" min="5" max="100" value="33">
+              </label>
+              <label>Print position
+                <select id="acPrintPosition">
+                  <option value="diagonal">Diagonal (centered, rotated)</option>
+                  <option value="top">Top of page</option>
+                  <option value="bottom">Bottom of page</option>
+                  <option value="all-pages">All pages (header + footer)</option>
+                </select>
+              </label>
+            </fieldset>
             <button type="submit">Update anti-capture settings</button>
           </form>
         </details>

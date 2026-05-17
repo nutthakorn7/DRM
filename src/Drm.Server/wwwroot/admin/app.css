@@ -368,6 +368,37 @@ button.danger:hover {
   margin-top: 12px;
 }
 
+.print-wm-fieldset {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+
+.print-wm-fieldset > legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+  padding: 0 6px;
+}
+
+.print-wm-fieldset > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 6px 0;
+}
+
+.print-wm-fieldset > label:has(input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
 .inline-check {
   display: inline-flex;
   align-items: center;
