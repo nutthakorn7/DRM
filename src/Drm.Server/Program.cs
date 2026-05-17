@@ -177,6 +177,15 @@ using (var scope = app.Services.CreateScope())
             ON "FileTags" ("TenantId", "Tag");
             """);
         dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantUserPersonas" (
+                "TenantId" TEXT NOT NULL,
+                "UserId" TEXT NOT NULL,
+                "Persona" TEXT NOT NULL DEFAULT 'Employee',
+                "AssignedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_TenantUserPersonas" PRIMARY KEY ("TenantId", "UserId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
             CREATE TABLE IF NOT EXISTS "TransparentProtectedFiles" (
                 "TenantId" TEXT NOT NULL,
                 "FileId" TEXT NOT NULL,
@@ -435,7 +444,7 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path.Equals("/", StringComparison.OrdinalIgnoreCase))
     {
-        context.Response.Redirect("/share/");
+        context.Response.Redirect("/me/");
         return;
     }
 
@@ -448,6 +457,12 @@ app.Use(async (context, next) =>
     if (context.Request.Path.Equals("/share", StringComparison.OrdinalIgnoreCase))
     {
         context.Response.Redirect("/share/");
+        return;
+    }
+
+    if (context.Request.Path.Equals("/me", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/me/");
         return;
     }
 
@@ -484,6 +499,8 @@ app.MapAdminTransparentFilesEndpoints();
 app.MapAdminSecureContainersEndpoints();
 app.MapAdminFolderWatcherEndpoints();
 app.MapCompatibilityEndpoints();
+app.MapPersonaEndpoints();
+app.MapQuickShareEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

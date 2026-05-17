@@ -881,3 +881,111 @@ The DRM viewer and protect workflow have been validated against an explicit rost
 ### Tests
 
 3 new tests (endpoint returns categories + known issues, known-issue entries always carry notes, `IsBlocked` is false for v1 to pin the contract). 218/218 total pass.
+
+## Phase 5AS Easy-to-Use Redesign for Non-Technical Users
+
+Takes the DRM product from "engineering preview / IT-admin only" to "any
+sales rep, lawyer, HR staffer, or executive can ship a protected file in
+≤ 60 seconds without training." Research-backed plan in
+`docs/superpowers/plans/2026-05-17-easy-to-use-redesign.md` (Kiteworks +
+Seclore + CapLinked + Locklizard + Digify + UXmatters Secure UX rubric).
+
+### Persona model
+
+| Persona | Capabilities |
+|---|---|
+| `Employee` (default) | protect, invite guests |
+| `KnowledgeWorker` | + revoke own files, bulk send |
+| `Executive` | + tenant-wide audit view |
+| `Admin` | full control |
+
+`DrmPersona` enum lives in `Drm.Domain`. `TenantUserPersonaEntity` persists
+assignments. `PersonaCapabilities.For(persona)` derives the capability map
+in one place (no per-call DB lookup).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/me/persona?tenantId=&userId=` | Returns persona name + capability flags (defaults to `Employee` when unassigned) |
+| `PUT` | `/api/admin/personas/{userId}` | Admin assigns a persona, writes `persona_assigned_*` audit event |
+| `GET` | `/api/admin/personas?tenantId=` | List all persona assignments for a tenant |
+
+### Quick Share endpoint
+
+`POST /api/me/share` accepts file bytes + recipient email and returns a
+share URL in one call. Replaces the previous 3-call dance (register file
+→ grant → create share-link). Enforces persona gate (`CanProtect`),
+validates email format, file size (≤ 200 MB), and expiry window
+(1 h – 1 yr). Mints a fresh share token (SHA-256 hashed at rest),
+audits as `quick_share_created`.
+
+### `/me/` landing page
+
+A persona-aware single-page landing (`src/Drm.Server/wwwroot/me/`) that
+makes the first thing a new user sees: one drop zone, one recipient
+input, one Send button. Root (`/`) now redirects here instead of
+`/share/` for first-time visitors.
+
+- Persists tenant + user ID in `localStorage` so the IDs are typed once
+  per browser
+- Loads `/api/me/persona` and shows the persona name in the header
+  badge; the `Admin →` nav link appears only when `CanAdmin` is true
+- Includes a 4-stop onboarding tour (gated by a localStorage flag) for
+  first-time visitors — drop zone → recipient → advanced → send
+- Renders the share URL inline with a "Copy link" button on success
+
+### Admin console polish
+
+- Credentials persist in `localStorage` (was `sessionStorage`) — survives
+  browser restart. A new **Forget** button clears them on demand
+- Global search bar at the top of the console; press <kbd>/</kbd>
+  anywhere to focus it and filter the 19 panels by title / eyebrow /
+  ID (e.g. type `watermark`, `box`, `audit`). <kbd>Esc</kbd> clears
+- `/admin/glossary.json` defines tooltips for 26 technical terms
+  (Tenant ID, Watermark template, Trailer secret, …). A `?` icon is
+  auto-decorated on any label or `<code>` that mentions a term; hover
+  shows the plain-English definition
+
+### Windows tray Quick Send panel
+
+The tray window gains a prominent **Quick Send** section at the top:
+one drop zone, one recipient email box, Send button. On click the tray
+calls `/api/me/share` directly and copies the share URL to the
+clipboard. Power-user fields (manual protect, transparent envelopes,
+containers, integrations) stay below for advanced workflows.
+
+### Windows viewer first-run overlay
+
+`HelpOverlayRoot` is a modal-style overlay that shows on first launch
+(gated by a flag in `%LocalAppData%\DRM\viewer-first-run.flag`) and any
+time the user presses `F1`. Documents drop targets, the Print WM
+toggle, the watermark / container banners, and keyboard shortcuts.
+`Esc` dismisses.
+
+### CLI `drm share`
+
+```bash
+drm-cli share \
+    --server-url https://drm.example.com \
+    --tenant-id 00000000-0000-0000-0000-000000000000 \
+    --user-id   00000000-0000-0000-0000-000000000000 \
+    --file      quarterly-results.xlsx \
+    --to        cfo@company.com \
+    --expires-hours 24 \
+    --admin-key  $DRM_ADMIN_API_KEY
+```
+
+Outputs only the share URL on stdout, so it composes with shell pipes.
+Returns exit code 1 if the server rejects the request, with the HTTP
+status + response body printed to stderr.
+
+### Deferred to a follow-up phase
+
+The Windows shell extension that adds a right-click "Protect with DRM"
+context menu in Explorer (Task 8 in the plan) is deferred to Phase
+5AS-shell. It requires a C++/COM in-proc server registered via
+`regsvr32` and Windows-only integration testing that won't run in CI.
+
+### Tests
+
+7 new (3 persona endpoint shape + 4 quick share contract). One existing
+redirect test updated to expect `/me/`. **231/231 pass.**

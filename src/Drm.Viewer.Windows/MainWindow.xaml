@@ -172,5 +172,36 @@
                    Foreground="#374151"
                    VerticalAlignment="Center"
                    Padding="10,0" />
+
+        <Grid x:Name="HelpOverlayRoot"
+              Grid.RowSpan="4"
+              Background="#CC000000"
+              Visibility="Collapsed">
+            <Border Background="#FFFFFF" Padding="24"
+                    CornerRadius="10"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MaxWidth="560">
+                <StackPanel>
+                    <TextBlock Text="DRM Viewer — Quick reference"
+                               FontSize="18" FontWeight="SemiBold" />
+                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Foreground="#374151">
+                        • <Bold>Drop</Bold> a .drmx, .drmcontainer, or transparent-protected file anywhere on this window to open it.<LineBreak/>
+                        • <Bold>Copy / Print / Export</Bold> buttons enable only when your policy allows that action.<LineBreak/>
+                        • <Bold>Print WM</Bold> (top-right): tick to stamp the printed page with your identity. Type a pattern like
+                          <Italic>CONFIDENTIAL {user} {time}</Italic> — tokens are replaced at print time.<LineBreak/>
+                        • <Bold>Banners</Bold> at the top mean a Transparent (yellow) or Container (blue) file was detected; follow the prompts.<LineBreak/>
+                        • Press <Bold>F1</Bold> anytime to see this overlay again.
+                    </TextBlock>
+                    <Button Content="Got it"
+                            HorizontalAlignment="Right"
+                            Margin="0,18,0,0"
+                            Padding="18,6"
+                            Background="#A45B13" Foreground="White"
+                            BorderThickness="0"
+                            Click="DismissHelpOverlay_Click" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

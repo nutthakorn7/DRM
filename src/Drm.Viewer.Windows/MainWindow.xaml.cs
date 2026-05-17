@@ -57,6 +57,10 @@ public partial class MainWindow : Window
         StatusText.Text = "No document loaded.";
         PrefillProtectedPathFromCommandLine();
         ApplyPermissionState();
+        if (ShouldShowFirstRunOverlay())
+        {
+            HelpOverlayRoot.Visibility = Visibility.Visible;
+        }
     }
 
     private void RefreshWatermarkTiles()
@@ -459,8 +463,51 @@ public partial class MainWindow : Window
         StatusText.Text = $"Exported original file: {dialog.FileName}";
     }
 
+    private const string FirstRunOverlayPathSegment = "DRM/viewer-first-run.flag";
+
+    private bool ShouldShowFirstRunOverlay()
+    {
+        var flag = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            FirstRunOverlayPathSegment);
+        return !File.Exists(flag);
+    }
+
+    private void MarkFirstRunOverlaySeen()
+    {
+        var flag = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            FirstRunOverlayPathSegment);
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(flag)!);
+            File.WriteAllText(flag, DateTimeOffset.UtcNow.ToString("O"));
+        }
+        catch (IOException) { /* not fatal */ }
+    }
+
+    private void DismissHelpOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        HelpOverlayRoot.Visibility = Visibility.Collapsed;
+        MarkFirstRunOverlaySeen();
+    }
+
     private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F1)
+        {
+            HelpOverlayRoot.Visibility = Visibility.Visible;
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && HelpOverlayRoot.Visibility == Visibility.Visible)
+        {
+            HelpOverlayRoot.Visibility = Visibility.Collapsed;
+            e.Handled = true;
+            return;
+        }
+
         if ((Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
         {
             return;

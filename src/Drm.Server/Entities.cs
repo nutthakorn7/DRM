@@ -455,6 +455,17 @@ public sealed class TransparentProtectedFileEntity
     public DateTimeOffset RegisteredAtUtc { get; set; }
 }
 
+public sealed class TenantUserPersonaEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public string Persona { get; set; } = "Employee";
+
+    public DateTimeOffset AssignedAtUtc { get; set; }
+}
+
 public sealed class FileTagEntity
 {
     public Guid TenantId { get; set; }

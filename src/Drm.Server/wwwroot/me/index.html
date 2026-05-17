@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DRM — Send a protected file</title>
+  <link rel="stylesheet" href="/me/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>DRM</strong>
+      <span class="badge" id="personaBadge">Loading…</span>
+    </div>
+    <nav>
+      <a href="/me/" class="active">Send</a>
+      <a href="/share/">Open shared file</a>
+      <a href="#" id="adminLink" hidden>Admin →</a>
+    </nav>
+  </header>
+
+  <main class="hero">
+    <h1>Send a protected file</h1>
+    <p class="lead">Drop a file, type a recipient email, click Send. They get a verification link — no DRM client needed on their side.</p>
+
+    <form id="quickShareForm" class="quick-share">
+      <details class="session" id="sessionDetails">
+        <summary>You are signed in as <span id="sessionLabel">(not configured)</span></summary>
+        <label>Tenant ID
+          <input id="tenantId" type="text" placeholder="00000000-0000-0000-0000-000000000000" required>
+        </label>
+        <label>User ID
+          <input id="userId" type="text" placeholder="00000000-0000-0000-0000-000000000000" required>
+        </label>
+        <p class="hint">These IDs are remembered on this browser only. Get them from your IT admin if you do not have them.</p>
+      </details>
+
+      <div id="dropZone" class="drop-zone" tabindex="0">
+        <div class="drop-icon">📄</div>
+        <p><strong>Drop a file here</strong> or click to browse</p>
+        <input type="file" id="fileInput" hidden>
+        <p id="fileSummary" class="file-summary"></p>
+      </div>
+
+      <label class="recipient">
+        Send to
+        <input id="recipient" type="email" required placeholder="bob@example.com" autocomplete="email">
+      </label>
+
+      <details class="advanced">
+        <summary>Advanced options</summary>
+        <label>Expires after
+          <input id="expiresHours" type="number" min="1" max="8760" value="168">
+          hours <span class="hint">(default 7 days)</span>
+        </label>
+        <label class="inline-check">
+          <input id="allowPrint" type="checkbox">
+          Allow recipient to print
+        </label>
+      </details>
+
+      <button type="submit" id="sendButton" class="primary big">Send protected file</button>
+    </form>
+
+    <section id="result" class="result" hidden>
+      <h2>✅ Sent</h2>
+      <p>Copy this link and send it to the recipient. They will need to verify their email before opening.</p>
+      <div class="share-url-row">
+        <input id="shareUrl" type="text" readonly>
+        <button id="copyBtn" type="button">Copy link</button>
+      </div>
+      <p class="hint">
+        Expires <span id="expiresAt"></span> ·
+        File <code id="fileIdSummary"></code> ·
+        <a id="anotherFileLink" href="#">Send another file</a>
+      </p>
+    </section>
+
+    <p id="errorBox" class="error-box" hidden></p>
+  </main>
+
+  <script src="/me/app.js" defer></script>
+</body>
+</html>

@@ -1,7 +1,18 @@
+// Migrate any older sessionStorage values into localStorage on first load so
+// admins don't lose their saved IDs when this update lands.
+(function migrateSessionStorage() {
+  ["drm:tenantId", "drm:adminKey", "drm:adminUserId"].forEach((key) => {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue && !localStorage.getItem(key)) {
+      localStorage.setItem(key, sessionValue);
+    }
+  });
+})();
+
 const state = {
-  tenantId: sessionStorage.getItem("drm:tenantId") || "",
-  adminKey: sessionStorage.getItem("drm:adminKey") || "",
-  adminUserId: sessionStorage.getItem("drm:adminUserId") || ""
+  tenantId: localStorage.getItem("drm:tenantId") || "",
+  adminKey: localStorage.getItem("drm:adminKey") || "",
+  adminUserId: localStorage.getItem("drm:adminUserId") || ""
 };
 
 const tenantIdInput = document.querySelector("#tenantId");
@@ -36,11 +47,89 @@ document.querySelector("#saveSession").addEventListener("click", () => {
   state.tenantId = tenantIdInput.value.trim();
   state.adminKey = adminKeyInput.value.trim();
   state.adminUserId = adminUserIdInput.value.trim();
-  sessionStorage.setItem("drm:tenantId", state.tenantId);
-  sessionStorage.setItem("drm:adminKey", state.adminKey);
-  sessionStorage.setItem("drm:adminUserId", state.adminUserId);
-  setStatus("Session saved", "ok");
+  localStorage.setItem("drm:tenantId", state.tenantId);
+  localStorage.setItem("drm:adminKey", state.adminKey);
+  localStorage.setItem("drm:adminUserId", state.adminUserId);
+  setStatus("Session saved (persists across browser sessions)", "ok");
 });
+
+// Forget-session helper: clear local credentials without nuking other admin
+// state (which the user may have spent time building).
+const forgetSessionBtn = document.querySelector("#forgetSession");
+if (forgetSessionBtn) {
+  forgetSessionBtn.addEventListener("click", () => {
+    state.tenantId = "";
+    state.adminKey = "";
+    state.adminUserId = "";
+    ["drm:tenantId", "drm:adminKey", "drm:adminUserId"].forEach((k) => localStorage.removeItem(k));
+    tenantIdInput.value = "";
+    adminKeyInput.value = "";
+    adminUserIdInput.value = "";
+    setStatus("Session cleared from this browser", "ok");
+  });
+}
+
+// Global search: hit `/` anywhere to jump to the panel-filter input.
+const globalSearch = document.querySelector("#globalSearch");
+if (globalSearch) {
+  document.addEventListener("keydown", (event) => {
+    const inField = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName ?? "");
+    if (event.key === "/" && !inField) {
+      event.preventDefault();
+      globalSearch.focus();
+      globalSearch.select();
+    }
+    if (event.key === "Escape" && document.activeElement === globalSearch) {
+      globalSearch.value = "";
+      globalSearch.dispatchEvent(new Event("input"));
+      globalSearch.blur();
+    }
+  });
+  globalSearch.addEventListener("input", () => {
+    const q = globalSearch.value.trim().toLowerCase();
+    document.querySelectorAll("section.panel").forEach((panel) => {
+      if (!q) { panel.hidden = false; return; }
+      const haystack = (panel.querySelector("h3, h4")?.textContent ?? "").toLowerCase() +
+                       " " + (panel.querySelector(".eyebrow")?.textContent ?? "").toLowerCase() +
+                       " " + (panel.id || "");
+      panel.hidden = !haystack.includes(q);
+    });
+  });
+}
+
+// Glossary tooltips: decorate any element whose text content contains a
+// term defined in /admin/glossary.json. Decoration is idempotent.
+(async function initGlossary() {
+  let glossary = {};
+  try {
+    const resp = await fetch("/admin/glossary.json");
+    if (resp.ok) glossary = await resp.json();
+  } catch { /* offline or missing — skip silently */ }
+
+  function decorate() {
+    if (!Object.keys(glossary).length) return;
+    document.querySelectorAll("label, summary, .eyebrow, code").forEach((el) => {
+      if (el.dataset.glossaryDecorated) return;
+      const text = el.textContent;
+      for (const [term, def] of Object.entries(glossary)) {
+        if (text && text.includes(term)) {
+          const icon = document.createElement("span");
+          icon.className = "help-icon";
+          icon.setAttribute("data-help", def);
+          icon.textContent = "?";
+          icon.title = def;
+          el.appendChild(icon);
+          el.dataset.glossaryDecorated = "1";
+          break;
+        }
+      }
+    });
+  }
+  decorate();
+  // Re-decorate when panels expand or new rows are rendered.
+  const observer = new MutationObserver(() => decorate());
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
 
 document.querySelector("#refreshUsers").addEventListener("click", () => {
   refreshUsers();

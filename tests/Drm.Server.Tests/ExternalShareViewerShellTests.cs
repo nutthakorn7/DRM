@@ -21,8 +21,10 @@ public sealed class ExternalShareViewerShellTests : IDisposable
     }
 
     [Fact]
-    public async Task Root_path_redirects_to_share_viewer()
+    public async Task Root_path_redirects_to_quick_share_landing()
     {
+        // Phase 5AS moved the default landing from /share/ to /me/ so the
+        // first thing a non-technical user sees is the one-step send flow.
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -31,7 +33,7 @@ public sealed class ExternalShareViewerShellTests : IDisposable
         using var response = await client.GetAsync("/");
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        response.Headers.Location.Should().Be("/share/");
+        response.Headers.Location.Should().Be("/me/");
     }
 
     [Fact]

@@ -445,6 +445,123 @@ public partial class MainWindow : Window
         }
     }
 
+    private string? quickPickedFile;
+
+    private void QuickDropZone_DragEnter(object sender, System.Windows.DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            e.Effects = System.Windows.DragDropEffects.Copy;
+            QuickDropZone.BorderBrush = System.Windows.Media.Brushes.SteelBlue;
+            QuickDropZone.Background = System.Windows.Media.Brushes.AliceBlue;
+        }
+        else
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void QuickDropZone_DragLeave(object sender, System.Windows.DragEventArgs e)
+    {
+        QuickDropZone.BorderBrush = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0xD1, 0xD5, 0xDB));
+        QuickDropZone.Background = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromRgb(0xFA, 0xFA, 0xFA));
+    }
+
+    private void QuickDropZone_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        QuickDropZone_DragLeave(sender, e);
+        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) return;
+        if (e.Data.GetData(System.Windows.DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        var firstFile = paths.FirstOrDefault(File.Exists);
+        if (firstFile is null) { QuickResultText.Text = "Folders are not supported; drop a single file."; return; }
+        quickPickedFile = firstFile;
+        QuickDropFile.Text = Path.GetFileName(firstFile);
+        QuickResultText.Text = string.Empty;
+    }
+
+    private void QuickBrowseButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+            Title = "Select file to send"
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            quickPickedFile = dialog.FileName;
+            QuickDropFile.Text = Path.GetFileName(dialog.FileName);
+            QuickResultText.Text = string.Empty;
+        }
+    }
+
+    private async void QuickSendButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(quickPickedFile))
+        {
+            QuickResultText.Text = "Drop a file or click Browse first.";
+            return;
+        }
+        var recipient = QuickRecipientBox.Text.Trim();
+        if (string.IsNullOrEmpty(recipient) || !recipient.Contains('@'))
+        {
+            QuickResultText.Text = "Enter a recipient email.";
+            return;
+        }
+
+        QuickSendButton.IsEnabled = false;
+        QuickResultText.Text = "Sending…";
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            var userId = ParseRequiredGuid(UserIdBox.Text, "User ID");
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+
+            var bytes = await File.ReadAllBytesAsync(quickPickedFile);
+            var body = new
+            {
+                tenantId,
+                userId,
+                recipientEmail = recipient,
+                fileName = Path.GetFileName(quickPickedFile),
+                contentType = "application/octet-stream",
+                fileBytesBase64 = Convert.ToBase64String(bytes),
+                expiresInHours = 168,
+                allowPrint = false
+            };
+            using var content = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(body),
+                System.Text.Encoding.UTF8, "application/json");
+            using var response = await httpClient.PostAsync("/api/me/share", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                QuickResultText.Text = $"Send failed: HTTP {(int)response.StatusCode}";
+                return;
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? "";
+            var fileId = doc.RootElement.GetProperty("fileId").GetString() ?? "";
+            System.Windows.Clipboard.SetText(shareUrl);
+            QuickResultText.Text = $"✅ Sent. Share URL copied to clipboard. File {fileId.Substring(0, 8)}…";
+        }
+        catch (Exception ex)
+        {
+            QuickResultText.Text = $"Send failed: {ex.Message}";
+        }
+        finally
+        {
+            QuickSendButton.IsEnabled = true;
+        }
+    }
+
     private async void CheckFolderWatcherButton_Click(object sender, RoutedEventArgs e)
     {
         CheckFolderWatcherButton.IsEnabled = false;

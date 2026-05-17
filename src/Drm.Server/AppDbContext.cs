@@ -48,6 +48,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<FileTagEntity> FileTags => Set<FileTagEntity>();
 
+    public DbSet<TenantUserPersonaEntity> TenantUserPersonas => Set<TenantUserPersonaEntity>();
+
     public DbSet<TransparentProtectedFileEntity> TransparentProtectedFiles => Set<TransparentProtectedFileEntity>();
 
     public DbSet<SecureContainerEntity> SecureContainers => Set<SecureContainerEntity>();
@@ -240,6 +242,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(t => new { t.TenantId, t.FileId, t.Tag });
             entity.HasIndex(t => new { t.TenantId, t.Tag });
             entity.Property(t => t.Tag).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<TenantUserPersonaEntity>(entity =>
+        {
+            entity.HasKey(p => new { p.TenantId, p.UserId });
+            entity.Property(p => p.Persona).HasMaxLength(32);
         });
 
         modelBuilder.Entity<TransparentProtectedFileEntity>(entity =>

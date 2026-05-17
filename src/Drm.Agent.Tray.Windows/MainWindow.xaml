@@ -18,6 +18,44 @@
         <StackPanel Grid.Row="0">
             <TextBlock Text="DRM Agent" FontSize="22" FontWeight="SemiBold" Foreground="#111827" />
             <TextBlock Text="Protect files into managed encrypted containers." Margin="0,4,0,0" Foreground="#4B5563" />
+            <Border Margin="0,16,0,0" Background="#FFFFFF" BorderBrush="#D1D5DB" BorderThickness="1"
+                    CornerRadius="8" Padding="14">
+                <StackPanel>
+                    <TextBlock Text="🚀 Quick Send (recommended)" FontSize="14" FontWeight="SemiBold"
+                               Foreground="#1f2937" />
+                    <TextBlock Text="One drop, one email, one click. The recipient gets a verification link."
+                               Foreground="#6B7280" Margin="0,2,0,8" TextWrapping="Wrap" FontSize="11" />
+                    <Border x:Name="QuickDropZone" Background="#FAFAFA" BorderBrush="#D1D5DB"
+                            BorderThickness="2" CornerRadius="6" Padding="14" AllowDrop="True"
+                            DragEnter="QuickDropZone_DragEnter"
+                            DragLeave="QuickDropZone_DragLeave"
+                            DragOver="QuickDropZone_DragEnter"
+                            Drop="QuickDropZone_Drop">
+                        <StackPanel>
+                            <TextBlock Text="Drop file here, or click Browse below" Foreground="#9CA3AF"
+                                       FontSize="11" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="QuickDropFile" Foreground="#6f3a08" FontWeight="SemiBold"
+                                       FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="Send to:" Foreground="#374151" VerticalAlignment="Center"
+                                   Margin="0,0,6,0" />
+                        <TextBox x:Name="QuickRecipientBox" Width="280" Height="26"
+                                 VerticalContentAlignment="Center" />
+                        <Button x:Name="QuickBrowseButton" Content="Browse" Margin="8,0,0,0"
+                                Padding="10,2" Click="QuickBrowseButton_Click" />
+                        <Button x:Name="QuickSendButton" Content="Send protected file"
+                                Margin="8,0,0,0" Padding="14,4" Background="#A45B13" Foreground="White"
+                                FontWeight="SemiBold" BorderThickness="0"
+                                Click="QuickSendButton_Click" />
+                    </StackPanel>
+                    <TextBlock x:Name="QuickResultText" Foreground="#047857" FontSize="11"
+                               TextWrapping="Wrap" Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+            <Expander Header="Advanced (manual protect, integrations, status)" IsExpanded="False"
+                      Margin="0,12,0,0" Foreground="#374151" />
         </StackPanel>
 
         <Grid Grid.Row="2">

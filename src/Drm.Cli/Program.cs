@@ -35,10 +35,55 @@ public static class DrmCli
                 return await ProtectAsync(protect, output, cancellationToken);
             case OpenCommandOptions open:
                 return await OpenAsync(open, output, cancellationToken);
+            case ShareCommandOptions share:
+                return await ShareAsync(share, output, error, cancellationToken);
             default:
                 await error.WriteLineAsync("No command was supplied.");
                 return 2;
         }
+    }
+
+    private static async Task<int> ShareAsync(
+        ShareCommandOptions options,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var bytes = await File.ReadAllBytesAsync(options.FilePath, cancellationToken);
+        using var http = new HttpClient { BaseAddress = new Uri(options.ServerUrl) };
+        if (!string.IsNullOrEmpty(options.AdminApiKey))
+        {
+            http.DefaultRequestHeaders.TryAddWithoutValidation("X-DRM-Admin-Key", options.AdminApiKey);
+        }
+
+        var body = new
+        {
+            tenantId = options.TenantId,
+            userId = options.UserId,
+            recipientEmail = options.RecipientEmail,
+            fileName = Path.GetFileName(options.FilePath),
+            contentType = "application/octet-stream",
+            fileBytesBase64 = Convert.ToBase64String(bytes),
+            expiresInHours = options.ExpiresInHours,
+            allowPrint = options.AllowPrint
+        };
+
+        using var content = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(body),
+            System.Text.Encoding.UTF8, "application/json");
+        using var response = await http.PostAsync("/api/me/share", content, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            await error.WriteLineAsync($"Share failed: HTTP {(int)response.StatusCode} {responseBody}");
+            return 1;
+        }
+
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = System.Text.Json.JsonDocument.Parse(responseJson);
+        var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString();
+        await output.WriteLineAsync(shareUrl);
+        return 0;
     }
 
     private static async Task<int> ProtectAsync(

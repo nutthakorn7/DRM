@@ -40,6 +40,16 @@ public sealed record OpenCommandOptions(
 
 public sealed record HelpCommandOptions : ICliCommand;
 
+public sealed record ShareCommandOptions(
+    string ServerUrl,
+    Guid TenantId,
+    Guid UserId,
+    string FilePath,
+    string RecipientEmail,
+    int ExpiresInHours,
+    bool AllowPrint,
+    string? AdminApiKey) : ICliCommand;
+
 public static class CliParser
 {
     private const Permission DefaultPermissions = Permission.View | Permission.Print;
@@ -55,6 +65,7 @@ public static class CliParser
         {
             "protect" => ParseProtect(args.Skip(1).ToArray()),
             "open" => ParseOpen(args.Skip(1).ToArray()),
+            "share" => ParseShare(args.Skip(1).ToArray()),
             _ => CliParseResult.Fail($"Unknown command '{args[0]}'.")
         };
     }
@@ -63,8 +74,43 @@ public static class CliParser
         """
         Usage:
           drm-cli protect --server-url URL --tenant-id GUID --user-id GUID --file PATH [--permissions "View, Print"] [--policy-template-id GUID] [--recipient-user-id GUID] [--recipient-group-id GUID] [--delete-original]
-          drm-cli open --server-url URL --user-id GUID --device-id GUID --file PATH --output PATH
+          drm-cli open    --server-url URL --user-id GUID --device-id GUID --file PATH --output PATH
+          drm-cli share   --server-url URL --tenant-id GUID --user-id GUID --file PATH --to EMAIL [--expires-hours N] [--allow-print] [--admin-key KEY]
         """;
+
+    private static CliParseResult ParseShare(IReadOnlyList<string> args)
+    {
+        var options = ReadOptions(args);
+        if (options.Error is not null) return CliParseResult.Fail(options.Error);
+
+        string? tenantError = null;
+        string? userError = null;
+        if (!TryGetRequired(options.Values, "server-url", out var serverUrl) ||
+            !TryGetRequiredGuid(options.Values, "tenant-id", out var tenantId, out tenantError) ||
+            !TryGetRequiredGuid(options.Values, "user-id", out var userId, out userError) ||
+            !TryGetRequired(options.Values, "file", out var filePath) ||
+            !TryGetRequired(options.Values, "to", out var recipientEmail))
+        {
+            return CliParseResult.Fail(tenantError ?? userError ?? "Missing required option for share.");
+        }
+
+        var expiresInHours = 168;
+        var rawExpires = GetOptional(options.Values, "expires-hours");
+        if (rawExpires is not null && (!int.TryParse(rawExpires, out expiresInHours) || expiresInHours <= 0))
+        {
+            return CliParseResult.Fail("--expires-hours must be a positive integer.");
+        }
+
+        return CliParseResult.Success(new ShareCommandOptions(
+            serverUrl,
+            tenantId,
+            userId,
+            filePath,
+            recipientEmail,
+            expiresInHours,
+            options.Flags.Contains("allow-print"),
+            GetOptional(options.Values, "admin-key")));
+    }
 
     private static CliParseResult ParseProtect(IReadOnlyList<string> args)
     {

@@ -407,6 +407,59 @@ button.danger:hover {
   color: var(--ink);
 }
 
+button.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+button.ghost:hover {
+  background: rgba(164, 91, 19, 0.08);
+}
+
+.global-search-row {
+  margin: 12px 0;
+}
+
+.global-search-row .search-label {
+  flex: 1 1 100%;
+}
+
+.global-search-row input[type="search"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: var(--surface);
+}
+
+.global-search-row input[type="search"]:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.help-icon:hover {
+  background: var(--accent-dark);
+}
+
 .license-tiers {
   display: flex;
   flex-wrap: wrap;
