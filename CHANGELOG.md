@@ -4,6 +4,124 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Phase 5B — Web console polish + design system (2026-05-17, single session)
+
+Took /admin/ from "functional but unfriendly" (audit grade B−) to A− across a
+17-commit session. New user can land cold and ship a protected file without
+asking IT. See `DESIGN.md` for the brand decisions and
+`~/.gstack/projects/DRM/designs/design-audit-20260517/` for the full audit
+report and screenshots.
+
+**Onboarding & wayfinding**
+- Welcome screen on first visit: one click generates a test Tenant ID, Admin
+  Key, and Admin user ID. Replaces the "wall of GUIDs" greeting that previously
+  greeted new users. Dismissed state in `localStorage.drm:bootstrapped`.
+- Getting Started checklist on the Overview tab: 5 numbered steps with action
+  buttons that auto-check as the user completes each step. Steps fire custom
+  `drm:onboarded` events so other parts of the app can listen.
+- "First time?" pill next to Tenant operations heading with hover hint.
+- Plain-language `ⓘ` info pills on every jargon panel heading (Transparent,
+  Containers, SIEM, Folder watcher, Watermarks, Simulator, …). Tooltips defined
+  in `PANEL_TIPS` map; tab labels get tooltips from `TAB_TIPS`.
+
+**Information architecture**
+- 19 admin panels collapsed into 5 tabs (Overview, Identity, Policy, Files,
+  Integrations) via `data-tab` attribute + body-level visibility CSS.
+  Persisted active tab in `localStorage.drm:adminActiveTab` and URL hash
+  (`#tab-identity`).
+- Sub-nav inside each tab: dynamic pill nav rendered from panels grouped under
+  the active tab, showing one panel at a time. Per-tab active sub-tab in
+  `localStorage.drm:adminActiveSubtab:{tab}`. Getting Started pinned to position
+  1 on Overview.
+- License + Server Health moved out of Overview into a slide-in **Settings
+  drawer** (gear button in page header → drawer from right, 420px, 220ms ease).
+  Backdrop + Escape + click-outside all close. Body scroll-locked while open.
+- Search mode (`data-active-tab="all"`) clears sub-nav and reveals every panel.
+- Sidebar global-nav simplified: 3 cross-surface links (Admin / Send / Open
+  shared) + Reference sub-nav (Use cases, Compatibility). Auto-collapses to
+  64px icon-only on `≤820px` viewports unless the user explicitly toggles.
+
+**Visual system**
+- Three-tier design token system shipped in `src/Drm.Server/wwwroot/static/tokens.css`:
+  primitives (color scales, spacing 4-64px, type 11-36px, radii, shadows,
+  motion, z-index), aliases (`--accent`, `--page`, `--rail`, `--ink`), and
+  component tokens (`--btn-*`, `--field-*`, `--card-*`, `--pill-*`). Surface
+  CSS now overrides only what's specific; one source of truth across all 5
+  surfaces.
+- **Teal-on-slate** palette unified across `/admin/`, `/me/`, `/share/`,
+  `/admin/cases/`, `/admin/compatibility/`. Replaces the prior brown-on-cream
+  scheme. `/share/`'s teal (judged the most polished surface in the audit) was
+  promoted to the system spine.
+- **IBM Plex Sans + IBM Plex Mono** loaded via Google Fonts with `preconnect`
+  and `font-display: swap`. Replaces `Arial, Helvetica, sans-serif` system
+  stack (the "I gave up on typography" signal). OpenType stylistic sets
+  ss01/ss03/cv02 enabled for crisper numerals.
+- Heading scale on a 1.25 major-third ratio: h1=28 / h2=22 / h3=18 / h4=16,
+  applied globally via tokens.css so every surface inherits.
+- All interactive elements bumped to **44px min-height** (WCAG/Apple HIG touch
+  target). Secondary nav pills allowed down to 36px. Sub-nav pills, primary
+  buttons, tab links, sidebar links, and inputs all conform.
+- Focus-ring system: `--focus-ring` (3px teal glow at 35% opacity) applied via
+  `:focus-visible` on all buttons/links and `:focus` on form fields across
+  every surface. Never `outline: none` without replacement.
+- `prefers-reduced-motion: reduce` honored globally — collapses all
+  `--duration-*` tokens to 0ms and clamps any un-tokenized transition to
+  0.01ms (belt-and-suspenders).
+
+**Empty states**
+- New `.empty-state` card pattern (dashed border + icon + title + hint) lives
+  in tokens.css.
+- `emptyStateRow(colspan, opts)` helper embeds it inside a `<td>` for table
+  bodies.
+- Shipped to Users, Groups, Files, Templates, Devices admin panels — each with
+  a panel-specific icon and a one-sentence hint that tells the new user the
+  concrete next step.
+- `/share/` preview pane now carries `data-has-session="false"` until the
+  viewer session loads; empty state shows "Document preview will appear here"
+  with a lock icon, hiding the previous `dl`-with-dashes placeholder. Disabled
+  Download/Print/Export action buttons also hidden until verification completes.
+
+**`/share/` flow gating**
+- Step 2 ("Confirm code") is visually + functionally locked until step 1
+  completes: opacity 0.45 + grayscale 0.3 + `pointer-events: none`. Transitions
+  cleanly to active state when verification ID is set.
+- Native browser validation popup replaced with custom validation written to
+  `#viewerStatus`. Both forms marked `novalidate`; `required` attributes
+  stripped. Errors now match the design system.
+
+**`/me/` decluttering**
+- Killed the persona modal + 4-step product tour that previously blocked the
+  send-file form on first visit. The form is self-evident (drop zone +
+  recipient + Send button) and doesn't need a tour. Audit measured the two
+  modals draining 30 goodwill points per first visit.
+- Persona picker survives as an opt-in "Personalize" link in the topbar that
+  clears the `localStorage` gate and re-opens the picker on demand.
+- Topbar nav touch targets bumped to 48px tall.
+
+**`/admin/cases/` and `/admin/compatibility/` docs shell**
+- New sticky brand bar (logo + "DRM" + "Reference" eyebrow + back-to-admin link).
+- Sticky TOC sidebar with scroll-spy. `/admin/compatibility/` TOC is
+  auto-populated after the matrix loads — one entry per category with row
+  count, max-height with independent scroll when the matrix is tall.
+
+**Bug fixes shipped during audit**
+- `fix(admin): settings drawer panels were display:none` — the tab-visibility
+  rule was hiding every `section.panel` not matching the active tab, including
+  drawer panels (no `data-tab`). Scoped the rule to `.surface` only so drawer
+  panels render correctly.
+- `fix(admin): welcome-screen hidden attribute now actually hides it` — the
+  class selector's `display: grid` was overriding the `hidden` attribute's
+  user-agent `display: none`, leaving "Create test tenant" and "Skip"
+  visually present but with no click handlers attached (the IIFE early-returned
+  when a tenant already existed in localStorage).
+- `fix(me): kill blocking persona + tour modals on first visit` — see above.
+
+**Design system source of truth**
+- New `DESIGN.md` in repo root captures the brand decisions, the three-tier
+  token rationale, the surface-by-surface chrome map, and the AI-slop blacklist
+  the team committed to avoiding. Future palette / typography / layout changes
+  should calibrate against this document.
+
 ### Security — Code-review remediation (C1–C4 + I4 + I7 + M2 + M4)
 
 A code review of phases 5AL–5AR surfaced four Critical and several Important findings. Fixed in this release.
