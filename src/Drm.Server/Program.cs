@@ -45,6 +45,8 @@ builder.Services.AddScoped<IAdminNotificationService, AdminNotificationService>(
 
 var app = builder.Build();
 
+SecurityStartupGuard.Validate(app.Configuration, app.Environment);
+
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();

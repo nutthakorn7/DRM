@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/*.user
+**/TestResults/
+**/.gstack/
+**/.git/
+**/.github/
+**/node_modules/
+docs/
+tests/
+**/*.db
+**/*.db-shm
+**/*.db-wal

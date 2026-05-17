@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  drm-server:
+    build: .
+    image: drm-server:local
+    ports:
+      - "5188:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DrmDb: "Data Source=/var/lib/drm/drm-server.db"
+      Drm__Mode: OnPrem
+      Drm__Security__AdminApiKey: ${DRM_ADMIN_API_KEY:-changeme-dev}
+      Drm__Security__ClientApiKey: ${DRM_CLIENT_API_KEY:-changeme-dev-client}
+      Drm__Security__TransparentTrailerSecret: ${DRM_TRAILER_SECRET:-changeme-dev-trailer}
+      Drm__License__EnabledTiers: ${DRM_LICENSE_TIERS:-All}
+      Drm__License__PaidEncrypterCount: ${DRM_PAID_ENCRYPTERS:-10}
+    volumes:
+      - drm-data:/var/lib/drm
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  drm-data:

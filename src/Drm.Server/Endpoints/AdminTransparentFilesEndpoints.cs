@@ -1,3 +1,5 @@
+using System.Text;
+using Drm.Crypto;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -5,6 +7,8 @@ namespace Drm.Server.Endpoints;
 
 public static class AdminTransparentFilesEndpoints
 {
+    private const long MaxStampPayloadBytes = 200L * 1024 * 1024;
+
     public static IEndpointRouteBuilder MapAdminTransparentFilesEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/transparent-files");
@@ -13,8 +17,9 @@ public static class AdminTransparentFilesEndpoints
         group.MapGet("/", ListAsync);
         group.MapGet("/{fileId:guid}", GetAsync);
         group.MapDelete("/{fileId:guid}", DeregisterAsync);
-
-        endpoints.MapGet("/api/admin/transparent-files/secret", GetTrailerSecret);
+        group.MapPost("/stamp", StampAsync);
+        group.MapPost("/verify", VerifyAsync);
+        group.MapGet("/secret", GetTrailerSecret);
 
         return endpoints;
     }
@@ -115,11 +120,131 @@ public static class AdminTransparentFilesEndpoints
         return TypedResults.NoContent();
     }
 
-    private static Ok<TrailerSecretResponse> GetTrailerSecret(IConfiguration configuration)
+    private static Results<Ok<VerifyResponse>, BadRequest<ErrorResponse>> VerifyAsync(
+        VerifyRequest request,
+        IConfiguration configuration)
     {
-        var secret = configuration["Drm:Security:TransparentTrailerSecret"]
-            ?? "drm-transparent-default-secret";
+        if (string.IsNullOrEmpty(request.FileBytesBase64))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_file_bytes"));
+        }
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(request.FileBytesBase64);
+        }
+        catch (FormatException)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_base64"));
+        }
+        if (bytes.LongLength == 0 || bytes.LongLength > MaxStampPayloadBytes)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("payload_size_out_of_range"));
+        }
+
+        var secret = configuration["Drm:Security:TransparentTrailerSecret"];
+        if (string.IsNullOrWhiteSpace(secret) ||
+            string.Equals(secret, SecurityStartupGuard.DefaultTrailerSecretPlaceholder, StringComparison.Ordinal))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("trailer_secret_not_configured"));
+        }
+
+        var hmacKey = Encoding.UTF8.GetBytes(secret);
+        if (TransparentEnvelope.TryReadTrailer(bytes, hmacKey, out var metadata, out var originalLength))
+        {
+            return TypedResults.Ok(new VerifyResponse(
+                Valid: true,
+                metadata!.TenantId,
+                metadata.FileId,
+                metadata.OwnerUserId,
+                metadata.ContentType,
+                metadata.OriginalFileName,
+                metadata.RegisteredAtUtc,
+                metadata.PolicyTemplateId,
+                OriginalLength: originalLength));
+        }
+        return TypedResults.Ok(new VerifyResponse(false, null, null, null, null, null, null, null, null));
+    }
+
+    private static Results<Ok<TrailerSecretResponse>, NotFound<ErrorResponse>, BadRequest<ErrorResponse>> GetTrailerSecret(
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        // The trailer secret is the only authenticity anchor for transparent
+        // files. Returning it over the network is gated to specific deployments
+        // (folder-watcher service inside the trust boundary). All other
+        // callers should use POST /stamp instead, which performs the stamping
+        // server-side and never reveals the secret.
+        var distributionAllowed = configuration.GetValue("Drm:Security:AllowTrailerSecretDistribution", false);
+        if (!distributionAllowed)
+        {
+            return TypedResults.NotFound(new ErrorResponse("trailer_secret_distribution_disabled"));
+        }
+
+        var secret = configuration["Drm:Security:TransparentTrailerSecret"];
+        if (string.IsNullOrWhiteSpace(secret) ||
+            string.Equals(secret, SecurityStartupGuard.DefaultTrailerSecretPlaceholder, StringComparison.Ordinal))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("trailer_secret_not_configured"));
+        }
         return TypedResults.Ok(new TrailerSecretResponse(secret));
+    }
+
+    private static Results<Ok<StampResponse>, BadRequest<ErrorResponse>> StampAsync(
+        StampRequest request,
+        IConfiguration configuration)
+    {
+        if (request.TenantId == Guid.Empty || request.OwnerUserId == Guid.Empty)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_identifiers"));
+        }
+        if (string.IsNullOrWhiteSpace(request.OriginalFileName))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_file_name"));
+        }
+        if (string.IsNullOrEmpty(request.FileBytesBase64))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_file_bytes"));
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(request.FileBytesBase64);
+        }
+        catch (FormatException)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("invalid_base64"));
+        }
+        if (bytes.LongLength == 0 || bytes.LongLength > MaxStampPayloadBytes)
+        {
+            return TypedResults.BadRequest(new ErrorResponse("payload_size_out_of_range"));
+        }
+
+        var secret = configuration["Drm:Security:TransparentTrailerSecret"];
+        if (string.IsNullOrWhiteSpace(secret) ||
+            string.Equals(secret, SecurityStartupGuard.DefaultTrailerSecretPlaceholder, StringComparison.Ordinal))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("trailer_secret_not_configured"));
+        }
+        var hmacKey = Encoding.UTF8.GetBytes(secret);
+
+        var fileId = request.FileId == Guid.Empty ? Guid.NewGuid() : request.FileId;
+        var metadata = new TransparentMetadata(
+            request.TenantId,
+            fileId,
+            request.OwnerUserId,
+            request.ContentType ?? "application/octet-stream",
+            request.OriginalFileName.Trim(),
+            DateTimeOffset.UtcNow,
+            request.PolicyTemplateId);
+
+        var stamped = TransparentEnvelope.AppendTrailer(bytes, metadata, hmacKey);
+        return TypedResults.Ok(new StampResponse(
+            fileId,
+            Convert.ToBase64String(stamped),
+            stamped.Length,
+            stamped.Length - bytes.Length));
     }
 
     private sealed record RegisterRequest(
@@ -145,6 +270,34 @@ public static class AdminTransparentFilesEndpoints
     }
 
     private sealed record TrailerSecretResponse(string Secret);
+
+    private sealed record StampRequest(
+        Guid TenantId,
+        Guid FileId,
+        Guid OwnerUserId,
+        string OriginalFileName,
+        string? ContentType,
+        Guid? PolicyTemplateId,
+        string FileBytesBase64);
+
+    private sealed record StampResponse(
+        Guid FileId,
+        string StampedFileBytesBase64,
+        long StampedSizeBytes,
+        long TrailerSizeBytes);
+
+    private sealed record VerifyRequest(string FileBytesBase64);
+
+    private sealed record VerifyResponse(
+        bool Valid,
+        Guid? TenantId,
+        Guid? FileId,
+        Guid? OwnerUserId,
+        string? ContentType,
+        string? OriginalFileName,
+        DateTimeOffset? RegisteredAtUtc,
+        Guid? PolicyTemplateId,
+        int? OriginalLength);
 
     private sealed record ErrorResponse(string ReasonCode);
 }

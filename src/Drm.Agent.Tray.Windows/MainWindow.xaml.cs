@@ -277,13 +277,6 @@ public partial class MainWindow : Window
             httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
                 "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
 
-            using var secretResponse = await httpClient.GetAsync("/api/admin/transparent-files/secret");
-            secretResponse.EnsureSuccessStatusCode();
-            var secretJson = await secretResponse.Content.ReadAsStringAsync();
-            using var secretDoc = System.Text.Json.JsonDocument.Parse(secretJson);
-            var secret = secretDoc.RootElement.GetProperty("secret").GetString() ?? "";
-            var hmacKey = System.Text.Encoding.UTF8.GetBytes(secret);
-
             var originalBytes = await File.ReadAllBytesAsync(sourceFile);
             var fileName = Path.GetFileName(sourceFile);
             var contentType = Path.GetExtension(sourceFile).ToLowerInvariant() switch
@@ -296,16 +289,36 @@ public partial class MainWindow : Window
                 _ => "application/octet-stream"
             };
 
-            var metadata = new Drm.Crypto.TransparentMetadata(
+            // Server-side stamping: bytes go up, stamped bytes come back. The
+            // HMAC trailer secret never leaves the server.
+            var stampBody = new
+            {
                 tenantId,
                 fileId,
                 ownerUserId,
+                originalFileName = fileName,
                 contentType,
-                fileName,
-                DateTimeOffset.UtcNow,
-                null);
-            var stamped = Drm.Crypto.TransparentEnvelope.AppendTrailer(originalBytes, metadata, hmacKey);
-            var outPath = Path.Combine(Path.GetDirectoryName(sourceFile)!, $"{Path.GetFileNameWithoutExtension(sourceFile)}-drm{Path.GetExtension(sourceFile)}");
+                policyTemplateId = (Guid?)null,
+                fileBytesBase64 = Convert.ToBase64String(originalBytes)
+            };
+            using var stampContent = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(stampBody),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            using var stampResponse = await httpClient.PostAsync("/api/admin/transparent-files/stamp", stampContent);
+            if (!stampResponse.IsSuccessStatusCode)
+            {
+                SetStatus($"Server stamp failed: HTTP {(int)stampResponse.StatusCode} {await stampResponse.Content.ReadAsStringAsync()}");
+                return;
+            }
+            var stampJson = await stampResponse.Content.ReadAsStringAsync();
+            using var stampDoc = System.Text.Json.JsonDocument.Parse(stampJson);
+            var stamped = Convert.FromBase64String(
+                stampDoc.RootElement.GetProperty("stampedFileBytesBase64").GetString() ?? "");
+
+            var outPath = Path.Combine(
+                Path.GetDirectoryName(sourceFile)!,
+                $"{Path.GetFileNameWithoutExtension(sourceFile)}-drm-{DateTime.UtcNow:yyyyMMddHHmmss}{Path.GetExtension(sourceFile)}");
             await File.WriteAllBytesAsync(outPath, stamped);
 
             var registerBody = new
@@ -396,8 +409,9 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var key = Drm.Crypto.SecureContainer.DeriveKey(passphrase, containerId);
-            var container = Drm.Crypto.SecureContainer.Pack(containerId, entries, key);
+            var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(Drm.Crypto.SecureContainer.SaltSize);
+            var key = Drm.Crypto.SecureContainer.DeriveKey(passphrase, salt);
+            var container = Drm.Crypto.SecureContainer.Pack(containerId, entries, key, salt);
             var displayName = Path.GetFileName(folder);
             if (string.IsNullOrWhiteSpace(displayName)) displayName = "secure-container";
             var outPath = Path.Combine(Path.GetDirectoryName(folder.TrimEnd(Path.DirectorySeparatorChar))!, $"{displayName}.drmcontainer");

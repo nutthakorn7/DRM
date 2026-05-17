@@ -60,15 +60,65 @@ public sealed class SecureContainerTests
     }
 
     [Fact]
-    public void DeriveKey_is_deterministic_for_same_passphrase_and_container_id()
+    public void DeriveKey_is_deterministic_for_same_passphrase_and_salt()
     {
-        var containerId = Guid.NewGuid();
-        var keyA = SecureContainer.DeriveKey("hunter2", containerId);
-        var keyB = SecureContainer.DeriveKey("hunter2", containerId);
+        var salt = RandomNumberGenerator.GetBytes(SecureContainer.SaltSize);
+        var keyA = SecureContainer.DeriveKey("hunter2", salt);
+        var keyB = SecureContainer.DeriveKey("hunter2", salt);
         keyA.Should().Equal(keyB);
         keyA.Length.Should().Be(SecureContainer.KeySize);
 
-        var keyDifferent = SecureContainer.DeriveKey("hunter2", Guid.NewGuid());
+        var differentSalt = RandomNumberGenerator.GetBytes(SecureContainer.SaltSize);
+        var keyDifferent = SecureContainer.DeriveKey("hunter2", differentSalt);
         keyA.Should().NotEqual(keyDifferent);
+    }
+
+    [Fact]
+    public void Pack_with_explicit_salt_writes_v2_header_with_salt_readable_via_TryReadSalt()
+    {
+        var containerId = Guid.NewGuid();
+        var salt = RandomNumberGenerator.GetBytes(SecureContainer.SaltSize);
+        var key = SecureContainer.DeriveKey("pwd", salt);
+        var entries = new List<SecureContainerEntry> { new("x.txt", Encoding.UTF8.GetBytes("data")) };
+
+        var container = SecureContainer.Pack(containerId, entries, key, salt);
+        container[SecureContainer.Magic.Length].Should().Be(SecureContainer.Version);
+
+        var readSalt = SecureContainer.TryReadSalt(container);
+        readSalt.Should().NotBeNull();
+        readSalt.Should().Equal(salt);
+
+        var unpacked = SecureContainer.Unpack(container, key);
+        unpacked.ContainerId.Should().Be(containerId);
+    }
+
+    [Fact]
+    public void Unpack_rejects_zip_slip_relative_paths_in_entries()
+    {
+        var containerId = Guid.NewGuid();
+        var salt = RandomNumberGenerator.GetBytes(SecureContainer.SaltSize);
+        var key = SecureContainer.DeriveKey("pwd", salt);
+        var malicious = new List<SecureContainerEntry>
+        {
+            new("../evil.exe", new byte[] { 1, 2, 3 })
+        };
+
+        var action = () => SecureContainer.Pack(containerId, malicious, key, salt);
+        action.Should().Throw<InvalidDataException>().WithMessage("*..*");
+    }
+
+    [Fact]
+    public void Unpack_rejects_absolute_path_entries()
+    {
+        var containerId = Guid.NewGuid();
+        var salt = RandomNumberGenerator.GetBytes(SecureContainer.SaltSize);
+        var key = SecureContainer.DeriveKey("pwd", salt);
+        var malicious = new List<SecureContainerEntry>
+        {
+            new("/etc/passwd", new byte[] { 1 })
+        };
+
+        var action = () => SecureContainer.Pack(containerId, malicious, key, salt);
+        action.Should().Throw<InvalidDataException>();
     }
 }

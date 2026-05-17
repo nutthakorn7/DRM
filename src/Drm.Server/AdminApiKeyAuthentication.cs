@@ -19,9 +19,19 @@ public static class AdminApiKeyAuthentication
             }
 
             var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+            var environment = context.RequestServices.GetRequiredService<IHostEnvironment>();
             var configuredKey = configuration["Drm:Security:AdminApiKey"];
             if (string.IsNullOrWhiteSpace(configuredKey))
             {
+                // SecurityStartupGuard refuses to start in non-Development with
+                // a blank admin key. This branch only runs under Development.
+                if (!environment.IsDevelopment())
+                {
+                    context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                    await context.Response.WriteAsJsonAsync(new ErrorResponse("admin_api_key_unconfigured"));
+                    return;
+                }
+
                 await next(context);
                 return;
             }

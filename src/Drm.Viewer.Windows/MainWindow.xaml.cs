@@ -27,6 +27,7 @@ public partial class MainWindow : Window
         };
 
     private string? temporaryPdfPath;
+    private readonly List<string> temporaryPrintWatermarkFiles = new();
     private byte[]? currentContent;
     private string currentContentType = string.Empty;
     private Permission currentPermissions = Permission.None;
@@ -174,11 +175,17 @@ public partial class MainWindow : Window
         }
         try
         {
-            // Sniff containerId from header to derive the key.
+            // Sniff salt from header to derive the v2 key; fall back to legacy
+            // v1 derivation when the file predates the salt addition.
             var headerOffset = Drm.Crypto.SecureContainer.Magic.Length + 1;
             var containerIdBytes = droppedContainerBytes.AsSpan(headerOffset, 16).ToArray();
             var containerId = new Guid(containerIdBytes);
-            var key = Drm.Crypto.SecureContainer.DeriveKey(passphrase, containerId);
+            var salt = Drm.Crypto.SecureContainer.TryReadSalt(droppedContainerBytes);
+#pragma warning disable CS0618 // v1 legacy KDF retained for backward compatibility
+            var key = salt is not null
+                ? Drm.Crypto.SecureContainer.DeriveKey(passphrase, salt)
+                : Drm.Crypto.SecureContainer.DeriveKeyLegacyV1(passphrase, containerId);
+#pragma warning restore CS0618
             var unpacked = Drm.Crypto.SecureContainer.Unpack(droppedContainerBytes, key);
 
             ContainerFilesList.ItemsSource = unpacked.Manifest.Entries
@@ -210,24 +217,34 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // Verification runs server-side so the HMAC secret never leaves
+            // the trust boundary.
             using var http = new System.Net.Http.HttpClient { BaseAddress = uri };
             http.DefaultRequestHeaders.TryAddWithoutValidation(
                 "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
-            using var secretResp = await http.GetAsync("/api/admin/transparent-files/secret");
-            if (!secretResp.IsSuccessStatusCode)
+            var verifyBody = new { fileBytesBase64 = Convert.ToBase64String(bytes) };
+            using var verifyContent = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(verifyBody),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            using var verifyResp = await http.PostAsync("/api/admin/transparent-files/verify", verifyContent);
+            if (!verifyResp.IsSuccessStatusCode)
             {
-                StatusText.Text = $"Could not fetch trailer secret (HTTP {(int)secretResp.StatusCode}).";
+                StatusText.Text = $"Transparent verify failed (HTTP {(int)verifyResp.StatusCode}).";
                 return;
             }
-            var secretJson = await secretResp.Content.ReadAsStringAsync();
-            using var secretDoc = System.Text.Json.JsonDocument.Parse(secretJson);
-            var secret = secretDoc.RootElement.GetProperty("secret").GetString() ?? "";
-            var hmacKey = System.Text.Encoding.UTF8.GetBytes(secret);
 
-            if (Drm.Crypto.TransparentEnvelope.TryReadTrailer(bytes, hmacKey, out var metadata, out var originalLength))
+            var verifyJson = await verifyResp.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(verifyJson);
+            var valid = doc.RootElement.GetProperty("valid").GetBoolean();
+            if (valid)
             {
+                var tenantId = doc.RootElement.GetProperty("tenantId").GetString() ?? "";
+                var fileId = doc.RootElement.GetProperty("fileId").GetString() ?? "";
+                var registered = doc.RootElement.GetProperty("registeredAtUtc").GetString() ?? "";
+                var originalLength = doc.RootElement.GetProperty("originalLength").GetInt32();
                 TransparentBanner.Visibility = Visibility.Visible;
-                TransparentBannerText.Text = $"Transparent DRM file detected · Tenant {metadata!.TenantId:D} · File {metadata.FileId:D} · Registered {metadata.RegisteredAtUtc:O} · Original size {originalLength:N0} bytes.";
+                TransparentBannerText.Text = $"Transparent DRM file detected · Tenant {tenantId} · File {fileId} · Registered {registered} · Original size {originalLength:N0} bytes.";
                 StatusText.Text = $"Transparent trailer valid. Open file in its native application: {filePath}";
             }
             else
@@ -385,6 +402,7 @@ public partial class MainWindow : Window
                     new PrintWatermarkOptions(resolved, 33, "diagonal"));
                 var stampedPath = Path.Combine(Path.GetTempPath(), $"drm-print-{Guid.NewGuid():N}.pdf");
                 await File.WriteAllBytesAsync(stampedPath, stamped);
+                temporaryPrintWatermarkFiles.Add(stampedPath);
                 PdfHost.Navigate(stampedPath);
                 StatusText.Text = $"Print watermark applied ({resolved.Length} chars). Triggering print…";
                 await Task.Delay(800);
@@ -473,7 +491,18 @@ public partial class MainWindow : Window
     {
         watermarkRefreshTimer.Stop();
         DeleteTemporaryPdf();
+        DeleteTemporaryPrintWatermarkFiles();
         base.OnClosed(e);
+    }
+
+    private void DeleteTemporaryPrintWatermarkFiles()
+    {
+        foreach (var path in temporaryPrintWatermarkFiles)
+        {
+            try { if (File.Exists(path)) File.Delete(path); }
+            catch (IOException) { /* embedded browser may still hold the file briefly */ }
+        }
+        temporaryPrintWatermarkFiles.Clear();
     }
 
     private Uri ParseServerUrl()

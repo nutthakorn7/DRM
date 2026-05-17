@@ -7,13 +7,26 @@ namespace Drm.FolderWatcher.Service;
 /// </summary>
 public sealed class FolderProtectionTracker
 {
+    /// <summary>
+    /// Cap on remembered paths. Once exceeded, oldest entries are evicted in
+    /// insertion order to keep memory bounded on long-running services.
+    /// </summary>
+    public const int MaxTrackedEntries = 50_000;
+
     private readonly object gate = new();
-    private readonly Dictionary<string, (long Size, DateTime LastWriteUtc)> seen = new(StringComparer.OrdinalIgnoreCase);
+    private readonly LinkedList<string> insertionOrder = new();
+    private readonly Dictionary<string, (LinkedListNode<string> Node, long Size, DateTime LastWriteUtc)> seen =
+        new(StringComparer.OrdinalIgnoreCase);
     private int filesProtected;
 
     public int FilesProtected
     {
         get { lock (gate) return filesProtected; }
+    }
+
+    public int TrackedEntries
+    {
+        get { lock (gate) return seen.Count; }
     }
 
     public bool ShouldProcess(string fullPath, long size, DateTime lastWriteUtc)
@@ -26,7 +39,7 @@ public sealed class FolderProtectionTracker
             {
                 return false;
             }
-            seen[fullPath] = (size, lastWriteUtc);
+            Upsert(fullPath, size, lastWriteUtc);
             return true;
         }
     }
@@ -35,8 +48,24 @@ public sealed class FolderProtectionTracker
     {
         lock (gate)
         {
-            seen[fullPath] = (newSize, newLastWriteUtc);
+            Upsert(fullPath, newSize, newLastWriteUtc);
             filesProtected++;
+        }
+    }
+
+    private void Upsert(string fullPath, long size, DateTime lastWriteUtc)
+    {
+        if (seen.TryGetValue(fullPath, out var existing))
+        {
+            insertionOrder.Remove(existing.Node);
+        }
+        var node = insertionOrder.AddLast(fullPath);
+        seen[fullPath] = (node, size, lastWriteUtc);
+
+        while (seen.Count > MaxTrackedEntries && insertionOrder.First is { } oldest)
+        {
+            seen.Remove(oldest.Value);
+            insertionOrder.RemoveFirst();
         }
     }
 }

@@ -99,13 +99,82 @@ public sealed class AdminTransparentFilesApiTests : IDisposable
     }
 
     [Fact]
-    public async Task Trailer_secret_endpoint_returns_configured_value()
+    public async Task Trailer_secret_endpoint_is_disabled_by_default()
     {
         using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/api/admin/transparent-files/secret");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Trailer_secret_endpoint_returns_secret_only_when_distribution_explicitly_allowed()
+    {
+        using var allowedFactory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:DrmDb", $"Data Source={Path.Combine(Path.GetTempPath(), $"drm-trans-secret-{Guid.NewGuid():N}.db")}");
+                builder.UseSetting("Drm:Mode", "OnPrem");
+                builder.UseSetting("Drm:Security:TransparentTrailerSecret", "my-secret");
+                builder.UseSetting("Drm:Security:AllowTrailerSecretDistribution", "true");
+            });
+        using var client = allowedFactory.CreateClient();
         var response = await client.GetFromJsonAsync<SecretResponse>(
             "/api/admin/transparent-files/secret");
         response!.Secret.Should().Be("my-secret");
+        allowedFactory.Dispose();
     }
+
+    [Fact]
+    public async Task Stamp_endpoint_returns_stamped_bytes_round_trips_via_verify()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var payload = System.Text.Encoding.UTF8.GetBytes("Hello DRM");
+
+        var stampReq = new
+        {
+            tenantId,
+            fileId = Guid.Empty,
+            ownerUserId,
+            originalFileName = "hello.txt",
+            contentType = "text/plain",
+            policyTemplateId = (Guid?)null,
+            fileBytesBase64 = Convert.ToBase64String(payload)
+        };
+        var stampResp = await client.PostAsJsonAsync(
+            "/api/admin/transparent-files/stamp", stampReq);
+        stampResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stamp = await stampResp.Content.ReadFromJsonAsync<StampResponseDto>();
+        stamp!.FileId.Should().NotBe(Guid.Empty);
+        stamp.StampedSizeBytes.Should().BeGreaterThan(payload.LongLength);
+        stamp.TrailerSizeBytes.Should().BeGreaterThan(0);
+
+        var verifyReq = new { fileBytesBase64 = stamp.StampedFileBytesBase64 };
+        var verifyResp = await client.PostAsJsonAsync(
+            "/api/admin/transparent-files/verify", verifyReq);
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var verify = await verifyResp.Content.ReadFromJsonAsync<VerifyResponseDto>();
+        verify!.Valid.Should().BeTrue();
+        verify.TenantId.Should().Be(tenantId);
+        verify.FileId.Should().Be(stamp.FileId);
+        verify.OriginalLength.Should().Be(payload.Length);
+    }
+
+    [Fact]
+    public async Task Verify_endpoint_reports_invalid_for_unstamped_bytes()
+    {
+        using var client = factory.CreateClient();
+        var verifyReq = new { fileBytesBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("plain bytes")) };
+        var verifyResp = await client.PostAsJsonAsync(
+            "/api/admin/transparent-files/verify", verifyReq);
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var verify = await verifyResp.Content.ReadFromJsonAsync<VerifyResponseDto>();
+        verify!.Valid.Should().BeFalse();
+    }
+
+    private sealed record StampResponseDto(Guid FileId, string StampedFileBytesBase64, long StampedSizeBytes, long TrailerSizeBytes);
+    private sealed record VerifyResponseDto(bool Valid, Guid? TenantId, Guid? FileId, Guid? OwnerUserId, string? ContentType, string? OriginalFileName, DateTimeOffset? RegisteredAtUtc, Guid? PolicyTemplateId, int? OriginalLength);
 
     public void Dispose()
     {

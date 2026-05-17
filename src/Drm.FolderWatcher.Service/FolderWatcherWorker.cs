@@ -26,8 +26,11 @@ public sealed class FolderWatcherWorker : BackgroundService
         this.logger = logger;
     }
 
+    private CancellationToken stoppingToken;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        this.stoppingToken = stoppingToken;
         while (!stoppingToken.IsCancellationRequested)
         {
             var opt = options.CurrentValue;
@@ -107,9 +110,14 @@ public sealed class FolderWatcherWorker : BackgroundService
     private async Task HandleEventAsync(string folder, string fullPath)
     {
         if (Directory.Exists(fullPath)) return;
+        if (stoppingToken.IsCancellationRequested) return;
         try
         {
-            await protector.ProtectAsync(folder, fullPath, CancellationToken.None);
+            await protector.ProtectAsync(folder, fullPath, stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Service shutting down — drop in-flight protect quietly.
         }
         catch (Exception ex)
         {

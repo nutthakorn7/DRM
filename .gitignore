@@ -7,3 +7,4 @@ obj/
 TestResults/
 src/Drm.Server/drm-server.db*
 .gstack/
+.claude/scheduled_tasks.lock
