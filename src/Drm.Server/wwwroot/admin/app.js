@@ -196,7 +196,7 @@ if (forgetSessionBtn) {
     const h3 = panel.querySelector("h3");
     if (h3) {
       let raw = h3.cloneNode(true);
-      raw.querySelectorAll("span.help-pill, .badge").forEach((n) => n.remove());
+      raw.querySelectorAll("span.help-pill, .badge, .info-pill").forEach((n) => n.remove());
       let text = raw.textContent.trim().split(/[—–·]/)[0].trim();
       // Cap at ~22 chars to keep pills compact
       if (text.length > 22) text = text.slice(0, 20).trim() + "…";
@@ -298,6 +298,54 @@ if (forgetSessionBtn) {
 
   window.__drmSetActiveTab = setActiveTab; // expose for search-bar use
   window.__drmSetActiveSubtab = setActiveSubtab;
+})();
+
+(function initGlossary() {
+  // Plain-language tooltips for jargon-y panel headings and tab labels.
+  // Each entry: panel/tab id → 1-sentence explanation a non-expert can read.
+  const PANEL_TIPS = {
+    transparent:     "Transparent encryption — protected docs open normally in Office for authorized users; everyone else sees gibberish.",
+    containers:      "DRM containers — files wrapped in a portable .drm package for offline distribution and import.",
+    "folder-watcher": "Auto-protect: watches a server folder and applies a policy to any file dropped in.",
+    siem:            "Stream audit events (opens, prints, denials) to your SIEM or log platform.",
+    watermarks:      "Visual labels (user, date, IP) overlaid on protected documents to deter screenshots.",
+    simulator:       "Dry-run a policy against a fake user/document to see exactly which actions would be allowed.",
+    directory:       "Pull users and groups from Azure AD / Entra ID, LDAP, or Google Workspace.",
+    box:             "Connect a Box.com tenant so uploaded files are auto-protected with your default policy.",
+    outlook:         "Outlook add-in — protect attachments at send-time without leaving the compose window.",
+    notifications:   "Email or Slack alerts when policies are violated, files expire, or access is denied.",
+    templates:       "Reusable policy bundles — pick one when protecting a file instead of configuring every rule.",
+    devices:         "Per-device trust list. Revoke a stolen laptop and every protected file on it stops opening.",
+    audit:           "Append-only log of every protect / open / print / deny event across the tenant.",
+    license:         "Your DRM subscription tier, seat count, and renewal date.",
+    status:          "Server health and version info — useful when filing a support ticket.",
+  };
+
+  const TAB_TIPS = {
+    overview:     "At-a-glance dashboard, audit log, license, and the getting-started checklist.",
+    identity:     "Users, groups, trusted devices, and directory connectors.",
+    policy:       "Policy templates, watermark designs, and the policy simulator.",
+    files:        "Protected files, transparent-encryption settings, and DRM containers.",
+    integrations: "Outside systems: Box, Outlook, SIEM, folder watcher, and notifications.",
+  };
+
+  Object.entries(PANEL_TIPS).forEach(([id, tip]) => {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    const h3 = panel.querySelector("h3");
+    if (!h3 || h3.querySelector(".info-pill")) return;
+    const pill = document.createElement("span");
+    pill.className = "info-pill";
+    pill.setAttribute("title", tip);
+    pill.setAttribute("aria-label", tip);
+    pill.textContent = "i";
+    h3.appendChild(pill);
+  });
+
+  Object.entries(TAB_TIPS).forEach(([id, tip]) => {
+    const btn = document.querySelector(`.tab-link[data-tab-link="${id}"]`);
+    if (btn) btn.setAttribute("title", tip);
+  });
 })();
 
 (function initWelcomeScreen() {
