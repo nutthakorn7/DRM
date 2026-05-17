@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DRM — Use Cases</title>
+  <link rel="stylesheet" href="/admin/app.css">
+  <style>
+    body { padding: 32px 24px; max-width: 920px; margin: 0 auto; }
+    h1 { margin: 0 0 4px 0; }
+    .lead { color: var(--muted); margin: 0 0 24px 0; }
+    .case-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 16px 0;
+      background: var(--surface);
+    }
+    .case-card .eyebrow {
+      color: var(--accent);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 0;
+    }
+    .case-card h2 {
+      margin: 4px 0 12px 0;
+      font-size: 1.25rem;
+    }
+    .case-card .grid {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 8px 16px;
+      margin-top: 12px;
+      font-size: 0.95rem;
+    }
+    .case-card .grid > strong {
+      color: var(--accent);
+    }
+    .back-link {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <a href="/admin/" class="back-link">&larr; Back to admin console</a>
+  <h1>Use Cases</h1>
+  <p class="lead">Three deployment patterns that map DRM features to real-world security scenarios. Mirrors the FinalCode V6 datasheet structure for sales conversations.</p>
+
+  <div class="case-card">
+    <p class="eyebrow">Case 1</p>
+    <h2>Protect files from targeted attacks</h2>
+    <p>Conventional gateway security does not catch lateral movement once an attacker is inside the network. The DRM Folder Watcher option (Phase 5AQ) auto-protects every file created in monitored network shares so sensitive information remains encrypted even if files are exfiltrated.</p>
+    <div class="grid">
+      <strong>WHAT</strong>
+      <span>Executive information, employee personal data, customer data, patents/IP and industry secrets, production planning, research data, partner-supplied materials</span>
+      <strong>WHO</strong>
+      <span>Divisions and departments protecting files across industry, vertical, and organization size; enterprises accredited by Privacy Mark / ISMS</span>
+      <strong>SOLUTION</strong>
+      <span>DRM Standard Edition + Folder Watcher Service (NetFolder tier)</span>
+    </div>
+  </div>
+
+  <div class="case-card">
+    <p class="eyebrow">Case 2</p>
+    <h2>Protect files from negligence, internal fraud, and employee turnover</h2>
+    <p>Companies lose sensitive files regularly through malicious acts: former employees stealing files, contractors going off-board with project data, accidental leaks. DRM Remote Delete + Notification lets the original owner delete files wherever they are and alerts on unauthorized access.</p>
+    <div class="grid">
+      <strong>WHAT</strong>
+      <span>Confidential documents, employee data, customer data, patents, research data, pre-disclosed IR reports, and other sensitive information that could be sold to competitors</span>
+      <strong>WHO</strong>
+      <span>Business management, sales, HR, R&amp;D, business planning, IP, call centers, branches, sales offices across industries</span>
+      <strong>SOLUTION</strong>
+      <span>DRM Standard Edition + Remote Delete tier + Email notifications (Phase 5AG)</span>
+    </div>
+  </div>
+
+  <div class="case-card">
+    <p class="eyebrow">Case 3</p>
+    <h2>Ensure internal file protection from data repositories</h2>
+    <p>Once files leave the protected data repository, data governance is lost. The DRM API tier enables external solutions to call DRM functions and automatically secure all files extracted from databases or business applications.</p>
+    <div class="grid">
+      <strong>WHAT</strong>
+      <span>Sales figures, personally identifiable information (PII), customer data, credit information, HR / salary records retrieved from database and saved as CSV / Excel</span>
+      <strong>WHO</strong>
+      <span>Corporate departments retrieving data from Oracle, Microsoft SQL, Salesforce, SAP, Marketo, ERP / CRM / marketing automation</span>
+      <strong>SOLUTION</strong>
+      <span>DRM Standard Edition + API tier (Integration CLI, Phase 5U)</span>
+    </div>
+  </div>
+</body>
+</html>

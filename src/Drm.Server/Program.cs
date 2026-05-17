@@ -401,6 +401,7 @@ app.MapAdminOutlookIntegrationEndpoints();
 app.MapOutlookAddInEndpoints();
 app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
+app.MapAdminFileZipEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();

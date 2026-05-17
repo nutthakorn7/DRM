@@ -196,6 +196,7 @@ document.querySelector("#updateWatermarkTemplateForm").addEventListener("submit"
   });
 
   setStatus("Anti-capture settings updated", "ok");
+  showPolicyPushToast(`Watermark template ${templateId.slice(0, 8)}… updated. Active viewer sessions will pick up the new pattern on the next file open.`);
   await refreshWatermarkTemplates();
 });
 
@@ -713,9 +714,10 @@ async function revokeFile(fileId) {
 
 async function applyPolicyTemplate() {
   const fileId = document.querySelector("#applyTemplateFileId").value.trim();
+  const templateId = document.querySelector("#applyPolicyTemplateId").value.trim();
   const body = {
     tenantId: requireTenantId(),
-    templateId: document.querySelector("#applyPolicyTemplateId").value.trim(),
+    templateId,
     adminUserId: requireAdminUserId()
   };
 
@@ -726,6 +728,17 @@ async function applyPolicyTemplate() {
 
   await refreshFiles();
   setStatus("Policy template applied", "ok");
+  showPolicyPushToast(`Template ${templateId.slice(0, 8)}… applied. The new policy will be enforced on the next file open — viewers do not need to reload anything.`);
+}
+
+function showPolicyPushToast(message) {
+  const existing = document.querySelector(".policy-push-toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = "policy-push-toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 6000);
 }
 
 async function deleteProtectedCopy() {
@@ -1097,6 +1110,7 @@ function renderFiles(files) {
     return;
   }
 
+  const tenantId = tenantIdInput.value.trim();
   filesBody.innerHTML = files.map((file) => `
     <tr>
       <td><code>${escapeHtml(file.fileId)}</code></td>
@@ -1105,7 +1119,10 @@ function renderFiles(files) {
       <td>${escapeHtml(file.permissions)}</td>
       <td>${renderRevokedBadge(file.revoked)}</td>
       <td>${escapeHtml(formatDate(file.expiresAtUtc))}</td>
-      <td>${file.revoked ? "" : `<button class="danger" type="button" data-revoke-file-id="${escapeHtml(file.fileId)}">Revoke</button>`}</td>
+      <td>
+        <a class="zip-link" href="/api/admin/files/${encodeURIComponent(file.fileId)}/convert/zip?tenantId=${encodeURIComponent(tenantId)}" download="drm-${escapeHtml(file.fileId)}.zip">ZIP</a>
+        ${file.revoked ? "" : ` <button class="danger" type="button" data-revoke-file-id="${escapeHtml(file.fileId)}">Revoke</button>`}
+      </td>
     </tr>
   `).join("");
 }

@@ -668,3 +668,29 @@ Token resolution at print time substitutes `{user}` / `{userId}`, `{file}` / `{f
 ### Tests
 
 2 new (PUT persists print fields, invalid position normalizes to diagonal). 188/188 total pass.
+
+## Phase 5AN ZIP Convert + Policy Push UI + Sales Use Cases
+
+Three small UX gaps closed in one phase to keep momentum toward parity.
+
+### ZIP file conversion
+
+`GET /api/admin/files/{fileId}/convert/zip?tenantId=...` returns an `application/zip` archive that bundles the protected file's metadata, grant list, tags, and an external share URL. The archive contains three plain-text entries so non-DRM-aware recipients can route the file correctly:
+
+- `README.txt` — human-readable handoff instructions
+- `manifest.json` — structured manifest (grants, tags, policy, watermark template)
+- `share-link.txt` — single-line URL pointing at `/share/?fileId=<id>` for browser-viewer fallback
+
+The admin Files panel renders a per-row **ZIP** action button that downloads the archive directly. Every conversion logs a `file_converted_to_zip` audit event.
+
+### Dynamic policy push toast
+
+When an admin applies a policy template or saves anti-capture watermark settings, a yellow toast slides in from the top-right corner explaining that active viewer sessions will pick up the new policy on the next file open. The toast auto-dismisses after 6 seconds. No SignalR or websocket dependency — the existing per-open server-side policy evaluation already enforces dynamic policy. The toast surfaces that behavior to the operator.
+
+### Use Cases sales pages
+
+`/admin/cases/` serves a static three-card page (Targeted attacks, Insider fraud / turnover, Internal data repos) mirrored from the FinalCode V6 datasheet. Each card lists WHAT / WHO / SOLUTION and links to the DRM tier configurations that solve the scenario. The admin console nav gains a `Use cases ↗` external link.
+
+### Tests
+
+3 new (ZIP archive content, 404 unknown file, 400 blank tenant). 191/191 total pass.
