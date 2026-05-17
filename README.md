@@ -37,7 +37,14 @@ dotnet test tests/Drm.Container.Tests/Drm.Container.Tests.csproj
 dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj
 dotnet test tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj
 dotnet test tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj
+dotnet test tests/Drm.UI.Tests/Drm.UI.Tests.csproj
 ```
+
+The `Drm.UI.Tests` project uses Microsoft.Playwright to drive a real
+Chromium browser against a live `Drm.Server` instance. First run will
+download the Chromium binary (~100 MB) into the test bin directory. The
+fixture spawns the server on a free localhost port and tears it down at
+the end of the test class, so no manual setup is required.
 
 On non-Windows hosts, Windows-targeted projects use `EnableWindowsTargeting` narrowly in their project files so restore and build can run on macOS.
 
