@@ -48,6 +48,6 @@ USER drm
 
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1
+    CMD bash -c 'echo > /dev/tcp/localhost/8080' || exit 1
 
 ENTRYPOINT ["dotnet", "Drm.Server.dll"]
