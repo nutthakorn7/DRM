@@ -2153,10 +2153,27 @@ async function loadWhoAmI() {
     const identity = await apiFetch("/api/admin/identity/whoami");
     const output = document.querySelector("#whoamiOutput");
     if (output) output.textContent = JSON.stringify(identity, null, 2);
+    setSharedKeyBanner(identity.sharedKeyFallback === true);
     setStatus("Session loaded", "ok");
   } catch (err) {
     const output = document.querySelector("#whoamiOutput");
     if (output) output.textContent = `Not authenticated: ${err.message}`;
+  }
+}
+
+function setSharedKeyBanner(visible) {
+  let banner = document.querySelector("#sharedKeyDeprecationBanner");
+  if (visible && !banner) {
+    banner = document.createElement("div");
+    banner.id = "sharedKeyDeprecationBanner";
+    banner.style.cssText =
+      "background:#7c2d12;color:#fff;padding:10px 16px;font-size:13px;display:flex;align-items:center;gap:10px;";
+    banner.innerHTML =
+      '<strong>Deprecation warning:</strong> This session is authenticated with the shared API key (X-DRM-Admin-Key). ' +
+      'Migrate to per-admin tokens (X-DRM-Admin-Token) before upgrading to a future release that removes shared-key support.';
+    document.body.insertBefore(banner, document.body.firstChild);
+  } else if (!visible && banner) {
+    banner.remove();
   }
 }
 

@@ -4,6 +4,53 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+**v1.1 enterprise — Slice 2: RBAC enforcement, admin UI, audit attribution.**
+Second slice of the v1 → v1.1 enterprise upgrade. Enforces the permission model
+from Slice 1 on every existing admin endpoint, ships a full admin identity
+management panel in the console, and wires `ActorAdminId` into every audit event
+so every change is traceable to the individual admin who made it.
+
+### Added
+- **Admin identity management panel** — new "Access control" tab in the admin
+  console. Shows current session (WhoAmI details), role list, admin user table
+  with disable/enable controls, create-admin form (email, display name, role,
+  token label), one-time token display on create and rotate, and per-user
+  rotate-token action. Reads from the `/api/admin/identity/*` endpoints added
+  in Slice 1.
+- **`ActorAdminId` on every audit event** — all `AuditEventEntity` constructions
+  across admin endpoints now set `ActorAdminId = AdminAudit.ActorId(httpContext)`,
+  resolved from the `AdminIdentity` stamped by `AdminIdentityMiddleware`. Covers
+  `AdminFilesEndpoints`, `AdminFileZipEndpoints`, `AdminWatermarkTemplatesEndpoints`,
+  `AdminTransparentFilesEndpoints`, `AdminSecureContainersEndpoints`, and all 7
+  conditional events in `AdminExternalShareSettingsEndpoints`.
+
+### Changed
+- **RBAC enforcement on all 23 admin endpoints** — every handler now calls
+  `AdminIdentityContext.TryRequirePermission(httpContext, permission, out var fail)`
+  before executing. Unauthenticated → 401. Insufficient permission → 403.
+  Read-only endpoints require `*:read` permissions; mutating endpoints require
+  `*:write`. Permissions map: files (`files:read/write/zip/revoke/grants`),
+  audit (`audit:read/export`), devices (`devices:read/write`), policy and
+  watermark templates (`policies:read/write`), tenant/settings surfaces
+  (`tenants:read/write`, `settings:read/write`), identity (`admins:read/write`).
+- `AdminAudit.SystemEvent` and `AdminAudit.PermissionEvent` factory methods now
+  accept an optional `HttpContext? httpContext` parameter and set `ActorAdminId`
+  from it. All call sites updated.
+
+### Fixed
+- Docker healthcheck used `wget` which is absent from
+  `mcr.microsoft.com/dotnet/aspnet:10.0`. Changed to
+  `bash -c 'echo > /dev/tcp/localhost/8080'` in `Dockerfile`,
+  root `docker-compose.yml`, and `deploy/management/docker/docker-compose.yml`.
+
+### Not in this slice (Slice 3 work)
+- Shared-key deprecation + retirement path: `Deprecation` response header on
+  shared-key requests, audit event per shared-key auth, admin console
+  deprecation banner, and a `Drm:Security:AdminSharedKeyMode` config toggle
+  (`Active` → `Warn` → `Disabled`).
+
+---
+
 **v1.1 enterprise — Slice 1: admin identity foundation (zero-downtime).**
 First slice of the v1 → v1.1 enterprise upgrade. Adds a real identity layer
 for admin users with per-admin API tokens and role-based permissions, while

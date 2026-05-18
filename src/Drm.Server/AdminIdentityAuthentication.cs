@@ -13,10 +13,17 @@ namespace Drm.Server;
 // Either path stamps HttpContext.Items[AdminIdentityContext.ContextKey] with
 // the resolved identity, so endpoints downstream get a real userId + role +
 // permission set regardless of which auth surface the client used.
+//
+// Drm:Security:AdminSharedKeyMode controls the shared-key lifecycle:
+//   Active  (default) — back-compat, no warnings
+//   Warn              — shared key works; adds Deprecation header + audit event
+//   Disabled          — shared-key requests rejected with 401 shared_key_disabled
 public static class AdminIdentityAuthentication
 {
     public const string TokenHeaderName = "X-DRM-Admin-Token";
     public const string SharedKeyHeaderName = "X-DRM-Admin-Key";
+
+    public enum SharedKeyMode { Active, Warn, Disabled }
 
     public static IApplicationBuilder UseAdminIdentityAuthentication(this IApplicationBuilder app)
     {
@@ -61,6 +68,15 @@ public static class AdminIdentityAuthentication
                 return;
             }
 
+            Enum.TryParse<SharedKeyMode>(
+                configuration["Drm:Security:AdminSharedKeyMode"], ignoreCase: true, out var sharedKeyMode);
+
+            if (sharedKeyMode == SharedKeyMode.Disabled)
+            {
+                await WriteError(context, 401, "shared_key_disabled");
+                return;
+            }
+
             if (!context.Request.Headers.TryGetValue(SharedKeyHeaderName, out var submittedKey)
                 || StringValues.IsNullOrEmpty(submittedKey))
             {
@@ -77,6 +93,21 @@ public static class AdminIdentityAuthentication
             // Shared-key path: synthesize the default-SuperAdmin identity so
             // downstream RBAC checks and audit attribution still work.
             context.Items[AdminIdentityContext.ContextKey] = await ResolveSharedKeyIdentityAsync(dbContext, context.RequestAborted);
+
+            if (sharedKeyMode == SharedKeyMode.Warn)
+            {
+                context.Response.Headers["Deprecation"] = "true";
+                dbContext.AuditEvents.Add(new AuditEventEntity
+                {
+                    TenantId = Guid.Empty,
+                    ActorAdminId = AdminSystemRoles.DefaultSuperAdminUserId,
+                    EventType = "admin_auth",
+                    ReasonCode = "shared_key_deprecated_usage",
+                    CreatedAtUtc = DateTimeOffset.UtcNow
+                });
+                await dbContext.SaveChangesAsync(context.RequestAborted);
+            }
+
             await next(context);
         });
     }
