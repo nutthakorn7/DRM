@@ -21,7 +21,7 @@ public static class AdminAuditEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.AuditRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.AuditRead, tenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(tenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
@@ -48,7 +48,7 @@ public static class AdminAuditEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.AuditExport, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.AuditExport, tenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(tenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));

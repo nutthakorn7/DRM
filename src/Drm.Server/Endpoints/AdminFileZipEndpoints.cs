@@ -21,7 +21,7 @@ public static class AdminFileZipEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesZip, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.FilesZip, tenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {

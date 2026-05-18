@@ -30,7 +30,7 @@ public static class AdminTransparentFilesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
@@ -89,7 +89,7 @@ public static class AdminTransparentFilesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsRead, tenantId, out var fail))
             return fail!;
         var items = await dbContext.TransparentProtectedFiles
             .AsNoTracking()
@@ -109,7 +109,7 @@ public static class AdminTransparentFilesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsRead, tenantId, out var fail))
             return fail!;
         var entity = await dbContext.TransparentProtectedFiles
             .AsNoTracking()
@@ -126,7 +126,7 @@ public static class AdminTransparentFilesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsWrite, tenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {
@@ -225,7 +225,7 @@ public static class AdminTransparentFilesEndpoints
         HttpContext httpContext,
         IConfiguration configuration)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
