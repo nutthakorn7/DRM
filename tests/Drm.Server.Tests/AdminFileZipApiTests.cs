@@ -106,4 +106,25 @@ public sealed class AdminFileZipApiTests : IDisposable
         foreach (var c in new[] { databasePath, $"{databasePath}-wal", $"{databasePath}-shm" })
             if (File.Exists(c)) File.Delete(c);
     }
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Zip_with_mismatched_header_returns_400_tenant_mismatch()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/admin/files/{fileId}/convert/zip?tenantId={tenantId}");
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<ZipErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record ZipErrorBody(string ReasonCode);
 }

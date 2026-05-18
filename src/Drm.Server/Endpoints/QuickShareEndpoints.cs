@@ -29,6 +29,10 @@ public static class QuickShareEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
         if (request.TenantId == Guid.Empty || request.UserId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_identifiers"));

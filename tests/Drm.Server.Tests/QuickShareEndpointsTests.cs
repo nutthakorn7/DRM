@@ -118,4 +118,34 @@ public sealed class QuickShareEndpointsTests : IDisposable
         Guid FileId, Guid ShareLinkId, string ShareUrl,
         DateTimeOffset ExpiresAtUtc, string RecipientEmail,
         string Permissions, int OriginalFileSizeBytes);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task QuickShare_with_mismatched_header_returns_400_tenant_mismatch()
+    {
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/me/share")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(),
+                userId = Guid.NewGuid(),
+                recipientEmail = "x@example.com",
+                fileName = "x.pdf",
+                contentType = "application/pdf",
+                fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("hi")),
+                expiresInHours = 24,
+                allowPrint = false,
+            }),
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<QuickShareErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record QuickShareErrorBody(string ReasonCode);
 }

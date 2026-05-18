@@ -11,11 +11,17 @@ public static class AdminPolicySimulatorEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Ok<PolicySimulationResponse>, NotFound<PolicySimulationResponse>, BadRequest<PolicySimulationResponse>>> SimulateAsync(
+    private static async Task<Results<Ok<PolicySimulationResponse>, NotFound<PolicySimulationResponse>, BadRequest<PolicySimulationResponse>, BadRequest<ErrorResponse>>> SimulateAsync(
         PolicySimulationRequest request,
+        HttpContext httpContext,
         PolicyDecisionService policyDecisionService,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var decision = await policyDecisionService.SimulateAsync(
             request.TenantId,
             request.FileId,
@@ -59,4 +65,6 @@ public static class AdminPolicySimulatorEndpoints
         string? WatermarkTemplate,
         DateTimeOffset? OfflineLeaseExpiresAtUtc,
         bool Simulated);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

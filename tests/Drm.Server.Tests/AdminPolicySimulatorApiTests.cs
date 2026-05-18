@@ -127,4 +127,31 @@ public sealed class AdminPolicySimulatorApiTests : IDisposable
         string? WatermarkTemplate,
         DateTimeOffset? OfflineLeaseExpiresAtUtc,
         bool Simulated);
+
+    // ─── X-DRM-Tenant-Id header assertion (SECURITY.md migration) ─────────
+
+    [Fact]
+    public async Task Simulate_with_mismatched_header_returns_400_tenant_mismatch()
+    {
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/policy-simulator")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(),
+                fileId = Guid.NewGuid(),
+                userId = Guid.NewGuid(),
+                deviceId = Guid.NewGuid(),
+                requestedPermission = "View",
+            }),
+        };
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<SimulatorErrorBody>();
+        body!.ReasonCode.Should().Be("tenant_mismatch");
+    }
+
+    private sealed record SimulatorErrorBody(string ReasonCode);
 }

@@ -21,6 +21,11 @@ public static class AdminFileZipEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         if (tenantId == Guid.Empty)
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));

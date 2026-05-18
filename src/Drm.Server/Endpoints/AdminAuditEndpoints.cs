@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drm.Server.Endpoints;
@@ -13,13 +14,19 @@ public static class AdminAuditEndpoints
         return endpoints;
     }
 
-    private static async Task<IReadOnlyList<AuditEventResponse>> GetAuditEventsAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AuditEventResponse>>, BadRequest<ErrorResponse>>> GetAuditEventsAsync(
         Guid tenantId,
         string? eventType,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await FilterAuditEvents(dbContext, tenantId, eventType)
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
+        var rows = await FilterAuditEvents(dbContext, tenantId, eventType)
             .OrderByDescending(auditEvent => auditEvent.Id)
             .Take(500)
             .Select(auditEvent => new AuditEventResponse(
@@ -31,14 +38,21 @@ public static class AdminAuditEndpoints
                 auditEvent.ReasonCode,
                 auditEvent.CreatedAtUtc))
             .ToListAsync(cancellationToken);
+        return TypedResults.Ok<IReadOnlyList<AuditEventResponse>>(rows);
     }
 
     private static async Task<IResult> GetAuditEventsCsvAsync(
         Guid tenantId,
         string? eventType,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
         var auditEvents = await FilterAuditEvents(dbContext, tenantId, eventType)
             .OrderByDescending(auditEvent => auditEvent.Id)
             .Take(5000)
@@ -116,4 +130,6 @@ public static class AdminAuditEndpoints
         Guid? UserId,
         string EventType,
         string ReasonCode);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }
