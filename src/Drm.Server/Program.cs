@@ -435,9 +435,108 @@ using (var scope = app.Services.CreateScope())
             connection.Close();
         }
     }
+
+    // Admin identity tables — created idempotently for both SQLite and Postgres so
+    // existing v1.0.1 databases pick them up without an EF migration step.
+    if (dbContext.Database.IsSqlite())
+    {
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AdminUsers" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_AdminUsers" PRIMARY KEY,
+                "Email" TEXT NOT NULL,
+                "DisplayName" TEXT NOT NULL DEFAULT '',
+                "RoleId" TEXT NOT NULL,
+                "Disabled" INTEGER NOT NULL DEFAULT 0,
+                "CreatedAtUtc" TEXT NOT NULL,
+                "LastUsedAtUtc" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AdminUsers_Email" ON "AdminUsers" ("Email");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AdminRoles" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_AdminRoles" PRIMARY KEY,
+                "Name" TEXT NOT NULL,
+                "PermissionsCsv" TEXT NOT NULL DEFAULT '',
+                "IsSystem" INTEGER NOT NULL DEFAULT 0,
+                "CreatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AdminRoles_Name" ON "AdminRoles" ("Name");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AdminApiTokens" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_AdminApiTokens" PRIMARY KEY,
+                "AdminUserId" TEXT NOT NULL,
+                "TokenHash" TEXT NOT NULL,
+                "Label" TEXT NOT NULL DEFAULT '',
+                "CreatedAtUtc" TEXT NOT NULL,
+                "LastUsedAtUtc" TEXT NULL,
+                "ExpiresAtUtc" TEXT NULL,
+                "Revoked" INTEGER NOT NULL DEFAULT 0
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AdminApiTokens_TokenHash" ON "AdminApiTokens" ("TokenHash");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_AdminApiTokens_AdminUserId" ON "AdminApiTokens" ("AdminUserId");
+            """);
+    }
+    else
+    {
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AdminUsers" (
+                "Id" uuid NOT NULL CONSTRAINT "PK_AdminUsers" PRIMARY KEY,
+                "Email" text NOT NULL,
+                "DisplayName" text NOT NULL DEFAULT '',
+                "RoleId" uuid NOT NULL,
+                "Disabled" boolean NOT NULL DEFAULT FALSE,
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "LastUsedAtUtc" timestamp with time zone NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AdminUsers_Email" ON "AdminUsers" ("Email");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AdminRoles" (
+                "Id" uuid NOT NULL CONSTRAINT "PK_AdminRoles" PRIMARY KEY,
+                "Name" text NOT NULL,
+                "PermissionsCsv" text NOT NULL DEFAULT '',
+                "IsSystem" boolean NOT NULL DEFAULT FALSE,
+                "CreatedAtUtc" timestamp with time zone NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AdminRoles_Name" ON "AdminRoles" ("Name");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AdminApiTokens" (
+                "Id" uuid NOT NULL CONSTRAINT "PK_AdminApiTokens" PRIMARY KEY,
+                "AdminUserId" uuid NOT NULL,
+                "TokenHash" text NOT NULL,
+                "Label" text NOT NULL DEFAULT '',
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "LastUsedAtUtc" timestamp with time zone NULL,
+                "ExpiresAtUtc" timestamp with time zone NULL,
+                "Revoked" boolean NOT NULL DEFAULT FALSE
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AdminApiTokens_TokenHash" ON "AdminApiTokens" ("TokenHash");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_AdminApiTokens_AdminUserId" ON "AdminApiTokens" ("AdminUserId");
+            """);
+    }
+
+    AdminIdentitySeed.Run(dbContext);
 }
 
-app.UseAdminApiKeyAuthentication();
+app.UseAdminIdentityAuthentication();
 app.UseScimBearerAuthentication();
 app.UseClientApiKeyAuthentication();
 app.UseTenantHeaderContext();
@@ -495,6 +594,7 @@ app.MapAdminOutlookIntegrationEndpoints();
 app.MapOutlookAddInEndpoints();
 app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
+app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();
 app.MapAdminSecureContainersEndpoints();

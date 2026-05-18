@@ -4,7 +4,62 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
-_No unreleased changes — the next release line will appear here._
+**v1.1 enterprise — Slice 1: admin identity foundation (zero-downtime).**
+First slice of the v1 → v1.1 enterprise upgrade. Adds a real identity layer
+for admin users with per-admin API tokens and role-based permissions, while
+keeping the v1.0.x `X-DRM-Admin-Key` shared-key auth working unchanged so
+existing deployments do not break.
+
+### Added
+- `AdminUser`, `AdminRole`, `AdminApiToken` entities + raw SQL migration
+  (idempotent on both SQLite and Postgres — drops into v1.0.1 databases
+  without an EF migration step).
+- Seed: 4 system roles (`SuperAdmin`, `TenantAdmin`, `Auditor`, `ReadOnly`)
+  and a synthetic Default SuperAdmin (`00000000-aaaa-aaaa-aaaa-000000000001`)
+  that shared-key callers authenticate as until per-admin tokens are
+  issued. Audit rows from shared-key callers attribute to this id.
+- `AdminIdentityMiddleware` (replaces `AdminApiKeyAuthentication` in the
+  pipeline). Accepts either `X-DRM-Admin-Token` (per-admin, v1.1) or
+  `X-DRM-Admin-Key` (shared, v1.0.x back-compat) and stamps an
+  `AdminIdentity` (id, role, permissions, sharedKeyFallback flag) onto
+  `HttpContext.Items` for downstream endpoints.
+- 24-permission RBAC set (`admins:read`, `tenants:write`, `audit:export`,
+  …) + `AdminIdentityContext.TryRequirePermission` helper. Permissions
+  are stored CSV-on-role and re-synced on every boot from the code
+  definitions in `AdminSystemRoles.PermissionsFor`.
+- `/api/admin/identity/*` endpoints: `whoami`, `roles`, `admins` (list /
+  create / disable / enable), `tokens/{id}/revoke`, and
+  `admins/{id}/rotate-token`. Token plaintext is returned exactly once on
+  create + rotate; the database stores only SHA-256 hashes.
+- 9 tests under `AdminIdentityApiTests` covering: shared-key →
+  default-admin resolution, invalid-token rejection, role listing,
+  admin creation + token round-trip auth, one-time-only token visibility,
+  cannot-disable-default-admin guard, revoked-token rejection, ReadOnly
+  role cannot create admins, seed idempotency.
+
+### Migration
+- **No operator action required.** First start under v1.1 seeds the four
+  system roles + default SuperAdmin into the existing database. The
+  existing `Drm:Security:AdminApiKey` env var keeps working — it now
+  resolves to the Default SuperAdmin identity, so existing automation /
+  the admin console / curl scripts all continue to authenticate.
+- To start using per-admin tokens: call `POST
+  /api/admin/identity/admins` with `{ email, displayName, roleId }`
+  using the shared key, then use the returned `token` as
+  `X-DRM-Admin-Token` on subsequent requests. The shared key remains
+  active in parallel until you choose to retire it (planned in a later
+  slice).
+
+### Not in this slice (Slice 2 work)
+- RBAC enforcement on the 23 existing admin endpoints (currently every
+  authenticated caller has effectively `*` because shared-key resolves
+  to SuperAdmin and per-admin tokens get their full role permission set
+  but no endpoint reads it yet).
+- Admin UI panel for managing admin users + tokens.
+- Refactoring existing audit writes to read actor from
+  `HttpContext.Items["DrmAdminIdentity"]` instead of body
+  `adminUserId`.
+- Shared-key deprecation / removal path.
 
 ## [1.0.1] — 2026-05-18
 

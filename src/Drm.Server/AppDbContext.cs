@@ -60,6 +60,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<FolderWatcherEventEntity> FolderWatcherEvents => Set<FolderWatcherEventEntity>();
 
+    public DbSet<AdminUserEntity> AdminUsers => Set<AdminUserEntity>();
+
+    public DbSet<AdminRoleEntity> AdminRoles => Set<AdminRoleEntity>();
+
+    public DbSet<AdminApiTokenEntity> AdminApiTokens => Set<AdminApiTokenEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
@@ -287,6 +293,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.FolderPath).HasMaxLength(1024);
             entity.Property(e => e.FileName).HasMaxLength(512);
             entity.Property(e => e.Status).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<AdminUserEntity>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.Property(u => u.Email).HasMaxLength(320);
+            entity.Property(u => u.DisplayName).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<AdminRoleEntity>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.HasIndex(r => r.Name).IsUnique();
+            entity.Property(r => r.Name).HasMaxLength(64);
+            entity.Property(r => r.PermissionsCsv).HasMaxLength(4096);
+        });
+
+        modelBuilder.Entity<AdminApiTokenEntity>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+            entity.HasIndex(t => t.AdminUserId);
+            entity.Property(t => t.TokenHash).HasMaxLength(128);
+            entity.Property(t => t.Label).HasMaxLength(128);
         });
     }
 }
