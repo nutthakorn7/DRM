@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+**v1.1 enterprise — Slice 3: shared-key deprecation path.**
+Third slice of the v1 → v1.1 enterprise upgrade. Adds a three-mode lifecycle
+toggle for the shared admin key so operators can signal deprecation before
+removing it, and updates the admin console to surface the warning visually.
+
+### Added
+- **`Drm:Security:AdminSharedKeyMode` config toggle** — three modes:
+  `Active` (default, no change), `Warn` (shared key accepted; response gains
+  `Deprecation: true` header and a `shared_key_deprecated_usage` audit event
+  is written), `Disabled` (shared-key requests rejected with 401
+  `shared_key_disabled` before any key comparison).
+- **Admin console deprecation banner** — `loadWhoAmI()` now calls
+  `setSharedKeyBanner(identity.sharedKeyFallback)`. When the active session
+  was authenticated via the shared key, a persistent dark-red banner appears
+  at the top of the page instructing the admin to migrate to per-admin tokens.
+
+### Not in this slice (Slice 4 work)
+- Admin console still sends `X-DRM-Admin-Key` for all requests. The console
+  itself needs to be migrated to send `X-DRM-Admin-Token` when a per-admin
+  token is stored, so the shared-key deprecation path actually removes the
+  console's dependency on the shared key.
+
+---
+
 **v1.1 enterprise — Slice 2: RBAC enforcement, admin UI, audit attribution.**
 Second slice of the v1 → v1.1 enterprise upgrade. Enforces the permission model
 from Slice 1 on every existing admin endpoint, ships a full admin identity
