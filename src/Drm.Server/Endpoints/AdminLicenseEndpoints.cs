@@ -10,8 +10,10 @@ public static class AdminLicenseEndpoints
         return endpoints;
     }
 
-    private static Ok<LicenseResponse> GetLicense(IConfiguration configuration)
+    private static IResult GetLicense(HttpContext httpContext, IConfiguration configuration)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         var configured = configuration["Drm:License:EnabledTiers"];
         var paidEncrypters = int.TryParse(configuration["Drm:License:PaidEncrypterCount"], out var p) ? p : 0;
         var tier = LicenseTierParser.ParseConfigured(configured);
@@ -23,7 +25,7 @@ public static class AdminLicenseEndpoints
             if (tier.HasFlag(value)) tiers.Add(value.ToString());
         }
 
-        return TypedResults.Ok(new LicenseResponse(
+        return Results.Ok(new LicenseResponse(
             tiers,
             paidEncrypters,
             paidEncrypters * 9));

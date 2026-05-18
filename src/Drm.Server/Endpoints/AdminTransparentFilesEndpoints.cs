@@ -24,15 +24,17 @@ public static class AdminTransparentFilesEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<TransparentFileResponse>, Conflict, BadRequest<ErrorResponse>>> RegisterAsync(
+    private static async Task<IResult> RegisterAsync(
         RegisterRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty || request.FileId == Guid.Empty || request.OwnerUserId == Guid.Empty)
@@ -75,17 +77,20 @@ public static class AdminTransparentFilesEndpoints
         });
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/transparent-files/{entity.FileId}?tenantId={entity.TenantId}",
             TransparentFileResponse.From(entity));
     }
 
-    private static async Task<IReadOnlyList<TransparentFileResponse>> ListAsync(
+    private static async Task<IResult> ListAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.TransparentProtectedFiles
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
+        var items = await dbContext.TransparentProtectedFiles
             .AsNoTracking()
             .Where(t => t.TenantId == tenantId)
             .OrderBy(t => t.OriginalFileName)
@@ -93,52 +98,61 @@ public static class AdminTransparentFilesEndpoints
                 t.TenantId, t.FileId, t.OwnerUserId, t.OriginalFileName, t.ContentType,
                 t.PolicyTemplateId, t.RegisteredAtUtc))
             .ToListAsync(cancellationToken);
+        return Results.Ok(items);
     }
 
-    private static async Task<Results<Ok<TransparentFileResponse>, NotFound>> GetAsync(
-        Guid fileId,
-        Guid tenantId,
-        AppDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var entity = await dbContext.TransparentProtectedFiles
-            .AsNoTracking()
-            .SingleOrDefaultAsync(t => t.TenantId == tenantId && t.FileId == fileId, cancellationToken);
-        return entity is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(TransparentFileResponse.From(entity));
-    }
-
-    private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> DeregisterAsync(
+    private static async Task<IResult> GetAsync(
         Guid fileId,
         Guid tenantId,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
+        var entity = await dbContext.TransparentProtectedFiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(t => t.TenantId == tenantId && t.FileId == fileId, cancellationToken);
+        return entity is null
+            ? Results.NotFound()
+            : Results.Ok(TransparentFileResponse.From(entity));
+    }
+
+    private static async Task<IResult> DeregisterAsync(
+        Guid fileId,
+        Guid tenantId,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var entity = await dbContext.TransparentProtectedFiles
             .SingleOrDefaultAsync(t => t.TenantId == tenantId && t.FileId == fileId, cancellationToken);
         if (entity is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
         dbContext.TransparentProtectedFiles.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return TypedResults.NoContent();
+        return Results.NoContent();
     }
 
-    private static Results<Ok<VerifyResponse>, BadRequest<ErrorResponse>> VerifyAsync(
+    private static IResult VerifyAsync(
         VerifyRequest request,
+        HttpContext httpContext,
         IConfiguration configuration)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (string.IsNullOrEmpty(request.FileBytesBase64))
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_file_bytes"));
+            return Results.BadRequest(new ErrorResponse("invalid_file_bytes"));
         }
         byte[] bytes;
         try
@@ -164,7 +178,7 @@ public static class AdminTransparentFilesEndpoints
         var hmacKey = Encoding.UTF8.GetBytes(secret);
         if (TransparentEnvelope.TryReadTrailer(bytes, hmacKey, out var metadata, out var originalLength))
         {
-            return TypedResults.Ok(new VerifyResponse(
+            return Results.Ok(new VerifyResponse(
                 Valid: true,
                 metadata!.TenantId,
                 metadata.FileId,
@@ -175,13 +189,16 @@ public static class AdminTransparentFilesEndpoints
                 metadata.PolicyTemplateId,
                 OriginalLength: originalLength));
         }
-        return TypedResults.Ok(new VerifyResponse(false, null, null, null, null, null, null, null, null));
+        return Results.Ok(new VerifyResponse(false, null, null, null, null, null, null, null, null));
     }
 
-    private static Results<Ok<TrailerSecretResponse>, NotFound<ErrorResponse>, BadRequest<ErrorResponse>> GetTrailerSecret(
+    private static IResult GetTrailerSecret(
+        HttpContext httpContext,
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         // The trailer secret is the only authenticity anchor for transparent
         // files. Returning it over the network is gated to specific deployments
         // (folder-watcher service inside the trust boundary). All other
@@ -190,26 +207,28 @@ public static class AdminTransparentFilesEndpoints
         var distributionAllowed = configuration.GetValue("Drm:Security:AllowTrailerSecretDistribution", false);
         if (!distributionAllowed)
         {
-            return TypedResults.NotFound(new ErrorResponse("trailer_secret_distribution_disabled"));
+            return Results.NotFound();
         }
 
         var secret = configuration["Drm:Security:TransparentTrailerSecret"];
         if (string.IsNullOrWhiteSpace(secret) ||
             string.Equals(secret, SecurityStartupGuard.DefaultTrailerSecretPlaceholder, StringComparison.Ordinal))
         {
-            return TypedResults.BadRequest(new ErrorResponse("trailer_secret_not_configured"));
+            return Results.BadRequest(new ErrorResponse("trailer_secret_not_configured"));
         }
-        return TypedResults.Ok(new TrailerSecretResponse(secret));
+        return Results.Ok(new TrailerSecretResponse(secret));
     }
 
-    private static Results<Ok<StampResponse>, BadRequest<ErrorResponse>> StampAsync(
+    private static IResult StampAsync(
         StampRequest request,
         HttpContext httpContext,
         IConfiguration configuration)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty || request.OwnerUserId == Guid.Empty)
@@ -258,7 +277,7 @@ public static class AdminTransparentFilesEndpoints
             request.PolicyTemplateId);
 
         var stamped = TransparentEnvelope.AppendTrailer(bytes, metadata, hmacKey);
-        return TypedResults.Ok(new StampResponse(
+        return Results.Ok(new StampResponse(
             fileId,
             Convert.ToBase64String(stamped),
             stamped.Length,

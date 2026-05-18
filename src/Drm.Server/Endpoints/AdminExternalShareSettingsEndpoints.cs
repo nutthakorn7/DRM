@@ -47,14 +47,17 @@ public static class AdminExternalShareSettingsEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Ok<ExternalShareSettingsResponse>, BadRequest<ErrorResponse>>> GetSettingsAsync(
+    private static async Task<IResult> GetSettingsAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         var settings = await dbContext.TenantExternalShareSettings
@@ -62,14 +65,15 @@ public static class AdminExternalShareSettingsEndpoints
             .SingleOrDefaultAsync(candidate => candidate.TenantId == tenantId, cancellationToken);
         if (settings is null)
         {
-            return TypedResults.Ok(ExternalShareSettingsResponse.Default(tenantId));
+            return Results.Ok(ExternalShareSettingsResponse.Default(tenantId));
         }
 
-        return TypedResults.Ok(ExternalShareSettingsResponse.From(settings));
+        return Results.Ok(ExternalShareSettingsResponse.From(settings));
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<ExternalShareSettingsHistoryEventResponse>>, BadRequest<ErrorResponse>>> GetSettingsHistoryAsync(
+    private static async Task<IResult> GetSettingsHistoryAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? limit,
         string? reasonCode,
         string? userId,
@@ -81,9 +85,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (!TryNormalizeHistoryReasonCode(reasonCode, out var normalizedReasonCode))
@@ -164,11 +170,12 @@ public static class AdminExternalShareSettingsEndpoints
             tenantId,
             dbContext,
             cancellationToken);
-        return TypedResults.Ok<IReadOnlyList<ExternalShareSettingsHistoryEventResponse>>(enrichedEvents);
+        return Results.Ok<IReadOnlyList<ExternalShareSettingsHistoryEventResponse>>(enrichedEvents);
     }
 
-    private static async Task<Results<Ok<ExternalShareSettingsHistoryPageResponse>, BadRequest<ErrorResponse>>> GetSettingsHistoryPageAsync(
+    private static async Task<IResult> GetSettingsHistoryPageAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? limit,
         long? beforeId,
         string? reasonCode,
@@ -181,9 +188,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (beforeId.HasValue && beforeId.Value <= 0)
@@ -285,14 +294,15 @@ public static class AdminExternalShareSettingsEndpoints
             dbContext,
             cancellationToken);
 
-        return TypedResults.Ok(new ExternalShareSettingsHistoryPageResponse(
+        return Results.Ok(new ExternalShareSettingsHistoryPageResponse(
             enrichedEvents,
             nextCursorId,
             hasMore));
     }
 
-    private static async Task<Results<ContentHttpResult, BadRequest<ErrorResponse>>> GetSettingsHistoryCsvAsync(
+    private static async Task<IResult> GetSettingsHistoryCsvAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? limit,
         string? reasonCode,
         string? userId,
@@ -304,9 +314,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (!TryNormalizeHistoryReasonCode(reasonCode, out var normalizedReasonCode))
@@ -389,11 +401,12 @@ public static class AdminExternalShareSettingsEndpoints
             dbContext,
             cancellationToken);
         var csv = BuildSettingsHistoryCsv(enrichedEvents);
-        return TypedResults.Text(csv, "text/csv");
+        return Results.Text(csv, "text/csv");
     }
 
-    private static async Task<Results<Ok<ExternalShareSettingsHistorySummaryResponse>, BadRequest<ErrorResponse>>> GetSettingsHistorySummaryAsync(
+    private static async Task<IResult> GetSettingsHistorySummaryAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? windowHours,
         string? reasonCode,
         string? userId,
@@ -405,9 +418,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (!TryNormalizeHistoryReasonCode(reasonCode, out var normalizedReasonCode))
@@ -474,11 +489,12 @@ public static class AdminExternalShareSettingsEndpoints
             parsedToUtc,
             dbContext,
             cancellationToken);
-        return TypedResults.Ok(summary);
+        return Results.Ok(summary);
     }
 
-    private static async Task<Results<ContentHttpResult, BadRequest<ErrorResponse>>> GetSettingsHistorySummaryCsvAsync(
+    private static async Task<IResult> GetSettingsHistorySummaryCsvAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? windowHours,
         string? reasonCode,
         string? userId,
@@ -490,9 +506,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (!TryNormalizeHistoryReasonCode(reasonCode, out var normalizedReasonCode))
@@ -560,11 +578,12 @@ public static class AdminExternalShareSettingsEndpoints
             dbContext,
             cancellationToken);
         var csv = BuildSettingsHistorySummaryCsv(summary);
-        return TypedResults.Text(csv, "text/csv");
+        return Results.Text(csv, "text/csv");
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<ExternalShareSettingsHistoryTrendPointResponse>>, BadRequest<ErrorResponse>>> GetSettingsHistoryTrendAsync(
+    private static async Task<IResult> GetSettingsHistoryTrendAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? windowDays,
         string? reasonCode,
         string? userId,
@@ -576,9 +595,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (!TryNormalizeHistoryReasonCode(reasonCode, out var normalizedReasonCode))
@@ -657,11 +678,12 @@ public static class AdminExternalShareSettingsEndpoints
             ? parsedFromUtc.Value
             : sinceUtc;
         var points = BuildSettingsHistoryTrendPoints(filteredEvents, effectiveFromUtc, parsedToUtc);
-        return TypedResults.Ok<IReadOnlyList<ExternalShareSettingsHistoryTrendPointResponse>>(points);
+        return Results.Ok<IReadOnlyList<ExternalShareSettingsHistoryTrendPointResponse>>(points);
     }
 
-    private static async Task<Results<ContentHttpResult, BadRequest<ErrorResponse>>> GetSettingsHistoryTrendCsvAsync(
+    private static async Task<IResult> GetSettingsHistoryTrendCsvAsync(
         Guid tenantId,
+        HttpContext httpContext,
         int? windowDays,
         string? reasonCode,
         string? userId,
@@ -673,9 +695,11 @@ public static class AdminExternalShareSettingsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         if (!TryNormalizeHistoryReasonCode(reasonCode, out var normalizedReasonCode))
@@ -754,7 +778,7 @@ public static class AdminExternalShareSettingsEndpoints
             : sinceUtc;
         var points = BuildSettingsHistoryTrendPoints(filteredEvents, effectiveFromUtc, parsedToUtc);
         var csv = BuildSettingsHistoryTrendCsv(points);
-        return TypedResults.Text(csv, "text/csv");
+        return Results.Text(csv, "text/csv");
     }
 
     private static IQueryable<AuditEventEntity> FilterSettingsHistoryEvents(
@@ -1456,15 +1480,17 @@ public static class AdminExternalShareSettingsEndpoints
         return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
 
-    private static async Task<Results<Ok<ExternalShareSettingsResponse>, BadRequest<ErrorResponse>>> UpsertSettingsAsync(
+    private static async Task<IResult> UpsertSettingsAsync(
         UpsertExternalShareSettingsRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty)
@@ -1588,18 +1614,20 @@ public static class AdminExternalShareSettingsEndpoints
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return TypedResults.Ok(ExternalShareSettingsResponse.From(settings));
+        return Results.Ok(ExternalShareSettingsResponse.From(settings));
     }
 
-    private static async Task<Results<Ok<ExternalShareLockdownResponse>, BadRequest<ErrorResponse>>> LockdownTenantExternalSharingAsync(
+    private static async Task<IResult> LockdownTenantExternalSharingAsync(
         LockdownExternalShareRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty)
@@ -1673,7 +1701,7 @@ public static class AdminExternalShareSettingsEndpoints
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return TypedResults.Ok(new ExternalShareLockdownResponse(
+        return Results.Ok(new ExternalShareLockdownResponse(
             request.TenantId,
             linksToRevoke.Count,
             now,

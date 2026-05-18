@@ -33,6 +33,8 @@ public sealed class AuditEventEntity
 
     public Guid? UserId { get; set; }
 
+    public Guid? ActorAdminId { get; set; }
+
     public string EventType { get; set; } = string.Empty;
 
     public string ReasonCode { get; set; } = string.Empty;

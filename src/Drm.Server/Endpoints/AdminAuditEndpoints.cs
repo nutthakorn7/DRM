@@ -14,17 +14,17 @@ public static class AdminAuditEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<AuditEventResponse>>, BadRequest<ErrorResponse>>> GetAuditEventsAsync(
+    private static async Task<IResult> GetAuditEventsAsync(
         Guid tenantId,
         string? eventType,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.AuditRead, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(tenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var rows = await FilterAuditEvents(dbContext, tenantId, eventType)
             .OrderByDescending(auditEvent => auditEvent.Id)
@@ -38,7 +38,7 @@ public static class AdminAuditEndpoints
                 auditEvent.ReasonCode,
                 auditEvent.CreatedAtUtc))
             .ToListAsync(cancellationToken);
-        return TypedResults.Ok<IReadOnlyList<AuditEventResponse>>(rows);
+        return Results.Ok<IReadOnlyList<AuditEventResponse>>(rows);
     }
 
     private static async Task<IResult> GetAuditEventsCsvAsync(
@@ -48,10 +48,10 @@ public static class AdminAuditEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.AuditExport, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(tenantId))
-        {
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
 
         var auditEvents = await FilterAuditEvents(dbContext, tenantId, eventType)
             .OrderByDescending(auditEvent => auditEvent.Id)

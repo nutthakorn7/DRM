@@ -21,16 +21,18 @@ public static class AdminFileTagsEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created, Conflict, BadRequest<ErrorResponse>>> AddTagAsync(
+    private static async Task<IResult> AddTagAsync(
         Guid fileId,
         AddTagRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty)
@@ -67,13 +69,13 @@ public static class AdminFileTagsEndpoints
         }
         catch (DbUpdateException)
         {
-            return TypedResults.Conflict();
+            return Results.Conflict();
         }
 
         return TypedResults.Created($"/api/admin/files/{fileId}/tags");
     }
 
-    private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> RemoveTagAsync(
+    private static async Task<IResult> RemoveTagAsync(
         Guid fileId,
         string tag,
         Guid tenantId,
@@ -81,9 +83,11 @@ public static class AdminFileTagsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (tenantId == Guid.Empty)
@@ -103,53 +107,65 @@ public static class AdminFileTagsEndpoints
 
         dbContext.FileTags.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return TypedResults.NoContent();
+        return Results.NoContent();
     }
 
-    private static async Task<IReadOnlyList<string>> ListTagsAsync(
+    private static async Task<IResult> ListTagsAsync(
         Guid fileId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.FileTags
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+            return fail!;
+        var tags = await dbContext.FileTags
             .AsNoTracking()
             .Where(t => t.TenantId == tenantId && t.FileId == fileId)
             .OrderBy(t => t.Tag)
             .Select(t => t.Tag)
             .ToListAsync(cancellationToken);
+        return Results.Ok(tags);
     }
 
-    private static async Task<IReadOnlyList<TagSummary>> ListAllTagsAsync(
+    private static async Task<IResult> ListAllTagsAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+            return fail!;
         var rows = await dbContext.FileTags
             .AsNoTracking()
             .Where(t => t.TenantId == tenantId)
             .Select(t => t.Tag)
             .ToListAsync(cancellationToken);
 
-        return rows
+        var result = rows
             .GroupBy(tag => tag, StringComparer.Ordinal)
             .Select(g => new TagSummary(g.Key, g.Count()))
             .OrderBy(s => s.Tag, StringComparer.Ordinal)
             .ToList();
+        return Results.Ok(result);
     }
 
-    private static async Task<IReadOnlyList<Guid>> ListFilesByTagAsync(
+    private static async Task<IResult> ListFilesByTagAsync(
         Guid tenantId,
         string tag,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.FileTags
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+            return fail!;
+        var fileIds = await dbContext.FileTags
             .AsNoTracking()
             .Where(t => t.TenantId == tenantId && t.Tag == tag)
             .OrderBy(t => t.FileId)
             .Select(t => t.FileId)
             .ToListAsync(cancellationToken);
+        return Results.Ok(fileIds);
     }
 
     private sealed record AddTagRequest(Guid TenantId, string Tag);

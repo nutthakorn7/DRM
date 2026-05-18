@@ -15,16 +15,16 @@ public static class AdminNotificationConfigEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<NotificationConfigResponse>, Ok<NotificationConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
+    private static async Task<IResult> UpsertConfigAsync(
         NotificationConfigRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var existing = await dbContext.TenantAdminNotificationConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
@@ -48,22 +48,22 @@ public static class AdminNotificationConfigEndpoints
 
         var response = NotificationConfigResponse.From(existing);
         return isNew
-            ? TypedResults.Created("/api/admin/notification-config", response)
-            : TypedResults.Ok(response);
+            ? Results.Created("/api/admin/notification-config", response)
+            : Results.Ok(response);
     }
 
-    private static async Task<Results<Ok<NotificationConfigResponse>, NotFound>> GetConfigAsync(
+    private static async Task<IResult> GetConfigAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         var config = await dbContext.TenantAdminNotificationConfigs
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
-
-        return config == null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(NotificationConfigResponse.From(config));
+        return config == null ? Results.NotFound() : Results.Ok(NotificationConfigResponse.From(config));
     }
 
     private sealed record NotificationConfigRequest(

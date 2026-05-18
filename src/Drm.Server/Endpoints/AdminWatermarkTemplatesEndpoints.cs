@@ -30,15 +30,17 @@ public static class AdminWatermarkTemplatesEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<WatermarkTemplateResponse>, Conflict, BadRequest<ErrorResponse>>> CreateWatermarkTemplateAsync(
+    private static async Task<IResult> CreateWatermarkTemplateAsync(
         CreateWatermarkTemplateRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var validationError = ValidateCreateRequest(request);
@@ -92,27 +94,29 @@ public static class AdminWatermarkTemplatesEndpoints
                     request.WatermarkTemplateId,
                     cancellationToken))
             {
-                return TypedResults.Conflict();
+                return Results.Conflict();
             }
 
             throw;
         }
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/watermark-templates/{template.WatermarkTemplateId}?tenantId={template.TenantId}",
             WatermarkTemplateResponse.From(template));
     }
 
-    private static async Task<Results<Ok<WatermarkTemplateResponse>, NotFound, BadRequest<ErrorResponse>>> UpdateWatermarkTemplateAsync(
+    private static async Task<IResult> UpdateWatermarkTemplateAsync(
         Guid watermarkTemplateId,
         UpdateWatermarkTemplateRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var validationError = ValidateUpdateRequest(request);
@@ -150,29 +154,36 @@ public static class AdminWatermarkTemplatesEndpoints
         dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "watermark_template_updated"));
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Ok(WatermarkTemplateResponse.From(template));
+        return Results.Ok(WatermarkTemplateResponse.From(template));
     }
 
-    private static async Task<IReadOnlyList<WatermarkTemplateResponse>> ListWatermarkTemplatesAsync(
+    private static async Task<IResult> ListWatermarkTemplatesAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.WatermarkTemplates
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+            return fail!;
+        var templates = await dbContext.WatermarkTemplates
             .AsNoTracking()
             .Where(template => template.TenantId == tenantId)
             .OrderBy(template => template.Name)
             .ThenBy(template => template.WatermarkTemplateId)
             .Select(template => WatermarkTemplateResponse.From(template))
             .ToListAsync(cancellationToken);
+        return Results.Ok(templates);
     }
 
-    private static async Task<Results<Ok<WatermarkTemplateResponse>, NotFound>> GetWatermarkTemplateAsync(
+    private static async Task<IResult> GetWatermarkTemplateAsync(
         Guid watermarkTemplateId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+            return fail!;
         var template = await dbContext.WatermarkTemplates
             .AsNoTracking()
             .SingleOrDefaultAsync(
@@ -182,10 +193,10 @@ public static class AdminWatermarkTemplatesEndpoints
 
         if (template is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
-        return TypedResults.Ok(WatermarkTemplateResponse.From(template));
+        return Results.Ok(WatermarkTemplateResponse.From(template));
     }
 
     private static Task<bool> WatermarkTemplateExistsAsync(

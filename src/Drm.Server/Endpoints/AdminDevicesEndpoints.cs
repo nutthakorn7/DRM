@@ -15,13 +15,16 @@ public static class AdminDevicesEndpoints
         return endpoints;
     }
 
-    private static async Task<IReadOnlyList<DeviceResponse>> ListDevicesAsync(
+    private static async Task<IResult> ListDevicesAsync(
         Guid tenantId,
         Guid? userId,
         string? status,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+            return fail!;
         var query = dbContext.AgentDevices
             .AsNoTracking()
             .Where(device => device.TenantId == tenantId);
@@ -36,20 +39,24 @@ public static class AdminDevicesEndpoints
             query = query.Where(device => device.Status == status.Trim());
         }
 
-        return await query
+        var devices = await query
             .OrderBy(device => device.Hostname)
             .ThenBy(device => device.DeviceId)
             .Take(500)
             .Select(device => DeviceResponse.From(device))
             .ToListAsync(cancellationToken);
+        return Results.Ok(devices);
     }
 
     private static async Task<IResult> GetDeviceHealthAsync(
         Guid tenantId,
         int? staleAfterMinutes,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+            return fail!;
         var effectiveStaleAfterMinutes = staleAfterMinutes ?? 15;
         if (effectiveStaleAfterMinutes is < 1 or > 10080)
         {
@@ -91,10 +98,10 @@ public static class AdminDevicesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
 
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
@@ -123,6 +130,7 @@ public static class AdminDevicesEndpoints
         {
             TenantId = request.TenantId,
             UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "device_disabled",
             ReasonCode = reason,
             CreatedAtUtc = now

@@ -15,21 +15,19 @@ public static class AdminUsersEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<UserResponse>, Conflict, BadRequest<ErrorResponse>>> CreateUserAsync(
+    private static async Task<IResult> CreateUserAsync(
         CreateUserRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
-        {
-            return TypedResults.Conflict();
-        }
+            return Results.Conflict();
 
         var user = new TenantUserEntity
         {
@@ -41,7 +39,7 @@ public static class AdminUsersEndpoints
         };
 
         dbContext.TenantUsers.Add(user);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, request.UserId, "user_created"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, request.UserId, "user_created", httpContext));
 
         try
         {
@@ -50,27 +48,28 @@ public static class AdminUsersEndpoints
         catch (DbUpdateException)
         {
             if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
-            {
-                return TypedResults.Conflict();
-            }
-
+                return Results.Conflict();
             throw;
         }
 
-        return TypedResults.Created($"/api/admin/users/{user.UserId}", UserResponse.From(user));
+        return Results.Created($"/api/admin/users/{user.UserId}", UserResponse.From(user));
     }
 
-    private static async Task<IReadOnlyList<UserResponse>> ListUsersAsync(
+    private static async Task<IResult> ListUsersAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.TenantUsers
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+            return fail!;
+        var users = await dbContext.TenantUsers
             .AsNoTracking()
             .Where(user => user.TenantId == tenantId)
             .OrderBy(user => user.Email)
             .Select(user => UserResponse.From(user))
             .ToListAsync(cancellationToken);
+        return Results.Ok(users);
     }
 
     private static Task<bool> ConflictingUserExistsAsync(
