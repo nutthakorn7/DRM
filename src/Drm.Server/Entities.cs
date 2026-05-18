@@ -2,6 +2,25 @@ using Drm.Domain;
 
 namespace Drm.Server;
 
+public enum TenantStatus { Active = 0, Suspended = 1 }
+
+public sealed class TenantEntity
+{
+    public Guid TenantId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public TenantStatus Status { get; set; }
+
+    public int? MaxEncrypters { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? SuspendedAtUtc { get; set; }
+}
+
 public sealed class ProtectedFileEntity
 {
     public Guid Id { get; set; }

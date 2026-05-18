@@ -4,6 +4,8 @@ namespace Drm.Server;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
+
     public DbSet<ProtectedFileEntity> ProtectedFiles => Set<ProtectedFileEntity>();
 
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
@@ -68,6 +70,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<TenantEntity>(entity =>
+        {
+            entity.HasKey(t => t.TenantId);
+            entity.HasIndex(t => t.Name).IsUnique();
+            entity.Property(t => t.Name).HasMaxLength(256);
+            entity.Property(t => t.DisplayName).HasMaxLength(256);
+            entity.Property(t => t.Status).HasConversion<int>();
+        });
+
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
         {
             entity.HasKey(file => new { file.TenantId, file.Id });

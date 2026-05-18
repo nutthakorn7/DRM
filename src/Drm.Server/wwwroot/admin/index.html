@@ -120,6 +120,9 @@
         <button type="button" class="tab-link" data-tab-link="integrations" role="tab" aria-selected="false">
           <span class="tab-icon">🔌</span><span class="tab-label">Integrations</span>
         </button>
+        <button type="button" class="tab-link" data-tab-link="tenants" role="tab" aria-selected="false">
+          <span class="tab-icon">🏢</span><span class="tab-label">Tenants</span>
+        </button>
       </nav>
 
       <nav class="subtab-nav" id="subTabNav" aria-label="Section sub-tabs" role="tablist"></nav>
@@ -1144,6 +1147,48 @@
               <tr>
                 <td colspan="7" class="empty">Click "Refresh recent events" to load activity.</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Tenants (operator-level, no per-tenant scope required) ─────────── -->
+      <section class="panel" id="tenants" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Multi-tenant SaaS</p>
+            <h3>Tenants</h3>
+          </div>
+          <button id="refreshTenants" type="button">Refresh</button>
+        </div>
+
+        <details id="createTenantDetails">
+          <summary>Create tenant</summary>
+          <form id="createTenantForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+            <input id="newTenantName" autocomplete="off" placeholder="Unique name (slug)" required>
+            <input id="newTenantDisplayName" autocomplete="off" placeholder="Display name (optional)">
+            <input id="newTenantId" autocomplete="off" placeholder="Tenant ID (UUID, blank = auto)">
+            <input id="newTenantMaxEncrypters" type="number" min="1" autocomplete="off" placeholder="Seat limit (blank = unlimited)">
+            <button type="submit">Create tenant</button>
+          </form>
+          <pre id="createTenantOutput" class="output-block" hidden></pre>
+        </details>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Display name</th>
+                <th>Status</th>
+                <th>Seat limit</th>
+                <th>Tenant ID</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tenantsBody">
+              <tr><td colspan="7" class="empty">Click "Refresh" to load tenants.</td></tr>
             </tbody>
           </table>
         </div>

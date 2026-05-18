@@ -1,9 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace Drm.Server;
 
 /// <summary>
 /// Reads the <c>X-DRM-Tenant-Id</c> request header (if present) and parks it
 /// in <see cref="HttpContext.Items"/> so endpoints can cross-check it against
 /// whatever tenant identifier the caller passed in the body.
+///
+/// Also enforces tenant suspension: if the resolved tenant has Status == Suspended,
+/// all /api/* requests for that tenant are rejected with 403 tenant_suspended.
 ///
 /// The header is the long-term canonical source of tenant context across all
 /// /api/* endpoints. Today, body-side <c>TenantId</c> remains accepted for
@@ -26,6 +31,24 @@ public static class TenantHeaderContext
                 && tenantId != Guid.Empty)
             {
                 context.Items[ItemKey] = tenantId;
+
+                // Enforce suspension only for /api/* paths (skip admin-identity and healthz)
+                if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+                {
+                    var db = context.RequestServices.GetRequiredService<AppDbContext>();
+                    var tenant = await db.Tenants
+                        .AsNoTracking()
+                        .Where(t => t.TenantId == tenantId)
+                        .Select(t => new { t.Status })
+                        .FirstOrDefaultAsync(context.RequestAborted);
+
+                    if (tenant?.Status == TenantStatus.Suspended)
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsJsonAsync(new { reasonCode = "tenant_suspended" });
+                        return;
+                    }
+                }
             }
 
             await next(context);

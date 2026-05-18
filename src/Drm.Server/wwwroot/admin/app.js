@@ -2290,3 +2290,105 @@ async function rotateAdminToken(adminId) {
   await refreshAdmins();
   setStatus("Token rotated — copy the new token above", "ok");
 }
+
+// ── Tenants (operator-level) ────────────────────────────────────────────────
+
+async function apiFetchGlobal(url, options = {}) {
+  const adminKey = requireAdminKey();
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...adminAuthHeader(adminKey),
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) {
+    setStatus(`Request failed: ${response.status}`, "error");
+    throw new Error(`Request failed with HTTP ${response.status}`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+async function refreshTenants() {
+  const tbody = document.getElementById("tenantsBody");
+  tbody.innerHTML = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
+  try {
+    const tenants = await apiFetchGlobal("/api/admin/tenants");
+    if (!tenants.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No tenants yet. Create one above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = tenants.map(t => {
+      const statusLabel = t.status === 0
+        ? '<span class="badge badge-ok">Active</span>'
+        : '<span class="badge badge-error">Suspended</span>';
+      const seatLabel = t.maxEncrypters != null ? t.maxEncrypters : '∞';
+      const toggleLabel = t.status === 0 ? "Suspend" : "Activate";
+      const toggleStatus = t.status === 0 ? 1 : 0;
+      const createdDate = new Date(t.createdAtUtc).toLocaleDateString();
+      return `<tr>
+        <td><code>${esc(t.name)}</code></td>
+        <td>${esc(t.displayName)}</td>
+        <td>${statusLabel}</td>
+        <td>${seatLabel}</td>
+        <td><code class="copy-id" title="Click to copy" style="cursor:pointer" onclick="navigator.clipboard.writeText('${esc(t.tenantId)}')">${esc(t.tenantId)}</code></td>
+        <td>${createdDate}</td>
+        <td>
+          <button type="button" class="ghost" onclick="toggleTenantStatus('${esc(t.tenantId)}', ${toggleStatus})">${toggleLabel}</button>
+        </td>
+      </tr>`;
+    }).join("");
+    setStatus(`Loaded ${tenants.length} tenant(s)`, "ok");
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Failed to load tenants.</td></tr>';
+  }
+}
+
+async function toggleTenantStatus(tenantId, newStatus) {
+  try {
+    await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(tenantId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: newStatus })
+    });
+    setStatus(newStatus === 1 ? "Tenant suspended" : "Tenant activated", "ok");
+    await refreshTenants();
+  } catch (e) {
+    // error already shown by apiFetchGlobal
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+document.getElementById("refreshTenants")?.addEventListener("click", refreshTenants);
+
+document.getElementById("createTenantForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("newTenantName").value.trim();
+  const displayName = document.getElementById("newTenantDisplayName").value.trim() || undefined;
+  const tenantId = document.getElementById("newTenantId").value.trim() || undefined;
+  const maxEncryptersRaw = document.getElementById("newTenantMaxEncrypters").value.trim();
+  const maxEncrypters = maxEncryptersRaw ? parseInt(maxEncryptersRaw, 10) : undefined;
+
+  const output = document.getElementById("createTenantOutput");
+  output.hidden = false;
+  output.textContent = "Creating…";
+
+  try {
+    const result = await apiFetchGlobal("/api/admin/tenants", {
+      method: "POST",
+      body: JSON.stringify({ name, displayName, tenantId, maxEncrypters })
+    });
+    output.textContent = `Created: ${result.tenantId}`;
+    document.getElementById("newTenantName").value = "";
+    document.getElementById("newTenantDisplayName").value = "";
+    document.getElementById("newTenantId").value = "";
+    document.getElementById("newTenantMaxEncrypters").value = "";
+    setStatus("Tenant created", "ok");
+    await refreshTenants();
+  } catch (e) {
+    output.textContent = "Failed to create tenant.";
+  }
+});

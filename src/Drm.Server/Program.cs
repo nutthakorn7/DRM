@@ -464,6 +464,32 @@ using (var scope = app.Services.CreateScope())
                 """);
         }
 
+        // Tenants table — added in v1.3 for multi-tenant SaaS mode
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "Tenants" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_Tenants" PRIMARY KEY,
+                "Name" TEXT NOT NULL DEFAULT '',
+                "DisplayName" TEXT NOT NULL DEFAULT '',
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "MaxEncrypters" INTEGER NULL,
+                "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "SuspendedAtUtc" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Tenants_Name" ON "Tenants" ("Name");
+            """);
+        // Backfill: insert a row for every tenant that already has data but no Tenants row
+        dbContext.Database.ExecuteSqlRaw("""
+            INSERT OR IGNORE INTO "Tenants" ("TenantId", "Name", "DisplayName", "Status", "CreatedAtUtc")
+            SELECT DISTINCT t, t, t, 0, datetime('now')
+            FROM (
+                SELECT TenantId AS t FROM "TenantUsers"
+                UNION SELECT TenantId FROM "TenantGroups"
+                UNION SELECT TenantId FROM "ProtectedFiles"
+            ) all_tenants;
+            """);
+
         if (openedHere)
         {
             connection.Close();
@@ -573,6 +599,31 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.ExecuteSqlRaw("""
             ALTER TABLE "AdminUsers" ADD COLUMN IF NOT EXISTS "TenantScope" uuid NULL;
             """);
+        // Tenants table — added in v1.3 for multi-tenant SaaS mode (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "Tenants" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_Tenants" PRIMARY KEY,
+                "Name" text NOT NULL DEFAULT '',
+                "DisplayName" text NOT NULL DEFAULT '',
+                "Status" integer NOT NULL DEFAULT 0,
+                "MaxEncrypters" integer NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "SuspendedAtUtc" timestamp with time zone NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Tenants_Name" ON "Tenants" ("Name");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            INSERT INTO "Tenants" ("TenantId", "Name", "DisplayName", "Status", "CreatedAtUtc")
+            SELECT DISTINCT t, t::text, t::text, 0, NOW()
+            FROM (
+                SELECT "TenantId" AS t FROM "TenantUsers"
+                UNION SELECT "TenantId" FROM "TenantGroups"
+                UNION SELECT "TenantId" FROM "ProtectedFiles"
+            ) all_tenants
+            ON CONFLICT DO NOTHING;
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -636,6 +687,7 @@ app.MapAdminOutlookIntegrationEndpoints();
 app.MapOutlookAddInEndpoints();
 app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
+app.MapAdminTenantsEndpoints();
 app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();

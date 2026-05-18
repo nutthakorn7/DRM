@@ -26,6 +26,23 @@ public static class AdminUsersEndpoints
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
+        // Seat quota: reject if tenant has a MaxEncrypters limit and it is already reached
+        var maxEncrypters = await dbContext.Tenants
+            .AsNoTracking()
+            .Where(t => t.TenantId == request.TenantId)
+            .Select(t => (int?)t.MaxEncrypters)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (maxEncrypters.HasValue)
+        {
+            var currentCount = await dbContext.TenantUsers
+                .AsNoTracking()
+                .CountAsync(u => u.TenantId == request.TenantId, cancellationToken);
+
+            if (currentCount >= maxEncrypters.Value)
+                return Results.Conflict(new ErrorResponse("seat_limit_exceeded"));
+        }
+
         if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
             return Results.Conflict();
 
