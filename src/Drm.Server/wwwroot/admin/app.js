@@ -2345,6 +2345,7 @@ async function refreshTenants() {
         <td style="white-space:nowrap">
           <button type="button" class="ghost" onclick="toggleTenantStatus('${esc(t.tenantId)}', ${toggleStatus})">${toggleLabel}</button>
           <button type="button" class="ghost" onclick="openKeyManager('${esc(t.tenantId)}', '${esc(t.name)}')" style="margin-left:4px">Keys</button>
+          <button type="button" class="ghost" onclick="openWebhookManager('${esc(t.tenantId)}', '${esc(t.name)}')" style="margin-left:4px">Webhooks</button>
         </td>
       </tr>`;
     }).join("");
@@ -2480,4 +2481,141 @@ document.getElementById("createTenantForm")?.addEventListener("submit", async (e
   } catch (e) {
     output.textContent = "Failed to create tenant.";
   }
+});
+
+// ── Billing webhook manager (inline sub-panel per tenant) ────────────────────
+
+let _webhookManagerTenantId = null;
+
+async function openWebhookManager(tenantId, tenantName) {
+  _webhookManagerTenantId = tenantId;
+  const panel = document.getElementById("webhookManagerPanel");
+  const title = document.getElementById("webhookManagerTitle");
+  if (title) title.textContent = `Billing webhooks — ${tenantName}`;
+  if (panel) panel.hidden = false;
+  panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  await refreshWebhooks();
+}
+
+async function refreshWebhooks() {
+  if (!_webhookManagerTenantId) return;
+  const tbody = document.getElementById("webhooksBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  try {
+    const hooks = await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(_webhookManagerTenantId)}/billing-webhooks`);
+    if (!hooks.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No webhooks registered.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = hooks.map(h => {
+      const created = new Date(h.createdAtUtc).toLocaleDateString();
+      return `<tr>
+        <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis"><code title="${esc(h.url)}">${esc(h.url)}</code></td>
+        <td><code>${esc(h.events)}</code></td>
+        <td>${created}</td>
+        <td><button type="button" class="ghost" onclick="deleteWebhook('${esc(h.webhookId)}')">Delete</button></td>
+      </tr>`;
+    }).join("");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Failed to load webhooks.</td></tr>';
+  }
+}
+
+async function deleteWebhook(webhookId) {
+  if (!_webhookManagerTenantId) return;
+  try {
+    const response = await fetch(
+      `/api/admin/tenants/${encodeURIComponent(_webhookManagerTenantId)}/billing-webhooks/${encodeURIComponent(webhookId)}`,
+      { method: "DELETE", headers: adminAuthHeader(requireAdminKey()) }
+    );
+    if (!response.ok) { setStatus(`Delete failed: ${response.status}`, "error"); return; }
+    setStatus("Webhook deleted", "ok");
+    await refreshWebhooks();
+  } catch {
+    setStatus("Failed to delete webhook", "error");
+  }
+}
+
+document.getElementById("createWebhookForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!_webhookManagerTenantId) return;
+  const url = document.getElementById("newWebhookUrl").value.trim();
+  const events = document.getElementById("newWebhookEvents").value;
+  const output = document.getElementById("createWebhookOutput");
+  output.hidden = false;
+  output.textContent = "Registering…";
+  try {
+    const result = await apiFetchGlobal(
+      `/api/admin/tenants/${encodeURIComponent(_webhookManagerTenantId)}/billing-webhooks`,
+      { method: "POST", body: JSON.stringify({ url, events }) }
+    );
+    output.textContent = `Webhook registered — save the signing secret now, it will not be shown again.\n\nSecret: ${result.secret}\nWebhook ID: ${result.webhookId}`;
+    document.getElementById("newWebhookUrl").value = "";
+    setStatus("Billing webhook registered", "ok");
+    await refreshWebhooks();
+  } catch {
+    output.textContent = "Failed to register webhook.";
+  }
+});
+
+document.getElementById("closeWebhookManager")?.addEventListener("click", () => {
+  document.getElementById("webhookManagerPanel")?.setAttribute("hidden", "");
+  _webhookManagerTenantId = null;
+});
+
+// ── Usage snapshot ────────────────────────────────────────────────────────────
+
+async function refreshUsage() {
+  const tbody = document.getElementById("usageBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  try {
+    const rows = await apiFetchGlobal("/api/admin/usage");
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No tenants yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const statusBadge = r.status === 0
+        ? '<span class="badge badge-ok">Active</span>'
+        : '<span class="badge badge-error">Suspended</span>';
+      const seats = r.maxSeats != null ? `${r.usedSeats} / ${r.maxSeats}` : `${r.usedSeats} / ∞`;
+      const seatPct = r.maxSeats != null ? Math.min(100, Math.round((r.usedSeats / r.maxSeats) * 100)) : 0;
+      const seatBar = r.maxSeats != null
+        ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? '#ef4444' : seatPct >= 80 ? '#f59e0b' : '#22c55e'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
+        : '';
+      return `<tr>
+        <td><strong>${esc(r.displayName)}</strong><br><small><code>${esc(r.name)}</code></small></td>
+        <td>${statusBadge}</td>
+        <td>${seats}${seatBar}</td>
+        <td>${r.activeKeys}</td>
+        <td>${r.protectedFiles}</td>
+      </tr>`;
+    }).join("");
+    setStatus(`Usage snapshot: ${rows.length} tenant(s)`, "ok");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Failed to load usage data.</td></tr>';
+  }
+}
+
+document.getElementById("refreshUsage")?.addEventListener("click", refreshUsage);
+
+document.getElementById("exportUsageCsv")?.addEventListener("click", () => {
+  const adminKey = requireAdminKey();
+  if (!adminKey) return;
+  const url = "/api/admin/usage?format=csv";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  const headers = adminAuthHeader(adminKey);
+  fetch(url, { headers: { ...headers } })
+    .then(r => r.blob())
+    .then(blob => {
+      const objectUrl = URL.createObjectURL(blob);
+      a.href = objectUrl;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+    })
+    .catch(() => setStatus("CSV export failed", "error"));
 });

@@ -21,6 +21,23 @@ public sealed class TenantClientKeyEntity
     public bool Revoked { get; set; }
 }
 
+public sealed class TenantBillingWebhookEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid WebhookId { get; set; }
+
+    public string Url { get; set; } = string.Empty;
+
+    public string Secret { get; set; } = string.Empty;
+
+    public string Events { get; set; } = "*";
+
+    public bool Enabled { get; set; } = true;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
 public sealed class TenantEntity
 {
     public Guid TenantId { get; set; }

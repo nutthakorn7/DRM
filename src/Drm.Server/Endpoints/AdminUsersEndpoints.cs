@@ -19,6 +19,7 @@ public static class AdminUsersEndpoints
         CreateUserRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
+        IServiceScopeFactory scopeFactory,
         CancellationToken cancellationToken)
     {
         if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
@@ -33,9 +34,10 @@ public static class AdminUsersEndpoints
             .Select(t => (int?)t.MaxEncrypters)
             .FirstOrDefaultAsync(cancellationToken);
 
+        int currentCount = 0;
         if (maxEncrypters.HasValue)
         {
-            var currentCount = await dbContext.TenantUsers
+            currentCount = await dbContext.TenantUsers
                 .AsNoTracking()
                 .CountAsync(u => u.TenantId == request.TenantId, cancellationToken);
 
@@ -67,6 +69,17 @@ public static class AdminUsersEndpoints
             if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
                 return Results.Conflict();
             throw;
+        }
+
+        // Fire seat_limit_approach webhook when crossing >= 80% of the seat limit
+        if (maxEncrypters.HasValue)
+        {
+            var newCount = currentCount + 1;
+            var pct = (double)newCount / maxEncrypters.Value;
+            var prevPct = (double)currentCount / maxEncrypters.Value;
+            if (pct >= 0.8 && prevPct < 0.8)
+                BillingWebhooks.FireAndForget(scopeFactory, request.TenantId, "seat_limit_approach",
+                    new { tenantId = request.TenantId, usedSeats = newCount, maxSeats = maxEncrypters.Value, usagePercent = (int)(pct * 100) });
         }
 
         return Results.Created($"/api/admin/users/{user.UserId}", UserResponse.From(user));

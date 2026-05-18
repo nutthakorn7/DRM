@@ -1228,6 +1228,77 @@
             </table>
           </div>
         </div>
+
+        <!-- Webhook manager sub-panel (shown when "Webhooks" is clicked on a tenant row) -->
+        <div id="webhookManagerPanel" hidden style="margin-top:1.5rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem">
+          <div class="section-head" style="margin-bottom:.75rem">
+            <div>
+              <p class="eyebrow">Billing events</p>
+              <h4 id="webhookManagerTitle">Billing webhooks</h4>
+            </div>
+            <button type="button" id="closeWebhookManager" class="ghost">Close</button>
+          </div>
+
+          <details id="createWebhookDetails">
+            <summary>Add webhook</summary>
+            <form id="createWebhookForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+              <input id="newWebhookUrl" autocomplete="off" placeholder="https://hooks.example.com/drm" required style="flex:2;min-width:240px">
+              <select id="newWebhookEvents" style="flex:1;min-width:160px">
+                <option value="*">All events</option>
+                <option value="seat_limit_approach">seat_limit_approach only</option>
+                <option value="tenant_suspended">tenant_suspended only</option>
+              </select>
+              <button type="submit">Add webhook</button>
+            </form>
+            <pre id="createWebhookOutput" class="output-block anti-capture-block" hidden></pre>
+          </details>
+
+          <div class="table-wrap" style="margin-top:.75rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th>Events</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="webhooksBody">
+                <tr><td colspan="4" class="empty">Select a tenant to manage webhooks.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="usage" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Billing</p>
+            <h3>Usage snapshot</h3>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="exportUsageCsv" type="button" class="ghost">Export CSV</button>
+            <button id="refreshUsage" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant</th>
+                <th>Status</th>
+                <th>Seats used</th>
+                <th>Active keys</th>
+                <th>Protected files</th>
+              </tr>
+            </thead>
+            <tbody id="usageBody">
+              <tr><td colspan="5" class="empty">Click "Refresh" to load usage snapshot.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
     </main>

@@ -107,6 +107,7 @@ public static class AdminTenantsEndpoints
         UpdateTenantRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
+        IServiceScopeFactory scopeFactory,
         CancellationToken cancellationToken)
     {
         if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.TenantsWrite, out var fail))
@@ -124,6 +125,7 @@ public static class AdminTenantsEndpoints
         if (request.MaxEncrypters is not null)
             tenant.MaxEncrypters = request.MaxEncrypters == 0 ? null : request.MaxEncrypters;
 
+        var wasActive = tenant.Status == TenantStatus.Active;
         if (request.Status is not null && request.Status != tenant.Status)
         {
             tenant.Status = request.Status.Value;
@@ -131,6 +133,10 @@ public static class AdminTenantsEndpoints
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (wasActive && tenant.Status == TenantStatus.Suspended)
+            BillingWebhooks.FireAndForget(scopeFactory, tenantId, "tenant_suspended",
+                new { tenantId, suspendedAtUtc = tenant.SuspendedAtUtc });
 
         var usedSeats = await dbContext.TenantUsers
             .AsNoTracking()

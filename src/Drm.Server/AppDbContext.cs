@@ -8,6 +8,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TenantClientKeyEntity> TenantClientKeys => Set<TenantClientKeyEntity>();
 
+    public DbSet<TenantBillingWebhookEntity> TenantBillingWebhooks => Set<TenantBillingWebhookEntity>();
+
     public DbSet<ProtectedFileEntity> ProtectedFiles => Set<ProtectedFileEntity>();
 
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
@@ -78,6 +80,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(k => k.KeyHash).IsUnique();
             entity.Property(k => k.KeyHash).HasMaxLength(128);
             entity.Property(k => k.Label).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<TenantBillingWebhookEntity>(entity =>
+        {
+            entity.HasKey(w => new { w.TenantId, w.WebhookId });
+            entity.Property(w => w.Url).HasMaxLength(2048);
+            entity.Property(w => w.Secret).HasMaxLength(256);
+            entity.Property(w => w.Events).HasMaxLength(256);
         });
 
         modelBuilder.Entity<TenantEntity>(entity =>

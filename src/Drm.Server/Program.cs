@@ -506,6 +506,19 @@ using (var scope = app.Services.CreateScope())
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantClientKeys_KeyHash"
             ON "TenantClientKeys" ("KeyHash");
             """);
+        // TenantBillingWebhooks table — added in v1.3.2 for usage/billing event webhooks
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantBillingWebhooks" (
+                "TenantId" TEXT NOT NULL,
+                "WebhookId" TEXT NOT NULL,
+                "Url" TEXT NOT NULL DEFAULT '',
+                "Secret" TEXT NOT NULL DEFAULT '',
+                "Events" TEXT NOT NULL DEFAULT '*',
+                "Enabled" INTEGER NOT NULL DEFAULT 1,
+                "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                CONSTRAINT "PK_TenantBillingWebhooks" PRIMARY KEY ("TenantId", "WebhookId")
+            );
+            """);
 
         if (openedHere)
         {
@@ -658,6 +671,19 @@ using (var scope = app.Services.CreateScope())
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantClientKeys_KeyHash"
             ON "TenantClientKeys" ("KeyHash");
             """);
+        // TenantBillingWebhooks table — added in v1.3.2 for usage/billing event webhooks (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantBillingWebhooks" (
+                "TenantId" uuid NOT NULL,
+                "WebhookId" uuid NOT NULL,
+                "Url" text NOT NULL DEFAULT '',
+                "Secret" text NOT NULL DEFAULT '',
+                "Events" text NOT NULL DEFAULT '*',
+                "Enabled" boolean NOT NULL DEFAULT TRUE,
+                "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                CONSTRAINT "PK_TenantBillingWebhooks" PRIMARY KEY ("TenantId", "WebhookId")
+            );
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -723,6 +749,8 @@ app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
 app.MapAdminTenantsEndpoints();
 app.MapAdminTenantClientKeysEndpoints();
+app.MapAdminTenantBillingWebhooksEndpoints();
+app.MapAdminUsageEndpoints();
 app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();
