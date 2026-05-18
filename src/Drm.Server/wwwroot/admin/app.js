@@ -656,7 +656,9 @@ async function refreshStatusDashboard() {
     }),
     probe("audit", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
-      const r = await fetch(`/api/audit?tenantId=${encodeURIComponent(tenantId)}&limit=1`);
+      const r = await fetch(`/api/audit?tenantId=${encodeURIComponent(tenantId)}&limit=1`, {
+        headers: { "X-DRM-Tenant-Id": tenantIdInput.value }
+      });
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
       const list = await r.json();
       return { level: "is-ok", detail: list.length > 0 ? "events flowing" : "no events yet" };

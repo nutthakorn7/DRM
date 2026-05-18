@@ -68,6 +68,23 @@ public sealed class ClientApiKeyAuthenticationTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    // ─── X-DRM-Tenant-Id header assertion on client surface (SECURITY.md) ─
+
+    [Fact]
+    public async Task Audit_with_mismatched_tenant_header_returns_400_tenant_mismatch()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-DRM-Client-Key", ClientApiKey);
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/audit?tenantId={Guid.NewGuid()}");
+        request.Headers.Add("X-DRM-Tenant-Id", Guid.NewGuid().ToString());
+
+        using var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task Health_endpoint_does_not_require_client_api_key()
     {

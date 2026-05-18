@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drm.Server.Endpoints;
@@ -11,12 +12,18 @@ public static class AuditEndpoints
         return endpoints;
     }
 
-    private static async Task<IReadOnlyList<AuditEventResponse>> GetAuditEventsAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AuditEventResponse>>, BadRequest<ErrorResponse>>> GetAuditEventsAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.AuditEvents
+        if (!httpContext.MatchesHeader(tenantId))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+
+        var rows = await dbContext.AuditEvents
             .Where(auditEvent => auditEvent.TenantId == tenantId)
             .OrderByDescending(auditEvent => auditEvent.Id)
             .Take(100)
@@ -29,6 +36,7 @@ public static class AuditEndpoints
                 auditEvent.ReasonCode,
                 auditEvent.CreatedAtUtc))
             .ToListAsync(cancellationToken);
+        return TypedResults.Ok<IReadOnlyList<AuditEventResponse>>(rows);
     }
 
     private sealed record AuditEventResponse(
@@ -39,4 +47,6 @@ public static class AuditEndpoints
         string EventType,
         string ReasonCode,
         DateTimeOffset CreatedAtUtc);
+
+    private sealed record ErrorResponse(string ReasonCode);
 }

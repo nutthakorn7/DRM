@@ -130,6 +130,27 @@ automatically via `apiFetch`. Direct-curl callers should start setting
 `X-DRM-Tenant-Id` so cross-tenant typos surface as deterministic 400s
 instead of silent data corruption.
 
+**2026-05-18 expansion — read surface & non-admin tenant-scoped reads.**
+The same cross-check was extended to read endpoints and to one non-admin
+endpoint that's tenant-scoped under the client-API-key surface:
+
+| Date | Endpoint | File |
+|---|---|---|
+| 2026-05-18 | `GET /api/admin/audit` + `/api/admin/audit.csv` | `AdminAuditEndpoints.cs` |
+| 2026-05-18 | `GET /api/admin/files/{id}/convert/zip` | `AdminFileZipEndpoints.cs` |
+| 2026-05-18 | `POST /api/admin/policy-simulator` | `AdminPolicySimulatorEndpoints.cs` |
+| 2026-05-18 | `POST /api/me/share` (quick-share) | `QuickShareEndpoints.cs` |
+| 2026-05-18 | `GET /api/audit` (client-API-key surface) | `AuditEndpoints.cs` |
+
+`/api/audit` is the only non-admin endpoint in the migration so far. It's
+included because the client API key is a single shared secret per
+deployment, so without the cross-check anyone holding the key could read
+any tenant's audit log just by guessing the tenant GUID — the same
+single-key-spans-many-tenants shape that motivated the admin migration.
+Other client-API-key endpoints (Files, SCIM, ExternalShare, etc.) are
+either bound to a tenant by the token they receive or are scoped by
+construction; they're not in scope today.
+
 ---
 
 ## What the agent endpoints trust
