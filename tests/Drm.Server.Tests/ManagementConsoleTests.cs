@@ -45,7 +45,7 @@ public sealed class ManagementConsoleTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
         html.Should().Contain("DRM Management");
-        html.Should().Contain("X-DRM-Admin-Key");
+        html.Should().Contain("Admin credential");
         html.Should().Contain("Tenant ID");
         html.Should().Contain("rel=\"icon\"");
         html.Should().Contain("Groups");

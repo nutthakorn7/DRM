@@ -2,7 +2,66 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
-## [Unreleased]
+## [1.1.0] — 2026-05-18
+
+**v1.1 enterprise — admin identity upgrade (Slices 1–4).**
+Completes the v1 → v1.1 enterprise upgrade. Every admin API call is now
+authenticated with a real, revocable, role-bound identity. The shared API
+key is supported as a backward-compatible fallback with an operator-controlled
+deprecation path, and the management console has been updated throughout to
+prefer per-admin tokens.
+
+### Added (v1.1.0 summary)
+- Per-admin tokens (`X-DRM-Admin-Token`), roles, and RBAC permission system
+  (Slice 1: `AdminUserEntity`, `AdminRoleEntity`, `AdminApiTokenEntity`,
+  `AdminTokenCrypto`, 4 system roles with scoped permission sets).
+- Admin identity management panel in the console — WhoAmI, role list, admin
+  user table with disable/enable, create-admin form with one-time token
+  display, per-user token rotation and revocation (Slice 2).
+- `ActorAdminId` set on every `AuditEventEntity` across all admin endpoints
+  so every change is traceable to the individual admin who made it (Slice 2).
+- `Drm:Security:AdminSharedKeyMode` config toggle (`Active` / `Warn` /
+  `Disabled`) for the shared-key lifecycle. `Warn` adds a `Deprecation: true`
+  response header and writes a `shared_key_deprecated_usage` audit event.
+  `Disabled` rejects shared-key requests with 401 `shared_key_disabled`
+  before any key comparison (Slice 3).
+- Admin console deprecation banner when the active session used the shared key
+  (`sharedKeyFallback == true` from WhoAmI) (Slice 3).
+- `adminAuthHeader()` helper in the console — routes to `X-DRM-Admin-Token`
+  when the credential starts with `drm_admin_`, otherwise falls back to
+  `X-DRM-Admin-Key`. All `apiFetch`, `apiFetchBlob`, and inline dashboard
+  probe calls updated (Slice 4).
+
+### Changed (v1.1.0 summary)
+- RBAC enforcement on all 23 admin endpoints via
+  `AdminIdentityContext.TryRequirePermission` (Slice 2).
+- `AdminAudit.SystemEvent` and `AdminAudit.PermissionEvent` accept optional
+  `HttpContext?` and set `ActorAdminId` from it (Slice 2).
+- Development mode with no `Drm:Security:AdminApiKey` now stamps the default
+  SuperAdmin identity instead of passing null, keeping the test suite green
+  without weakening production paths (Slice 4 / test fix).
+- Admin console credential input relabeled "Admin credential" with placeholder
+  naming both token and key forms. Checklist step 2 guides toward per-admin
+  tokens (Slice 4).
+
+### Fixed (v1.1.0 summary)
+- Docker healthcheck used `wget` which is absent from
+  `mcr.microsoft.com/dotnet/aspnet:10.0`. Changed to
+  `bash -c 'echo > /dev/tcp/localhost/8080'` in `Dockerfile`,
+  root `docker-compose.yml`, and `deploy/management/docker/docker-compose.yml`.
+
+### Tests
+- +6 `AdminSharedKeyModeTests`: Active/Warn/Disabled mode behaviour,
+  `Deprecation` header, audit event write, token still works in Disabled mode.
+- `ManagementConsoleTests`: updated assertion from `X-DRM-Admin-Key` to
+  `Admin credential` to match the renamed label.
+- Full server suite: **278/278 pass**.
+
+---
+
+**v1.1 enterprise — Slice 4: console migration to per-admin tokens.**
+Fourth slice. The management console auto-detects whether the stored credential
+is a per-admin token or the legacy shared key, and routes to the correct header.
 
 **v1.1 enterprise — Slice 3: shared-key deprecation path.**
 Third slice of the v1 → v1.1 enterprise upgrade. Adds a three-mode lifecycle
