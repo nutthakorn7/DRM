@@ -26,6 +26,15 @@ public static class TenantHeaderContext
     {
         return app.Use(async (context, next) =>
         {
+            // Per-tenant client key may have already resolved the tenant (set by ClientApiKeyAuthentication)
+            if (context.Items.TryGetValue(ClientApiKeyAuthentication.ResolvedTenantItemKey, out var resolved)
+                && resolved is Guid resolvedId
+                && resolvedId != Guid.Empty
+                && !context.Request.Headers.ContainsKey(HeaderName))
+            {
+                context.Items[ItemKey] = resolvedId;
+            }
+
             if (context.Request.Headers.TryGetValue(HeaderName, out var raw)
                 && Guid.TryParse(raw.ToString(), out var tenantId)
                 && tenantId != Guid.Empty)

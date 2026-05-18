@@ -4,6 +4,23 @@ namespace Drm.Server;
 
 public enum TenantStatus { Active = 0, Suspended = 1 }
 
+public sealed class TenantClientKeyEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid KeyId { get; set; }
+
+    public string KeyHash { get; set; } = string.Empty;
+
+    public string Label { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? LastUsedAtUtc { get; set; }
+
+    public bool Revoked { get; set; }
+}
+
 public sealed class TenantEntity
 {
     public Guid TenantId { get; set; }

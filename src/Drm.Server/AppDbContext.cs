@@ -6,6 +6,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
+    public DbSet<TenantClientKeyEntity> TenantClientKeys => Set<TenantClientKeyEntity>();
+
     public DbSet<ProtectedFileEntity> ProtectedFiles => Set<ProtectedFileEntity>();
 
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
@@ -70,6 +72,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<TenantClientKeyEntity>(entity =>
+        {
+            entity.HasKey(k => new { k.TenantId, k.KeyId });
+            entity.HasIndex(k => k.KeyHash).IsUnique();
+            entity.Property(k => k.KeyHash).HasMaxLength(128);
+            entity.Property(k => k.Label).HasMaxLength(128);
+        });
+
         modelBuilder.Entity<TenantEntity>(entity =>
         {
             entity.HasKey(t => t.TenantId);

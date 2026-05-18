@@ -489,6 +489,23 @@ using (var scope = app.Services.CreateScope())
                 UNION SELECT TenantId FROM "ProtectedFiles"
             ) all_tenants;
             """);
+        // TenantClientKeys table — added in v1.3.1 for per-tenant client API keys
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantClientKeys" (
+                "TenantId" TEXT NOT NULL,
+                "KeyId" TEXT NOT NULL,
+                "KeyHash" TEXT NOT NULL,
+                "Label" TEXT NOT NULL DEFAULT '',
+                "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "LastUsedAtUtc" TEXT NULL,
+                "Revoked" INTEGER NOT NULL DEFAULT 0,
+                CONSTRAINT "PK_TenantClientKeys" PRIMARY KEY ("TenantId", "KeyId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantClientKeys_KeyHash"
+            ON "TenantClientKeys" ("KeyHash");
+            """);
 
         if (openedHere)
         {
@@ -624,6 +641,23 @@ using (var scope = app.Services.CreateScope())
             ) all_tenants
             ON CONFLICT DO NOTHING;
             """);
+        // TenantClientKeys table — added in v1.3.1 for per-tenant client API keys (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantClientKeys" (
+                "TenantId" uuid NOT NULL,
+                "KeyId" uuid NOT NULL,
+                "KeyHash" text NOT NULL,
+                "Label" text NOT NULL DEFAULT '',
+                "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "LastUsedAtUtc" timestamp with time zone NULL,
+                "Revoked" boolean NOT NULL DEFAULT FALSE,
+                CONSTRAINT "PK_TenantClientKeys" PRIMARY KEY ("TenantId", "KeyId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantClientKeys_KeyHash"
+            ON "TenantClientKeys" ("KeyHash");
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -688,6 +722,7 @@ app.MapOutlookAddInEndpoints();
 app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
 app.MapAdminTenantsEndpoints();
+app.MapAdminTenantClientKeysEndpoints();
 app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();

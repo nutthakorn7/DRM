@@ -2323,7 +2323,15 @@ async function refreshTenants() {
       const statusLabel = t.status === 0
         ? '<span class="badge badge-ok">Active</span>'
         : '<span class="badge badge-error">Suspended</span>';
-      const seatLabel = t.maxEncrypters != null ? t.maxEncrypters : '∞';
+      const usedSeats = t.usedSeats ?? 0;
+      const maxSeats = t.maxEncrypters;
+      const seatLabel = maxSeats != null
+        ? `${usedSeats} / ${maxSeats}`
+        : `${usedSeats} / ∞`;
+      const seatPct = maxSeats != null ? Math.min(100, Math.round((usedSeats / maxSeats) * 100)) : 0;
+      const seatBar = maxSeats != null
+        ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? '#ef4444' : '#22c55e'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
+        : '';
       const toggleLabel = t.status === 0 ? "Suspend" : "Activate";
       const toggleStatus = t.status === 0 ? 1 : 0;
       const createdDate = new Date(t.createdAtUtc).toLocaleDateString();
@@ -2331,11 +2339,12 @@ async function refreshTenants() {
         <td><code>${esc(t.name)}</code></td>
         <td>${esc(t.displayName)}</td>
         <td>${statusLabel}</td>
-        <td>${seatLabel}</td>
+        <td>${seatLabel}${seatBar}</td>
         <td><code class="copy-id" title="Click to copy" style="cursor:pointer" onclick="navigator.clipboard.writeText('${esc(t.tenantId)}')">${esc(t.tenantId)}</code></td>
         <td>${createdDate}</td>
-        <td>
+        <td style="white-space:nowrap">
           <button type="button" class="ghost" onclick="toggleTenantStatus('${esc(t.tenantId)}', ${toggleStatus})">${toggleLabel}</button>
+          <button type="button" class="ghost" onclick="openKeyManager('${esc(t.tenantId)}', '${esc(t.name)}')" style="margin-left:4px">Keys</button>
         </td>
       </tr>`;
     }).join("");
@@ -2363,6 +2372,86 @@ function esc(s) {
 }
 
 document.getElementById("refreshTenants")?.addEventListener("click", refreshTenants);
+
+// ── Key manager (inline sub-panel per tenant) ────────────────────────────────
+
+let _keyManagerTenantId = null;
+
+async function openKeyManager(tenantId, tenantName) {
+  _keyManagerTenantId = tenantId;
+  const panel = document.getElementById("keyManagerPanel");
+  const title = document.getElementById("keyManagerTitle");
+  if (title) title.textContent = `Client keys — ${tenantName}`;
+  if (panel) panel.hidden = false;
+  panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  await refreshKeys();
+}
+
+async function refreshKeys() {
+  if (!_keyManagerTenantId) return;
+  const tbody = document.getElementById("keysBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  try {
+    const keys = await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(_keyManagerTenantId)}/client-keys`);
+    if (!keys.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No active keys. Create one below.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = keys.map(k => {
+      const lastUsed = k.lastUsedAtUtc ? new Date(k.lastUsedAtUtc).toLocaleString() : "Never";
+      return `<tr>
+        <td>${esc(k.label) || '<em>unlabelled</em>'}</td>
+        <td><code>${esc(k.keyId)}</code></td>
+        <td>${lastUsed}</td>
+        <td><button type="button" class="ghost" onclick="revokeKey('${esc(k.keyId)}')">Revoke</button></td>
+      </tr>`;
+    }).join("");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Failed to load keys.</td></tr>';
+  }
+}
+
+async function revokeKey(keyId) {
+  if (!_keyManagerTenantId) return;
+  try {
+    const response = await fetch(
+      `/api/admin/tenants/${encodeURIComponent(_keyManagerTenantId)}/client-keys/${encodeURIComponent(keyId)}`,
+      { method: "DELETE", headers: adminAuthHeader(requireAdminKey()) }
+    );
+    if (!response.ok) { setStatus(`Revoke failed: ${response.status}`, "error"); return; }
+    setStatus("Key revoked", "ok");
+    await refreshKeys();
+  } catch {
+    setStatus("Failed to revoke key", "error");
+  }
+}
+
+document.getElementById("createKeyForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!_keyManagerTenantId) return;
+  const label = document.getElementById("newKeyLabel").value.trim();
+  const output = document.getElementById("createKeyOutput");
+  output.hidden = false;
+  output.textContent = "Creating…";
+  try {
+    const result = await apiFetchGlobal(
+      `/api/admin/tenants/${encodeURIComponent(_keyManagerTenantId)}/client-keys`,
+      { method: "POST", body: JSON.stringify({ label: label || null }) }
+    );
+    output.textContent = `Key created — save it now, it will not be shown again.\n\nKey: ${result.key}\nKey ID: ${result.keyId}`;
+    document.getElementById("newKeyLabel").value = "";
+    setStatus("Client key created", "ok");
+    await refreshKeys();
+  } catch {
+    output.textContent = "Failed to create key.";
+  }
+});
+
+document.getElementById("closeKeyManager")?.addEventListener("click", () => {
+  document.getElementById("keyManagerPanel")?.setAttribute("hidden", "");
+  _keyManagerTenantId = null;
+});
 
 document.getElementById("createTenantForm")?.addEventListener("submit", async (e) => {
   e.preventDefault();

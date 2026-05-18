@@ -1181,7 +1181,7 @@
                 <th>Name</th>
                 <th>Display name</th>
                 <th>Status</th>
-                <th>Seat limit</th>
+                <th>Seats used</th>
                 <th>Tenant ID</th>
                 <th>Created</th>
                 <th>Actions</th>
@@ -1191,6 +1191,42 @@
               <tr><td colspan="7" class="empty">Click "Refresh" to load tenants.</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Key manager sub-panel (shown when "Keys" is clicked on a tenant row) -->
+        <div id="keyManagerPanel" hidden style="margin-top:1.5rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem">
+          <div class="section-head" style="margin-bottom:.75rem">
+            <div>
+              <p class="eyebrow">API access</p>
+              <h4 id="keyManagerTitle">Client keys</h4>
+            </div>
+            <button type="button" id="closeKeyManager" class="ghost">Close</button>
+          </div>
+
+          <details id="createKeyDetails">
+            <summary>Issue new key</summary>
+            <form id="createKeyForm" class="create-row" style="gap:6px;margin-top:8px">
+              <input id="newKeyLabel" autocomplete="off" placeholder="Label (e.g. production)">
+              <button type="submit">Issue key</button>
+            </form>
+            <pre id="createKeyOutput" class="output-block anti-capture-block" hidden></pre>
+          </details>
+
+          <div class="table-wrap" style="margin-top:.75rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Key ID</th>
+                  <th>Last used</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="keysBody">
+                <tr><td colspan="4" class="empty">Select a tenant to manage keys.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

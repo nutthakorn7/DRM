@@ -197,6 +197,7 @@ public sealed class AdminTenantsTests : IDisposable
         string DisplayName,
         int Status,
         int? MaxEncrypters,
+        int UsedSeats,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset? SuspendedAtUtc);
 }
