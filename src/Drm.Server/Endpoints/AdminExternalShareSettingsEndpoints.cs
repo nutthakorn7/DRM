@@ -1566,6 +1566,7 @@ public static class AdminExternalShareSettingsEndpoints
                 TenantId = request.TenantId,
                 FileId = null,
                 UserId = request.AdminUserId,
+                ActorAdminId = AdminAudit.ActorId(httpContext),
                 EventType = "external_share_changed",
                 ReasonCode = request.ExternalSharingEnabled ? "external_sharing_enabled" : "external_sharing_disabled",
                 CreatedAtUtc = now
@@ -1579,6 +1580,7 @@ public static class AdminExternalShareSettingsEndpoints
                 TenantId = request.TenantId,
                 FileId = null,
                 UserId = request.AdminUserId,
+                ActorAdminId = AdminAudit.ActorId(httpContext),
                 EventType = "external_share_changed",
                 ReasonCode = "external_share_guest_domain_allowlist_updated",
                 CreatedAtUtc = now
@@ -1592,6 +1594,7 @@ public static class AdminExternalShareSettingsEndpoints
                 TenantId = request.TenantId,
                 FileId = null,
                 UserId = request.AdminUserId,
+                ActorAdminId = AdminAudit.ActorId(httpContext),
                 EventType = "external_share_changed",
                 ReasonCode = "external_share_guest_blocklist_updated",
                 CreatedAtUtc = now
@@ -1607,6 +1610,7 @@ public static class AdminExternalShareSettingsEndpoints
                 TenantId = request.TenantId,
                 FileId = null,
                 UserId = request.AdminUserId,
+                ActorAdminId = AdminAudit.ActorId(httpContext),
                 EventType = "external_share_changed",
                 ReasonCode = "external_share_policy_limits_updated",
                 CreatedAtUtc = now
@@ -1671,6 +1675,7 @@ public static class AdminExternalShareSettingsEndpoints
                 TenantId = request.TenantId,
                 FileId = link.FileId,
                 UserId = request.AdminUserId,
+                ActorAdminId = AdminAudit.ActorId(httpContext),
                 EventType = "external_share_changed",
                 ReasonCode = "external_share_link_revoked_by_lockdown",
                 CreatedAtUtc = now
@@ -1684,6 +1689,7 @@ public static class AdminExternalShareSettingsEndpoints
                 TenantId = request.TenantId,
                 FileId = null,
                 UserId = request.AdminUserId,
+                ActorAdminId = AdminAudit.ActorId(httpContext),
                 EventType = "external_share_changed",
                 ReasonCode = "external_sharing_disabled",
                 CreatedAtUtc = now
@@ -1695,6 +1701,7 @@ public static class AdminExternalShareSettingsEndpoints
             TenantId = request.TenantId,
             FileId = null,
             UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "external_share_changed",
             ReasonCode = "external_share_tenant_lockdown",
             CreatedAtUtc = now

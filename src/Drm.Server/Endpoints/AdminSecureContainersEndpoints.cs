@@ -79,6 +79,7 @@ public static class AdminSecureContainersEndpoints
         {
             TenantId = request.TenantId,
             FileId = request.ContainerId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "system_changed",
             ReasonCode = "secure_container_registered",
             CreatedAtUtc = DateTimeOffset.UtcNow

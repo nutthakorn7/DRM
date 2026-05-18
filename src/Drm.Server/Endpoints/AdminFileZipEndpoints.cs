@@ -87,6 +87,7 @@ public static class AdminFileZipEndpoints
         {
             TenantId = tenantId,
             FileId = file.Id,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "system_changed",
             ReasonCode = "file_converted_to_zip",
             CreatedAtUtc = DateTimeOffset.UtcNow

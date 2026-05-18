@@ -71,6 +71,7 @@ public static class AdminTransparentFilesEndpoints
         {
             TenantId = request.TenantId,
             FileId = request.FileId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "system_changed",
             ReasonCode = "transparent_file_registered",
             CreatedAtUtc = DateTimeOffset.UtcNow

@@ -80,7 +80,7 @@ public static class AdminWatermarkTemplatesEndpoints
         };
 
         dbContext.WatermarkTemplates.Add(template);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "watermark_template_created"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "watermark_template_created", httpContext));
 
         try
         {
@@ -151,7 +151,7 @@ public static class AdminWatermarkTemplatesEndpoints
         template.PrintWatermarkOpacityPercent = request.PrintWatermarkOpacityPercent;
         template.PrintWatermarkPosition = NormalizePosition(request.PrintWatermarkPosition);
 
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "watermark_template_updated"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "watermark_template_updated", httpContext));
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Results.Ok(WatermarkTemplateResponse.From(template));

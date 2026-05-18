@@ -123,6 +123,7 @@ public static class AdminFilesEndpoints
             TenantId = request.TenantId,
             FileId = fileId,
             UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "protected_file_delete_requested",
             ReasonCode = "queued",
             CreatedAtUtc = now
@@ -189,7 +190,8 @@ public static class AdminFilesEndpoints
             fileId,
             request.AdminUserId,
             "external_share_link_created",
-            now));
+            now,
+            httpContext));
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await notificationService.NotifyAsync(
@@ -278,7 +280,8 @@ public static class AdminFilesEndpoints
                 fileId,
                 request.AdminUserId,
                 "external_share_link_revoked",
-                now));
+                now,
+                httpContext));
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -316,6 +319,7 @@ public static class AdminFilesEndpoints
             TenantId = file.TenantId,
             FileId = file.Id,
             UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "file_revoked",
             ReasonCode = "revoked",
             CreatedAtUtc = now
@@ -403,7 +407,7 @@ public static class AdminFilesEndpoints
             grant.Permissions = normalizedPermissions;
         }
 
-        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grant_upserted"));
+        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grant_upserted", httpContext));
 
         try
         {
@@ -518,7 +522,7 @@ public static class AdminFilesEndpoints
         dbContext.FileGrants.RemoveRange(existing);
         dbContext.FileGrants.AddRange(parsed);
         file.Permissions = Permission.None;
-        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grants_replaced"));
+        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grants_replaced", httpContext));
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Results.Ok<IReadOnlyList<FileGrantResponse>>(parsed
@@ -569,7 +573,8 @@ public static class AdminFilesEndpoints
             request.TenantId,
             fileId,
             request.AdminUserId,
-            "policy_template_applied"));
+            "policy_template_applied",
+            httpContext));
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Results.Ok(FileResponse.From(file));
@@ -711,13 +716,15 @@ public static class AdminFilesEndpoints
         Guid fileId,
         Guid adminUserId,
         string reasonCode,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        HttpContext? httpContext = null)
     {
         return new AuditEventEntity
         {
             TenantId = tenantId,
             FileId = fileId,
             UserId = adminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "external_share_changed",
             ReasonCode = reasonCode,
             CreatedAtUtc = createdAtUtc
