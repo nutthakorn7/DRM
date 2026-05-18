@@ -6,7 +6,7 @@ namespace Drm.Server.Endpoints;
 public static class AdminTenantBillingWebhooksEndpoints
 {
     private static readonly HashSet<string> KnownEvents =
-        new(StringComparer.OrdinalIgnoreCase) { "*", "seat_limit_approach", "tenant_suspended" };
+        new(StringComparer.OrdinalIgnoreCase) { "*", "seat_limit_approach", "tenant_suspended", "file_expired", "alert_fired" };
 
     public static IEndpointRouteBuilder MapAdminTenantBillingWebhooksEndpoints(this IEndpointRouteBuilder endpoints)
     {

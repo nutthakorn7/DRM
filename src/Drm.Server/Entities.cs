@@ -621,3 +621,50 @@ public sealed class TenantAdminNotificationConfigEntity
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
+
+/// <summary>Alert condition types for operator alert rules.</summary>
+public enum AlertCondition
+{
+    SeatUsagePctAbove = 0,   // usedSeats / maxSeats * 100 > threshold
+    FilesProtectedAbove = 1,  // total protected files for tenant > threshold
+    TenantInactiveDays = 2,   // no audit events for tenant in N days
+    NewRegistrationsAbove = 3 // pending/verified registrations > threshold
+}
+
+public sealed class OperatorAlertRuleEntity
+{
+    public Guid RuleId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Optional: if set, rule applies to this tenant only. Null = all tenants.</summary>
+    public Guid? TenantId { get; set; }
+
+    public AlertCondition Condition { get; set; }
+
+    public double Threshold { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>If true, a billing webhook is fired when the alert triggers.</summary>
+    public bool FireWebhook { get; set; } = false;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class OperatorAlertFiredEntity
+{
+    public long Id { get; set; }
+
+    public Guid RuleId { get; set; }
+
+    public Guid? TenantId { get; set; }
+
+    public string RuleName { get; set; } = string.Empty;
+
+    public double ActualValue { get; set; }
+
+    public double Threshold { get; set; }
+
+    public DateTimeOffset FiredAtUtc { get; set; }
+}

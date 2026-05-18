@@ -50,6 +50,12 @@ if (emailSettings.IsConfigured)
 else
     builder.Services.AddSingleton<IRegistrationEmailSender, NoopRegistrationEmailSender>();
 
+var auditSettings = builder.Configuration.GetSection("Drm:Audit").Get<AuditSettings>() ?? new AuditSettings();
+builder.Services.AddSingleton(auditSettings);
+builder.Services.AddHostedService<AuditRetentionWorker>();
+builder.Services.AddHostedService<FileExpiryWorker>();
+builder.Services.AddHostedService<AlertEvaluationWorker>();
+
 var app = builder.Build();
 
 SecurityStartupGuard.Validate(app.Configuration, app.Environment);
@@ -612,6 +618,37 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_AdminApiTokens_AdminUserId" ON "AdminApiTokens" ("AdminUserId");
             """);
+        // OperatorAlertRules + OperatorAlertsFired — added in v1.5 for operator alert engine
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertRules" (
+                "RuleId" TEXT NOT NULL CONSTRAINT "PK_OperatorAlertRules" PRIMARY KEY,
+                "Name" TEXT NOT NULL DEFAULT '',
+                "TenantId" TEXT NULL,
+                "Condition" INTEGER NOT NULL DEFAULT 0,
+                "Threshold" REAL NOT NULL DEFAULT 0,
+                "Enabled" INTEGER NOT NULL DEFAULT 1,
+                "FireWebhook" INTEGER NOT NULL DEFAULT 0,
+                "CreatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertRules_TenantId" ON "OperatorAlertRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertsFired" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_OperatorAlertsFired" PRIMARY KEY AUTOINCREMENT,
+                "RuleId" TEXT NOT NULL,
+                "TenantId" TEXT NULL,
+                "RuleName" TEXT NOT NULL DEFAULT '',
+                "ActualValue" REAL NOT NULL DEFAULT 0,
+                "Threshold" REAL NOT NULL DEFAULT 0,
+                "FiredAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertsFired_RuleId_FiredAtUtc"
+            ON "OperatorAlertsFired" ("RuleId", "FiredAtUtc");
+            """);
     }
     else
     {
@@ -749,6 +786,38 @@ using (var scope = app.Services.CreateScope())
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantRegistrations_TokenHash"
             ON "TenantRegistrations" ("TokenHash");
             """);
+
+        // OperatorAlertRules + OperatorAlertsFired — added in v1.5 for operator alert engine (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertRules" (
+                "RuleId" uuid NOT NULL CONSTRAINT "PK_OperatorAlertRules" PRIMARY KEY,
+                "Name" text NOT NULL DEFAULT '',
+                "TenantId" uuid NULL,
+                "Condition" integer NOT NULL DEFAULT 0,
+                "Threshold" double precision NOT NULL DEFAULT 0,
+                "Enabled" boolean NOT NULL DEFAULT true,
+                "FireWebhook" boolean NOT NULL DEFAULT false,
+                "CreatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertRules_TenantId" ON "OperatorAlertRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertsFired" (
+                "Id" bigserial NOT NULL CONSTRAINT "PK_OperatorAlertsFired" PRIMARY KEY,
+                "RuleId" uuid NOT NULL,
+                "TenantId" uuid NULL,
+                "RuleName" text NOT NULL DEFAULT '',
+                "ActualValue" double precision NOT NULL DEFAULT 0,
+                "Threshold" double precision NOT NULL DEFAULT 0,
+                "FiredAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertsFired_RuleId_FiredAtUtc"
+            ON "OperatorAlertsFired" ("RuleId", "FiredAtUtc");
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -818,6 +887,8 @@ app.MapAdminTenantBillingWebhooksEndpoints();
 app.MapAdminUsageEndpoints();
 app.MapPublicRegistrationEndpoints();
 app.MapAdminRegistrationsEndpoints();
+app.MapAdminMetricsEndpoints();
+app.MapAdminAlertEndpoints();
 app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();

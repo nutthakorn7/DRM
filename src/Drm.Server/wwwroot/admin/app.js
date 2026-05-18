@@ -2715,3 +2715,169 @@ document.getElementById("rejectForm")?.addEventListener("submit", async (e) => {
 
 document.getElementById("refreshRegistrations")?.addEventListener("click", refreshRegistrations);
 document.getElementById("registrationStatusFilter")?.addEventListener("change", refreshRegistrations);
+
+// ── Analytics / metrics ───────────────────────────────────────────────────────
+
+function drawSparkline(svgId, values, color = "#6366f1") {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  svg.innerHTML = "";
+  if (!values || values.length < 2) {
+    svg.innerHTML = `<text x="110" y="28" text-anchor="middle" fill="#9ca3af" font-size="11">No data</text>`;
+    return;
+  }
+  const W = 220, H = 48, pad = 4;
+  const maxVal = Math.max(...values, 1);
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+    const y = H - pad - (v / maxVal) * (H - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const area = `M${pts[0]} ` + pts.slice(1).map(p => `L${p}`).join(" ") +
+    ` L${(W - pad).toFixed(1)},${H} L${pad},${H} Z`;
+  const line = `M${pts[0]} ` + pts.slice(1).map(p => `L${p}`).join(" ");
+  svg.innerHTML =
+    `<defs><linearGradient id="sg-${svgId}" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>` +
+    `<stop offset="100%" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>` +
+    `<path d="${area}" fill="url(#sg-${svgId})"/>` +
+    `<path d="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
+}
+
+async function refreshMetrics() {
+  const period = document.getElementById("metricsPeriod")?.value ?? "7";
+  try {
+    const data = await apiFetchGlobal(`/api/admin/metrics?period=${period}`);
+    document.getElementById("mTotalTenants").textContent = data.summary.totalTenants;
+    document.getElementById("mActiveTenants").textContent = data.summary.activeTenants;
+    document.getElementById("mTotalUsers").textContent = data.summary.totalUsers;
+    document.getElementById("mTotalFiles").textContent = data.summary.totalFiles;
+    document.getElementById("mNewRegs").textContent = data.summary.newRegistrations;
+
+    const buckets = data.buckets ?? [];
+    drawSparkline("sparkTotalEvents",    buckets.map(b => b.totalEvents),    "#6366f1");
+    drawSparkline("sparkFilesProtected", buckets.map(b => b.filesProtected), "#10b981");
+    drawSparkline("sparkDecryptions",    buckets.map(b => b.decryptions),    "#f59e0b");
+    drawSparkline("sparkNewUsers",       buckets.map(b => b.newUsers),       "#3b82f6");
+    setStatus(`Metrics loaded (${period}d)`, "ok");
+  } catch {
+    setStatus("Failed to load metrics", "error");
+  }
+}
+
+document.getElementById("refreshMetrics")?.addEventListener("click", refreshMetrics);
+document.getElementById("metricsPeriod")?.addEventListener("change", refreshMetrics);
+
+// === Alert rules ===
+
+let _editingRuleId = null;
+
+async function refreshAlertRules() {
+  const [rulesRes, firedRes] = await Promise.all([
+    apiFetch("/api/admin/alert-rules"),
+    apiFetch("/api/admin/alerts-fired?limit=50"),
+  ]);
+  if (!rulesRes.ok || !firedRes.ok) return;
+  const rules = await rulesRes.json();
+  const fired = await firedRes.json();
+
+  const tbody = document.querySelector("#alertRulesTable tbody");
+  if (tbody) {
+    tbody.innerHTML = rules.map(r => `
+      <tr>
+        <td>${esc(r.name)}</td>
+        <td>${esc(r.conditionName)}</td>
+        <td>${r.threshold}</td>
+        <td>${r.tenantId ? esc(r.tenantId) : '<span class="badge-info">global</span>'}</td>
+        <td>${r.fireWebhook ? '<span class="badge-warn">yes</span>' : 'no'}</td>
+        <td>${r.enabled ? '<span class="badge-ok">on</span>' : '<span class="badge-error">off</span>'}</td>
+        <td>
+          <button type="button" onclick="openEditAlert('${r.ruleId}')">Edit</button>
+          <button type="button" class="danger" onclick="deleteAlertRule('${r.ruleId}')">Delete</button>
+        </td>
+      </tr>`).join("");
+  }
+
+  const firedTbody = document.querySelector("#alertsFiredTable tbody");
+  if (firedTbody) {
+    firedTbody.innerHTML = fired.map(f => `
+      <tr>
+        <td>${esc(f.ruleName)}</td>
+        <td>${f.tenantId ? esc(f.tenantId) : '—'}</td>
+        <td>${f.actualValue.toFixed(2)}</td>
+        <td>${f.threshold}</td>
+        <td>${new Date(f.firedAtUtc).toLocaleString()}</td>
+      </tr>`).join("");
+  }
+}
+
+function openCreateAlert() {
+  _editingRuleId = null;
+  document.getElementById("alertRuleDialogTitle").textContent = "New alert rule";
+  document.getElementById("alertRuleId").value = "";
+  document.getElementById("alertRuleName").value = "";
+  document.getElementById("alertRuleCondition").value = "0";
+  document.getElementById("alertRuleThreshold").value = "80";
+  document.getElementById("alertRuleTenantId").value = "";
+  document.getElementById("alertRuleEnabled").checked = true;
+  document.getElementById("alertRuleFireWebhook").checked = false;
+  document.getElementById("alertRuleDialog").showModal();
+}
+
+async function openEditAlert(ruleId) {
+  const res = await apiFetch("/api/admin/alert-rules");
+  if (!res.ok) return;
+  const rules = await res.json();
+  const rule = rules.find(r => r.ruleId === ruleId);
+  if (!rule) return;
+  _editingRuleId = ruleId;
+  document.getElementById("alertRuleDialogTitle").textContent = "Edit alert rule";
+  document.getElementById("alertRuleId").value = ruleId;
+  document.getElementById("alertRuleName").value = rule.name;
+  document.getElementById("alertRuleCondition").value = String(rule.condition);
+  document.getElementById("alertRuleThreshold").value = String(rule.threshold);
+  document.getElementById("alertRuleTenantId").value = rule.tenantId ?? "";
+  document.getElementById("alertRuleEnabled").checked = rule.enabled;
+  document.getElementById("alertRuleFireWebhook").checked = rule.fireWebhook;
+  document.getElementById("alertRuleDialog").showModal();
+}
+
+async function deleteAlertRule(ruleId) {
+  if (!confirm("Delete this alert rule?")) return;
+  await apiFetch(`/api/admin/alert-rules/${ruleId}`, { method: "DELETE" });
+  await refreshAlertRules();
+}
+
+document.getElementById("alertRuleForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = document.getElementById("alertRuleName").value.trim();
+  const condition = parseInt(document.getElementById("alertRuleCondition").value, 10);
+  const threshold = parseFloat(document.getElementById("alertRuleThreshold").value);
+  const tenantIdRaw = document.getElementById("alertRuleTenantId").value.trim();
+  const tenantId = tenantIdRaw || null;
+  const enabled = document.getElementById("alertRuleEnabled").checked;
+  const fireWebhook = document.getElementById("alertRuleFireWebhook").checked;
+
+  if (_editingRuleId) {
+    await apiFetch(`/api/admin/alert-rules/${_editingRuleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, threshold, enabled, fireWebhook }),
+    });
+  } else {
+    await apiFetch("/api/admin/alert-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, condition, threshold, tenantId, enabled, fireWebhook }),
+    });
+  }
+
+  document.getElementById("alertRuleDialog").close();
+  await refreshAlertRules();
+});
+
+document.getElementById("cancelAlertRuleBtn")?.addEventListener("click", () => {
+  document.getElementById("alertRuleDialog").close();
+});
+document.getElementById("openCreateAlertBtn")?.addEventListener("click", openCreateAlert);
+document.getElementById("refreshAlertsBtn")?.addEventListener("click", refreshAlertRules);

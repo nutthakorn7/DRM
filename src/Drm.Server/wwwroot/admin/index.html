@@ -977,6 +977,119 @@
         </ol>
       </section>
 
+      <section class="panel" id="analytics" data-tab="overview">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Activity</p>
+            <h3>Analytics</h3>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="metricsPeriod" style="min-width:100px">
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+            </select>
+            <button id="refreshMetrics" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1.25rem" id="metricsSummary">
+          <div class="metric-card"><span class="metric-value" id="mTotalTenants">—</span><span class="metric-label">Total tenants</span></div>
+          <div class="metric-card"><span class="metric-value" id="mActiveTenants">—</span><span class="metric-label">Active tenants</span></div>
+          <div class="metric-card"><span class="metric-value" id="mTotalUsers">—</span><span class="metric-label">Total users</span></div>
+          <div class="metric-card"><span class="metric-value" id="mTotalFiles">—</span><span class="metric-label">Protected files</span></div>
+          <div class="metric-card"><span class="metric-value" id="mNewRegs">—</span><span class="metric-label">New registrations</span></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px" id="metricsCharts">
+          <div class="sparkline-card">
+            <p class="sparkline-label">Events / day</p>
+            <svg id="sparkTotalEvents" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="sparkline-card">
+            <p class="sparkline-label">Files protected / day</p>
+            <svg id="sparkFilesProtected" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="sparkline-card">
+            <p class="sparkline-label">Decryptions / day</p>
+            <svg id="sparkDecryptions" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="sparkline-card">
+            <p class="sparkline-label">New users / day</p>
+            <svg id="sparkNewUsers" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="alerts" data-tab="overview">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Monitoring</p>
+            <h3>Operator alert rules</h3>
+          </div>
+          <button id="openCreateAlertBtn" type="button">+ New rule</button>
+        </div>
+        <table id="alertRulesTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Condition</th>
+              <th>Threshold</th>
+              <th>Tenant</th>
+              <th>Webhook</th>
+              <th>Enabled</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div class="section-head" style="margin-top:2rem;">
+          <div>
+            <p class="eyebrow">History</p>
+            <h3>Recent alerts fired</h3>
+          </div>
+          <button id="refreshAlertsBtn" type="button">Refresh</button>
+        </div>
+        <table id="alertsFiredTable">
+          <thead>
+            <tr>
+              <th>Rule</th>
+              <th>Tenant</th>
+              <th>Actual</th>
+              <th>Threshold</th>
+              <th>Fired at</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <!-- Create/edit alert rule dialog -->
+        <dialog id="alertRuleDialog">
+          <form id="alertRuleForm" method="dialog">
+            <h4 id="alertRuleDialogTitle">New alert rule</h4>
+            <input type="hidden" id="alertRuleId" value="" />
+            <label>Name<input type="text" id="alertRuleName" required placeholder="e.g. High seat usage" /></label>
+            <label>Condition
+              <select id="alertRuleCondition">
+                <option value="0">Seat usage % above threshold</option>
+                <option value="1">Files protected above threshold</option>
+                <option value="2">Tenant inactive for N days</option>
+                <option value="3">New registrations above threshold</option>
+              </select>
+            </label>
+            <label>Threshold<input type="number" id="alertRuleThreshold" min="0" step="0.1" value="80" required /></label>
+            <label>Tenant ID (leave blank for global)<input type="text" id="alertRuleTenantId" placeholder="optional UUID" /></label>
+            <label class="checkbox-row"><input type="checkbox" id="alertRuleEnabled" checked /> Enabled</label>
+            <label class="checkbox-row"><input type="checkbox" id="alertRuleFireWebhook" /> Fire billing webhook on alert</label>
+            <div class="dialog-actions">
+              <button type="button" id="cancelAlertRuleBtn">Cancel</button>
+              <button type="submit" id="saveAlertRuleBtn">Save</button>
+            </div>
+          </form>
+        </dialog>
+      </section>
+
       <section class="panel" id="dashboard" data-tab="overview">
         <div class="section-head">
           <div>

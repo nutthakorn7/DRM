@@ -74,6 +74,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<AdminApiTokenEntity> AdminApiTokens => Set<AdminApiTokenEntity>();
 
+    public DbSet<OperatorAlertRuleEntity> OperatorAlertRules => Set<OperatorAlertRuleEntity>();
+
+    public DbSet<OperatorAlertFiredEntity> OperatorAlertsFired => Set<OperatorAlertFiredEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantClientKeyEntity>(entity =>
@@ -366,6 +370,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(t => t.AdminUserId);
             entity.Property(t => t.TokenHash).HasMaxLength(128);
             entity.Property(t => t.Label).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<OperatorAlertRuleEntity>(entity =>
+        {
+            entity.HasKey(r => r.RuleId);
+            entity.HasIndex(r => r.TenantId);
+            entity.Property(r => r.Name).HasMaxLength(256);
+            entity.Property(r => r.Condition).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<OperatorAlertFiredEntity>(entity =>
+        {
+            entity.HasKey(f => f.Id);
+            entity.HasIndex(f => new { f.RuleId, f.FiredAtUtc });
+            entity.Property(f => f.RuleName).HasMaxLength(256);
         });
     }
 }
