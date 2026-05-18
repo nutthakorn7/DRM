@@ -16,16 +16,16 @@ public static class AdminDirectorySyncEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<DirectorySyncConfigResponse>, Ok<DirectorySyncConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
+    private static async Task<IResult> UpsertConfigAsync(
         DirectorySyncConfigRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var existing = await dbContext.TenantDirectorySyncConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
@@ -47,46 +47,42 @@ public static class AdminDirectorySyncEndpoints
 
         var response = DirectorySyncConfigResponse.From(existing);
         return isNew
-            ? TypedResults.Created("/api/admin/directory/config", response)
-            : TypedResults.Ok(response);
+            ? Results.Created("/api/admin/directory/config", response)
+            : Results.Ok(response);
     }
 
-    private static async Task<Results<Ok<DirectorySyncConfigResponse>, NotFound>> GetConfigAsync(
+    private static async Task<IResult> GetConfigAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+            return fail!;
         var config = await dbContext.TenantDirectorySyncConfigs
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
-
-        return config == null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(DirectorySyncConfigResponse.From(config));
+        return config == null ? Results.NotFound() : Results.Ok(DirectorySyncConfigResponse.From(config));
     }
 
-    private static async Task<Results<Ok<SyncResultResponse>, NotFound, BadRequest<ErrorResponse>>> TriggerSyncAsync(
+    private static async Task<IResult> TriggerSyncAsync(
         TriggerSyncRequest request,
         HttpContext httpContext,
         IDirectorySyncService syncService,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
-
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         try
         {
             var result = await syncService.SyncAsync(request.TenantId, cancellationToken);
-            return TypedResults.Ok(new SyncResultResponse(
-                result.UsersUpserted,
-                result.GroupsUpserted,
-                result.MembershipsUpserted));
+            return Results.Ok(new SyncResultResponse(result.UsersUpserted, result.GroupsUpserted, result.MembershipsUpserted));
         }
         catch (InvalidOperationException)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
     }
 

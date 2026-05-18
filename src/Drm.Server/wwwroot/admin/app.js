@@ -107,9 +107,9 @@ if (forgetSessionBtn) {
     adminKeyInput.dispatchEvent(new Event("change", { bubbles: true }));
     try {
       await navigator.clipboard.writeText(key);
-      setStatus(`Generated Admin Key (also copied to clipboard).`, "ok");
+      setStatus(`Generated shared key (also copied to clipboard). Prefer per-admin tokens from the Access control tab.`, "ok");
     } catch {
-      setStatus(`Generated Admin Key.`, "ok");
+      setStatus(`Generated shared key. Prefer per-admin tokens from the Access control tab.`, "ok");
     }
     refresh();
   });
@@ -607,7 +607,7 @@ async function refreshStatusDashboard() {
     probe("directory", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/directory/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
+        headers: { ...adminAuthHeader(adminKeyInput.value), "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -617,7 +617,7 @@ async function refreshStatusDashboard() {
     probe("box", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/box/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
+        headers: { ...adminAuthHeader(adminKeyInput.value), "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -627,7 +627,7 @@ async function refreshStatusDashboard() {
     probe("outlook", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/outlook/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
+        headers: { ...adminAuthHeader(adminKeyInput.value), "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -637,7 +637,7 @@ async function refreshStatusDashboard() {
     probe("folder-watcher", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/folder-watcher/config?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
+        headers: { ...adminAuthHeader(adminKeyInput.value), "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (r.status === 404) return { level: "is-warn", detail: "not configured" };
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
@@ -648,7 +648,7 @@ async function refreshStatusDashboard() {
     }),
     probe("license", async () => {
       const r = await fetch("/api/admin/license", {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
+        headers: { ...adminAuthHeader(adminKeyInput.value), "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
       const c = await r.json();
@@ -666,7 +666,7 @@ async function refreshStatusDashboard() {
     probe("containers", async () => {
       if (!tenantId) return { level: "is-warn", detail: "no tenant" };
       const r = await fetch(`/api/admin/secure-containers?tenantId=${encodeURIComponent(tenantId)}`, {
-        headers: { "X-DRM-Admin-Key": adminKeyInput.value, "X-DRM-Tenant-Id": tenantIdInput.value }
+        headers: { ...adminAuthHeader(adminKeyInput.value), "X-DRM-Tenant-Id": tenantIdInput.value }
       });
       if (!r.ok) return { level: "is-err", detail: `HTTP ${r.status}` };
       const list = await r.json();
@@ -1672,6 +1672,12 @@ async function disableDevice(deviceId) {
   setStatus("Device disabled", "ok");
 }
 
+function adminAuthHeader(credential) {
+  return credential.startsWith("drm_admin_")
+    ? { "X-DRM-Admin-Token": credential }
+    : { "X-DRM-Admin-Key": credential };
+}
+
 async function apiFetch(url, options = {}) {
   const adminKey = requireAdminKey();
   // Pass tenant ID via X-DRM-Tenant-Id so the server can cross-check it
@@ -1682,7 +1688,7 @@ async function apiFetch(url, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      "X-DRM-Admin-Key": adminKey,
+      ...adminAuthHeader(adminKey),
       ...(tenantHeader ? { "X-DRM-Tenant-Id": tenantHeader } : {}),
       ...(options.headers || {})
     }
@@ -1706,7 +1712,7 @@ async function apiFetchBlob(url, options = {}) {
   const response = await fetch(url, {
     ...options,
     headers: {
-      "X-DRM-Admin-Key": adminKey,
+      ...adminAuthHeader(adminKey),
       ...(tenantHeader ? { "X-DRM-Tenant-Id": tenantHeader } : {}),
       ...(options.headers || {})
     }
@@ -2091,4 +2097,192 @@ function isShareLinkInactive(link) {
 
 function isDeviceDisabled(device) {
   return device.status === "disabled" || Boolean(device.disabledAtUtc);
+}
+
+// Admin Identity Management
+document.querySelector("#refreshAdminIdentity").addEventListener("click", () => {
+  loadWhoAmI();
+  refreshRoles().then(() => refreshAdmins());
+});
+
+document.querySelector("#refreshRoles").addEventListener("click", () => {
+  refreshRoles();
+});
+
+document.querySelector("#createAdminForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.querySelector("#newAdminEmail").value.trim();
+  const displayName = document.querySelector("#newAdminDisplayName").value.trim();
+  const roleId = document.querySelector("#newAdminRoleId").value.trim();
+  const tokenLabel = document.querySelector("#newAdminTokenLabel").value.trim();
+
+  if (!roleId) {
+    setStatus("Select a role before creating an admin", "error");
+    return;
+  }
+
+  const body = {
+    email,
+    displayName: displayName || null,
+    roleId,
+    tokenLabel: tokenLabel || null,
+    tokenExpiresAtUtc: null
+  };
+
+  const created = await apiFetch("/api/admin/identity/admins", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  const output = document.querySelector("#createAdminOutput");
+  output.hidden = false;
+  output.textContent = [
+    "Admin created — save this token now, it will not be shown again.",
+    "",
+    `Admin ID : ${created.adminUserId}`,
+    `Email    : ${created.email}`,
+    `Role     : ${created.roleName}`,
+    `Token ID : ${created.tokenId}`,
+    `Token    : ${created.token}`,
+    created.tokenExpiresAtUtc
+      ? `Expires  : ${new Date(created.tokenExpiresAtUtc).toLocaleString()}`
+      : "Expires  : never"
+  ].join("\n");
+
+  event.target.reset();
+  await refreshAdmins();
+  setStatus(`Admin ${email} created`, "ok");
+});
+
+async function loadWhoAmI() {
+  try {
+    const identity = await apiFetch("/api/admin/identity/whoami");
+    const output = document.querySelector("#whoamiOutput");
+    if (output) output.textContent = JSON.stringify(identity, null, 2);
+    setSharedKeyBanner(identity.sharedKeyFallback === true);
+    setStatus("Session loaded", "ok");
+  } catch (err) {
+    const output = document.querySelector("#whoamiOutput");
+    if (output) output.textContent = `Not authenticated: ${err.message}`;
+  }
+}
+
+function setSharedKeyBanner(visible) {
+  let banner = document.querySelector("#sharedKeyDeprecationBanner");
+  if (visible && !banner) {
+    banner = document.createElement("div");
+    banner.id = "sharedKeyDeprecationBanner";
+    banner.style.cssText =
+      "background:#7c2d12;color:#fff;padding:10px 16px;font-size:13px;display:flex;align-items:center;gap:10px;";
+    banner.innerHTML =
+      '<strong>Deprecation warning:</strong> This session is authenticated with the shared API key (X-DRM-Admin-Key). ' +
+      'Migrate to per-admin tokens (X-DRM-Admin-Token) before upgrading to a future release that removes shared-key support.';
+    document.body.insertBefore(banner, document.body.firstChild);
+  } else if (!visible && banner) {
+    banner.remove();
+  }
+}
+
+async function refreshRoles() {
+  const roles = await apiFetch("/api/admin/identity/roles");
+  const rolesBody = document.querySelector("#rolesBody");
+  if (!roles.length) {
+    rolesBody.innerHTML = '<tr><td colspan="4" class="empty">No roles found.</td></tr>';
+    setStatus("No roles", "ok");
+    return;
+  }
+  rolesBody.innerHTML = roles.map((r) => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td><code>${escapeHtml(r.id)}</code></td>
+      <td><small>${escapeHtml(r.permissions.join(", "))}</small></td>
+      <td>${r.isSystem ? '<span class="badge">System</span>' : ""}</td>
+    </tr>
+  `).join("");
+
+  const select = document.querySelector("#newAdminRoleId");
+  if (select) {
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Select role…</option>' +
+      roles.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join("");
+    if (currentVal) select.value = currentVal;
+  }
+
+  setStatus(`${roles.length} role${roles.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshAdmins() {
+  const admins = await apiFetch("/api/admin/identity/admins");
+  const adminsBody = document.querySelector("#adminsBody");
+  if (!admins.length) {
+    adminsBody.innerHTML = '<tr><td colspan="7" class="empty">No admin users found.</td></tr>';
+    setStatus("No admins", "ok");
+    return;
+  }
+  adminsBody.innerHTML = admins.map((a) => `
+    <tr>
+      <td>${escapeHtml(a.email)}</td>
+      <td>${escapeHtml(a.displayName || "")}</td>
+      <td>${escapeHtml(a.roleName)}</td>
+      <td>${renderEnabledBadge(!a.disabled)}</td>
+      <td>${a.activeTokenCount}</td>
+      <td>${escapeHtml(formatDate(a.lastUsedAtUtc) || "—")}</td>
+      <td>
+        ${a.disabled
+          ? `<button type="button" data-enable-admin="${escapeHtml(a.id)}">Enable</button>`
+          : `<button type="button" class="danger" data-disable-admin="${escapeHtml(a.id)}">Disable</button>`}
+        <button type="button" data-rotate-token-admin="${escapeHtml(a.id)}">Rotate token</button>
+      </td>
+    </tr>
+  `).join("");
+
+  adminsBody.querySelectorAll("[data-disable-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => disableAdminUser(btn.dataset.disableAdmin));
+  });
+  adminsBody.querySelectorAll("[data-enable-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => enableAdminUser(btn.dataset.enableAdmin));
+  });
+  adminsBody.querySelectorAll("[data-rotate-token-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => rotateAdminToken(btn.dataset.rotateTokenAdmin));
+  });
+
+  setStatus(`${admins.length} admin${admins.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function disableAdminUser(adminId) {
+  await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(adminId)}/disable`, {
+    method: "POST"
+  });
+  await refreshAdmins();
+  setStatus("Admin disabled", "ok");
+}
+
+async function enableAdminUser(adminId) {
+  await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(adminId)}/enable`, {
+    method: "POST"
+  });
+  await refreshAdmins();
+  setStatus("Admin enabled", "ok");
+}
+
+async function rotateAdminToken(adminId) {
+  const result = await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(adminId)}/rotate-token`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  const output = document.querySelector("#rotateTokenOutput");
+  if (output) {
+    output.hidden = false;
+    output.textContent = [
+      "New token issued — save it now, it will not be shown again.",
+      "",
+      `Token ID : ${result.tokenId}`,
+      `Token    : ${result.token}`,
+      result.expiresAtUtc
+        ? `Expires  : ${new Date(result.expiresAtUtc).toLocaleString()}`
+        : "Expires  : never"
+    ].join("\n");
+  }
+  await refreshAdmins();
+  setStatus("Token rotated — copy the new token above", "ok");
 }

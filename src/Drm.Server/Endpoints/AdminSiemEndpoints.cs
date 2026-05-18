@@ -17,16 +17,16 @@ public static class AdminSiemEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<SiemWebhookResponse>, Conflict, BadRequest<ErrorResponse>>> CreateWebhookAsync(
+    private static async Task<IResult> CreateWebhookAsync(
         CreateSiemWebhookRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var validationError = await ValidateCreateRequestAsync(request, cancellationToken);
         if (validationError is not null)
@@ -49,7 +49,7 @@ public static class AdminSiemEndpoints
         };
 
         dbContext.SiemWebhooks.Add(webhook);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "siem_webhook_created"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "siem_webhook_created", httpContext));
 
         try
         {
@@ -58,27 +58,25 @@ public static class AdminSiemEndpoints
         catch (DbUpdateException)
         {
             if (await WebhookExistsAsync(dbContext, request.TenantId, request.WebhookId, cancellationToken))
-            {
-                return TypedResults.Conflict();
-            }
-
+                return Results.Conflict();
             throw;
         }
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/siem-webhooks/{webhook.WebhookId}?tenantId={webhook.TenantId}",
             SiemWebhookResponse.From(webhook));
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<SiemWebhookResponse>>, BadRequest<ErrorResponse>>> ListWebhooksAsync(
+    private static async Task<IResult> ListWebhooksAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
         if (tenantId == Guid.Empty)
-        {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
-        }
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
 
         var webhooks = await dbContext.SiemWebhooks
             .AsNoTracking()
@@ -88,7 +86,7 @@ public static class AdminSiemEndpoints
             .Select(webhook => SiemWebhookResponse.From(webhook))
             .ToListAsync(cancellationToken);
 
-        return TypedResults.Ok<IReadOnlyList<SiemWebhookResponse>>(webhooks);
+        return Results.Ok(webhooks);
     }
 
     private static Task<bool> WebhookExistsAsync(

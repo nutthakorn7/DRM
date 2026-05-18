@@ -24,12 +24,15 @@ public static class AdminFilesEndpoints
         return endpoints;
     }
 
-    private static async Task<IReadOnlyList<FileResponse>> ListFilesAsync(
+    private static async Task<IResult> ListFilesAsync(
         Guid tenantId,
+        HttpContext httpContext,
         string? q,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+            return fail!;
         var query = dbContext.ProtectedFiles
             .AsNoTracking()
             .Where(file => file.TenantId == tenantId);
@@ -39,23 +42,27 @@ public static class AdminFilesEndpoints
             query = query.Where(file => file.ContentType.Contains(q));
         }
 
-        return await query
+        var files = await query
             .OrderBy(file => file.Id)
             .Take(100)
             .Select(file => FileResponse.From(file))
             .ToListAsync(cancellationToken);
+        return Results.Ok(files);
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<AgentCommandResponse>>, NotFound>> ListFileCommandsAsync(
+    private static async Task<IResult> ListFileCommandsAsync(
         Guid fileId,
         Guid tenantId,
+        HttpContext httpContext,
         Guid? deviceId,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+            return fail!;
         if (!await FileExistsAsync(dbContext, tenantId, fileId, cancellationToken))
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         var query = dbContext.AgentCommands
@@ -71,28 +78,30 @@ public static class AdminFilesEndpoints
             .Take(100)
             .ToListAsync(cancellationToken);
 
-        return TypedResults.Ok<IReadOnlyList<AgentCommandResponse>>(commands
+        return Results.Ok<IReadOnlyList<AgentCommandResponse>>(commands
             .OrderByDescending(command => command.CreatedAtUtc)
             .Select(AgentCommandResponse.From)
             .ToList());
     }
 
-    private static async Task<Results<Created<AgentCommandResponse>, NotFound, BadRequest<ErrorResponse>>> EnqueueDeleteProtectedCopyCommandAsync(
+    private static async Task<IResult> EnqueueDeleteProtectedCopyCommandAsync(
         Guid fileId,
         EnqueueDeleteProtectedCopyCommandRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (!await FileExistsAsync(dbContext, request.TenantId, fileId, cancellationToken) ||
             !await DeviceExistsAsync(dbContext, request.TenantId, request.DeviceId, cancellationToken))
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -114,6 +123,7 @@ public static class AdminFilesEndpoints
             TenantId = request.TenantId,
             FileId = fileId,
             UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "protected_file_delete_requested",
             ReasonCode = "queued",
             CreatedAtUtc = now
@@ -121,12 +131,12 @@ public static class AdminFilesEndpoints
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/files/{fileId}/commands/{command.CommandId}",
             AgentCommandResponse.From(command));
     }
 
-    private static async Task<Results<Created<CreateExternalShareLinkResponse>, BadRequest<ErrorResponse>, NotFound>> CreateExternalShareLinkAsync(
+    private static async Task<IResult> CreateExternalShareLinkAsync(
         Guid fileId,
         CreateExternalShareLinkRequest request,
         HttpContext httpContext,
@@ -134,9 +144,11 @@ public static class AdminFilesEndpoints
         IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var file = await dbContext.ProtectedFiles
@@ -147,14 +159,14 @@ public static class AdminFilesEndpoints
 
         if (file is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         var now = DateTimeOffset.UtcNow;
         var validationError = ValidateCreateExternalShareLinkRequest(file, request, now);
         if (validationError is not null)
         {
-            return TypedResults.BadRequest(validationError);
+            return Results.BadRequest(validationError);
         }
 
         var token = ExternalShareToken.Create();
@@ -178,7 +190,8 @@ public static class AdminFilesEndpoints
             fileId,
             request.AdminUserId,
             "external_share_link_created",
-            now));
+            now,
+            httpContext));
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await notificationService.NotifyAsync(
@@ -197,20 +210,23 @@ public static class AdminFilesEndpoints
             token.Plaintext,
             shareLink.GuestEmail);
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/files/{fileId}/share-links/{shareLink.ShareLinkId}",
             CreateExternalShareLinkResponse.From(shareLink, token.Plaintext, shareUrl));
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<ExternalShareLinkResponse>>, NotFound>> ListExternalShareLinksAsync(
+    private static async Task<IResult> ListExternalShareLinksAsync(
         Guid fileId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+            return fail!;
         if (!await FileExistsAsync(dbContext, tenantId, fileId, cancellationToken))
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         var links = await dbContext.ExternalShareLinks
@@ -219,14 +235,14 @@ public static class AdminFilesEndpoints
             .Take(100)
             .ToListAsync(cancellationToken);
 
-        return TypedResults.Ok<IReadOnlyList<ExternalShareLinkResponse>>(links
+        return Results.Ok<IReadOnlyList<ExternalShareLinkResponse>>(links
             .OrderByDescending(link => link.CreatedAtUtc)
             .ThenBy(link => link.ShareLinkId)
             .Select(ExternalShareLinkResponse.From)
             .ToList());
     }
 
-    private static async Task<Results<Ok<ExternalShareLinkResponse>, NotFound, BadRequest<ErrorResponse>>> RevokeExternalShareLinkAsync(
+    private static async Task<IResult> RevokeExternalShareLinkAsync(
         Guid fileId,
         Guid shareLinkId,
         RevokeExternalShareLinkRequest request,
@@ -234,9 +250,11 @@ public static class AdminFilesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var shareLink = await dbContext.ExternalShareLinks
@@ -262,14 +280,15 @@ public static class AdminFilesEndpoints
                 fileId,
                 request.AdminUserId,
                 "external_share_link_revoked",
-                now));
+                now,
+                httpContext));
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return TypedResults.Ok(ExternalShareLinkResponse.From(shareLink));
+        return Results.Ok(ExternalShareLinkResponse.From(shareLink));
     }
 
-    private static async Task<Results<Ok<RevokeFileResponse>, BadRequest<ErrorResponse>, NotFound>> RevokeFileAsync(
+    private static async Task<IResult> RevokeFileAsync(
         Guid fileId,
         RevokeFileRequest request,
         HttpContext httpContext,
@@ -278,9 +297,11 @@ public static class AdminFilesEndpoints
         IAdminNotificationService notificationService,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var file = await dbContext.ProtectedFiles
@@ -288,7 +309,7 @@ public static class AdminFilesEndpoints
 
         if (file is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -298,6 +319,7 @@ public static class AdminFilesEndpoints
             TenantId = file.TenantId,
             FileId = file.Id,
             UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "file_revoked",
             ReasonCode = "revoked",
             CreatedAtUtc = now
@@ -316,41 +338,43 @@ public static class AdminFilesEndpoints
                 now),
             cancellationToken);
 
-        return TypedResults.Ok(new RevokeFileResponse(file.TenantId, file.Id, file.Revoked));
+        return Results.Ok(new RevokeFileResponse(file.TenantId, file.Id, file.Revoked));
     }
 
-    private static async Task<Results<Created<FileGrantResponse>, BadRequest<ErrorResponse>, NotFound>> UpsertGrantAsync(
+    private static async Task<IResult> UpsertGrantAsync(
         Guid fileId,
         UpsertFileGrantRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (!Enum.TryParse<GrantSubjectType>(request.SubjectType, ignoreCase: true, out var subjectType)
             || !Enum.IsDefined(subjectType))
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_subject_type"));
+            return Results.BadRequest(new ErrorResponse("invalid_subject_type"));
         }
 
         if (!PermissionParser.TryParse(request.Permissions, out var permissions))
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_permissions"));
+            return Results.BadRequest(new ErrorResponse("invalid_permissions"));
         }
 
         if (!await FileExistsAsync(dbContext, request.TenantId, fileId, cancellationToken))
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         if (subjectType == GrantSubjectType.Group
             && !await GroupExistsAsync(dbContext, request.TenantId, request.SubjectId, cancellationToken))
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         var normalizedSubjectType = subjectType.ToString();
@@ -383,7 +407,7 @@ public static class AdminFilesEndpoints
             grant.Permissions = normalizedPermissions;
         }
 
-        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grant_upserted"));
+        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grant_upserted", httpContext));
 
         try
         {
@@ -416,21 +440,23 @@ public static class AdminFilesEndpoints
             grant = conflictingGrant;
         }
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/files/{fileId}/grants/{grant.SubjectType}/{grant.SubjectId}",
             FileGrantResponse.From(grant));
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<FileGrantResponse>>, BadRequest<ErrorResponse>, NotFound>> ReplaceGrantsAsync(
+    private static async Task<IResult> ReplaceGrantsAsync(
         Guid fileId,
         ReplaceGrantsRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var file = await dbContext.ProtectedFiles
@@ -438,12 +464,12 @@ public static class AdminFilesEndpoints
 
         if (file is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         if (request.Grants is null)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_grants"));
+            return Results.BadRequest(new ErrorResponse("invalid_grants"));
         }
 
         var parsed = new List<FileGrantEntity>();
@@ -452,30 +478,30 @@ public static class AdminFilesEndpoints
         {
             if (grant is null)
             {
-                return TypedResults.BadRequest(new ErrorResponse("invalid_grants"));
+                return Results.BadRequest(new ErrorResponse("invalid_grants"));
             }
 
             if (!Enum.TryParse<GrantSubjectType>(grant.SubjectType, ignoreCase: true, out var subjectType)
                 || !Enum.IsDefined(subjectType))
             {
-                return TypedResults.BadRequest(new ErrorResponse("invalid_subject_type"));
+                return Results.BadRequest(new ErrorResponse("invalid_subject_type"));
             }
 
             if (!PermissionParser.TryParse(grant.Permissions, out var permissions))
             {
-                return TypedResults.BadRequest(new ErrorResponse("invalid_permissions"));
+                return Results.BadRequest(new ErrorResponse("invalid_permissions"));
             }
 
             if (subjectType == GrantSubjectType.Group
                 && !await GroupExistsAsync(dbContext, request.TenantId, grant.SubjectId, cancellationToken))
             {
-                return TypedResults.NotFound();
+                return Results.NotFound();
             }
 
             var normalizedSubjectType = subjectType.ToString();
             if (!seenSubjects.Add((normalizedSubjectType, grant.SubjectId)))
             {
-                return TypedResults.BadRequest(new ErrorResponse("duplicate_grant"));
+                return Results.BadRequest(new ErrorResponse("duplicate_grant"));
             }
 
             parsed.Add(new FileGrantEntity
@@ -496,24 +522,26 @@ public static class AdminFilesEndpoints
         dbContext.FileGrants.RemoveRange(existing);
         dbContext.FileGrants.AddRange(parsed);
         file.Permissions = Permission.None;
-        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grants_replaced"));
+        dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grants_replaced", httpContext));
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Ok<IReadOnlyList<FileGrantResponse>>(parsed
+        return Results.Ok<IReadOnlyList<FileGrantResponse>>(parsed
             .Select(FileGrantResponse.From)
             .ToList());
     }
 
-    private static async Task<Results<Ok<FileResponse>, NotFound, BadRequest<ErrorResponse>>> ApplyPolicyTemplateAsync(
+    private static async Task<IResult> ApplyPolicyTemplateAsync(
         Guid fileId,
         ApplyPolicyTemplateRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var file = await dbContext.ProtectedFiles
@@ -528,12 +556,12 @@ public static class AdminFilesEndpoints
 
         if (file is null || template is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         if (!PermissionParser.TryParse(template.Permissions, out var permissions))
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
 
         file.Permissions = permissions;
@@ -545,10 +573,11 @@ public static class AdminFilesEndpoints
             request.TenantId,
             fileId,
             request.AdminUserId,
-            "policy_template_applied"));
+            "policy_template_applied",
+            httpContext));
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Ok(FileResponse.From(file));
+        return Results.Ok(FileResponse.From(file));
     }
 
     private static async Task UpsertOwnerGrantFromTemplateAsync(
@@ -687,13 +716,15 @@ public static class AdminFilesEndpoints
         Guid fileId,
         Guid adminUserId,
         string reasonCode,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        HttpContext? httpContext = null)
     {
         return new AuditEventEntity
         {
             TenantId = tenantId,
             FileId = fileId,
             UserId = adminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "external_share_changed",
             ReasonCode = reasonCode,
             CreatedAtUtc = createdAtUtc

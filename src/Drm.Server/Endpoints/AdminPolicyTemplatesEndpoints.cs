@@ -20,32 +20,23 @@ public static class AdminPolicyTemplatesEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<PolicyTemplateResponse>, Conflict, BadRequest<ErrorResponse>>> CreatePolicyTemplateAsync(
+    private static async Task<IResult> CreatePolicyTemplateAsync(
         CreatePolicyTemplateRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var validationError = ValidateCreateRequest(request);
-        if (validationError is not null)
-        {
-            return TypedResults.BadRequest(validationError);
-        }
-
+        if (validationError is not null) return Results.BadRequest(validationError);
         if (!PermissionParser.TryParse(request.Permissions, out var permissions))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_permissions"));
-        }
-
+            return Results.BadRequest(new ErrorResponse("invalid_permissions"));
         if (await PolicyTemplateExistsAsync(dbContext, request.TenantId, request.TemplateId, cancellationToken))
-        {
-            return TypedResults.Conflict();
-        }
+            return Results.Conflict();
 
         var template = new PolicyTemplateEntity
         {
@@ -60,7 +51,7 @@ public static class AdminPolicyTemplatesEndpoints
         };
 
         dbContext.PolicyTemplates.Add(template);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "policy_template_created"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "policy_template_created", httpContext));
 
         try
         {
@@ -69,49 +60,47 @@ public static class AdminPolicyTemplatesEndpoints
         catch (DbUpdateException)
         {
             if (await PolicyTemplateExistsAsync(dbContext, request.TenantId, request.TemplateId, cancellationToken))
-            {
-                return TypedResults.Conflict();
-            }
-
+                return Results.Conflict();
             throw;
         }
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/policy-templates/{template.TemplateId}?tenantId={template.TenantId}",
             PolicyTemplateResponse.From(template));
     }
 
-    private static async Task<IReadOnlyList<PolicyTemplateResponse>> ListPolicyTemplatesAsync(
+    private static async Task<IResult> ListPolicyTemplatesAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.PolicyTemplates
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+            return fail!;
+        var templates = await dbContext.PolicyTemplates
             .AsNoTracking()
             .Where(template => template.TenantId == tenantId)
             .OrderBy(template => template.Name)
             .Select(template => PolicyTemplateResponse.From(template))
             .ToListAsync(cancellationToken);
+        return Results.Ok(templates);
     }
 
-    private static async Task<Results<Ok<PolicyTemplateResponse>, NotFound>> GetPolicyTemplateAsync(
+    private static async Task<IResult> GetPolicyTemplateAsync(
         Guid templateId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+            return fail!;
         var template = await dbContext.PolicyTemplates
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 candidate => candidate.TenantId == tenantId && candidate.TemplateId == templateId,
                 cancellationToken);
-
-        if (template is null)
-        {
-            return TypedResults.NotFound();
-        }
-
-        return TypedResults.Ok(PolicyTemplateResponse.From(template));
+        return template is null ? Results.NotFound() : Results.Ok(PolicyTemplateResponse.From(template));
     }
 
     private static Task<bool> PolicyTemplateExistsAsync(

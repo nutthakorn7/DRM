@@ -430,6 +430,23 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
+        // AuditEvents.ActorAdminId — added in v1.1 Slice 2 for RBAC actor attribution
+        var auditColumns = new HashSet<string>(StringComparer.Ordinal);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"AuditEvents\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                auditColumns.Add(reader.GetString(1));
+        }
+
+        if (!auditColumns.Contains("ActorAdminId"))
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "AuditEvents" ADD COLUMN "ActorAdminId" TEXT NULL;
+                """);
+        }
+
         if (openedHere)
         {
             connection.Close();
@@ -530,6 +547,10 @@ using (var scope = app.Services.CreateScope())
             """);
         dbContext.Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_AdminApiTokens_AdminUserId" ON "AdminApiTokens" ("AdminUserId");
+            """);
+        // AuditEvents.ActorAdminId — added in v1.1 Slice 2 for RBAC actor attribution (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "AuditEvents" ADD COLUMN IF NOT EXISTS "ActorAdminId" uuid NULL;
             """);
     }
 

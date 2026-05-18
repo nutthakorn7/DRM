@@ -17,7 +17,7 @@
       <div class="welcome-logo" aria-hidden="true">🔒</div>
       <p class="eyebrow">First time here</p>
       <h1 id="welcomeTitle">Welcome to DRM Management</h1>
-      <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, Admin Key, and Admin user ID for you — you can replace them with real credentials anytime.</p>
+      <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, admin credential, and Admin user ID for you — you can replace them with real credentials anytime.</p>
 
       <ul class="welcome-steps">
         <li><span class="step-num">1</span> Generate credentials</li>
@@ -76,7 +76,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Management API</p>
-          <h2>Tenant operations <span class="help-pill" id="topbarHelp" title="First time here? Fill in Tenant ID and Admin Key below — we'll guide you through the 5-step setup checklist on the Overview tab.">First time?</span></h2>
+          <h2>Tenant operations <span class="help-pill" id="topbarHelp" title="First time here? Fill in Tenant ID and admin credential below — we'll guide you through the 5-step setup checklist on the Overview tab.">First time?</span></h2>
         </div>
       </header>
 
@@ -86,8 +86,8 @@
           <input id="tenantId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
         </label>
         <label>
-          <span>X-DRM-Admin-Key</span>
-          <input id="adminKey" type="password" autocomplete="off" placeholder="Admin API key">
+          <span>Admin credential</span>
+          <input id="adminKey" type="password" autocomplete="off" placeholder="Per-admin token (drm_admin_…) or shared key">
         </label>
         <label>
           <span>Admin user ID</span>
@@ -406,6 +406,87 @@
               <tr>
                 <td colspan="8" class="empty">Refresh to load agent devices.</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="adminIdentity" data-tab="identity">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Access control</p>
+            <h3>Admin console access</h3>
+          </div>
+          <button id="refreshAdminIdentity" type="button">Refresh</button>
+        </div>
+
+        <details>
+          <summary>Current session (WhoAmI)</summary>
+          <pre id="whoamiOutput" class="output-block">Load to see session details.</pre>
+        </details>
+
+        <div class="section-head" style="margin-top:1.25rem">
+          <div>
+            <p class="eyebrow">RBAC</p>
+            <h4>Roles</h4>
+          </div>
+          <button id="refreshRoles" type="button" class="ghost">Refresh roles</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role ID</th>
+                <th>Permissions</th>
+                <th>System</th>
+              </tr>
+            </thead>
+            <tbody id="rolesBody">
+              <tr><td colspan="4" class="empty">Click "Refresh" to load roles.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-head" style="margin-top:1.25rem">
+          <div>
+            <p class="eyebrow">Users</p>
+            <h4>Admin users</h4>
+          </div>
+        </div>
+
+        <details class="anti-capture-block">
+          <summary>Create admin user</summary>
+          <form id="createAdminForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+            <input id="newAdminEmail" type="email" autocomplete="off" placeholder="Email" required>
+            <input id="newAdminDisplayName" autocomplete="off" placeholder="Display name (optional)">
+            <select id="newAdminRoleId" aria-label="Role">
+              <option value="">Select role…</option>
+            </select>
+            <input id="newAdminTokenLabel" autocomplete="off" placeholder="Token label (optional)">
+            <button type="submit">Create admin</button>
+          </form>
+          <pre id="createAdminOutput" class="output-block" hidden></pre>
+        </details>
+
+        <pre id="rotateTokenOutput" class="output-block" hidden></pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Display name</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Tokens</th>
+                <th>Last used</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminsBody">
+              <tr><td colspan="7" class="empty">Click "Refresh" to load admin users.</td></tr>
             </tbody>
           </table>
         </div>
@@ -848,10 +929,10 @@
           <li class="checklist-item" data-step="adminKey">
             <span class="check">○</span>
             <div class="step-body">
-              <strong>2. Set the Admin API Key</strong>
-              <p class="hint">A shared secret that protects /api/admin/*. Generate a random 32-byte key now or paste one your IT admin provided.</p>
+              <strong>2. Set admin credential</strong>
+              <p class="hint">Paste a per-admin token (drm_admin_…) from the Access control tab, or the shared Admin API key as a fallback. Per-admin tokens are recommended — they carry identity and support revocation.</p>
               <div class="step-actions">
-                <button type="button" id="generateAdminKey">Generate random Admin Key</button>
+                <button type="button" id="generateAdminKey">Generate random shared key</button>
               </div>
             </div>
           </li>

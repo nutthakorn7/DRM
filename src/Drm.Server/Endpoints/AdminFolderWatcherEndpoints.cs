@@ -19,16 +19,16 @@ public static class AdminFolderWatcherEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<FolderWatcherConfigResponse>, Ok<FolderWatcherConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
+    private static async Task<IResult> UpsertConfigAsync(
         UpsertConfigRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         if (request.TenantId == Guid.Empty)
         {
@@ -57,65 +57,72 @@ public static class AdminFolderWatcherEndpoints
             : TypedResults.Ok(response);
     }
 
-    private static async Task<Results<Ok<FolderWatcherConfigResponse>, NotFound>> GetConfigAsync(
+    private static async Task<IResult> GetConfigAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+            return fail!;
         var exists = await dbContext.TenantFolderWatcherConfigs
             .AsNoTracking()
             .AnyAsync(c => c.TenantId == tenantId, cancellationToken);
         if (!exists)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
-        return TypedResults.Ok(await BuildResponseAsync(dbContext, tenantId, cancellationToken));
+        return Results.Ok(await BuildResponseAsync(dbContext, tenantId, cancellationToken));
     }
 
-    private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> ReportAsync(
+    private static async Task<IResult> ReportAsync(
         ServiceReportRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
 
         var config = await dbContext.TenantFolderWatcherConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
         if (config is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
         config.LastReportStatus = request.Status;
         config.LastReportAtUtc = DateTimeOffset.UtcNow;
         config.LastFilesProtected = request.FilesProtected;
         config.Hostname = request.Hostname;
         await dbContext.SaveChangesAsync(cancellationToken);
-        return TypedResults.NoContent();
+        return Results.NoContent();
     }
 
-    private static async Task<Results<Created, BadRequest<ErrorResponse>>> PostEventAsync(
+    private static async Task<IResult> PostEventAsync(
         ServiceEventRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty)
         {
-            return TypedResults.BadRequest(new ErrorResponse("invalid_tenant_id"));
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
         }
         dbContext.FolderWatcherEvents.Add(new FolderWatcherEventEntity
         {
@@ -132,14 +139,17 @@ public static class AdminFolderWatcherEndpoints
         return TypedResults.Created("/api/admin/folder-watcher/events");
     }
 
-    private static async Task<IReadOnlyList<FolderWatcherEventResponse>> ListEventsAsync(
+    private static async Task<IResult> ListEventsAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         int? limit,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+            return fail!;
         var pageSize = Math.Clamp(limit ?? 50, 1, 200);
-        return await dbContext.FolderWatcherEvents
+        var events = await dbContext.FolderWatcherEvents
             .AsNoTracking()
             .Where(e => e.TenantId == tenantId)
             .OrderByDescending(e => e.Id)
@@ -147,6 +157,7 @@ public static class AdminFolderWatcherEndpoints
             .Select(e => new FolderWatcherEventResponse(
                 e.Id, e.Hostname, e.FolderPath, e.FileName, e.FileSize, e.Status, e.FileId, e.OccurredAtUtc))
             .ToListAsync(cancellationToken);
+        return Results.Ok(events);
     }
 
     private static async Task<FolderWatcherConfigResponse> BuildResponseAsync(

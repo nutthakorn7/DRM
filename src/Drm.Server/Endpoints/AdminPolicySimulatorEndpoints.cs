@@ -11,16 +11,16 @@ public static class AdminPolicySimulatorEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Ok<PolicySimulationResponse>, NotFound<PolicySimulationResponse>, BadRequest<PolicySimulationResponse>, BadRequest<ErrorResponse>>> SimulateAsync(
+    private static async Task<IResult> SimulateAsync(
         PolicySimulationRequest request,
         HttpContext httpContext,
         PolicyDecisionService policyDecisionService,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var decision = await policyDecisionService.SimulateAsync(
             request.TenantId,
@@ -38,17 +38,9 @@ public static class AdminPolicySimulatorEndpoints
             decision.OfflineLeaseExpiresAtUtc,
             Simulated: true);
 
-        if (decision.InvalidPermission)
-        {
-            return TypedResults.BadRequest(response);
-        }
-
-        if (!decision.FileFound)
-        {
-            return TypedResults.NotFound(response);
-        }
-
-        return TypedResults.Ok(response);
+        if (decision.InvalidPermission) return Results.BadRequest(response);
+        if (!decision.FileFound) return Results.NotFound(response);
+        return Results.Ok(response);
     }
 
     private sealed record PolicySimulationRequest(

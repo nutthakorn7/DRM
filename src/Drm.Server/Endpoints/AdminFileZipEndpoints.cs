@@ -14,16 +14,18 @@ public static class AdminFileZipEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<FileStreamHttpResult, NotFound, BadRequest<ErrorResponse>>> ConvertToZipAsync(
+    private static async Task<IResult> ConvertToZipAsync(
         Guid fileId,
         Guid tenantId,
         AppDbContext dbContext,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesZip, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (tenantId == Guid.Empty)
@@ -85,6 +87,7 @@ public static class AdminFileZipEndpoints
         {
             TenantId = tenantId,
             FileId = file.Id,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "system_changed",
             ReasonCode = "file_converted_to_zip",
             CreatedAtUtc = DateTimeOffset.UtcNow

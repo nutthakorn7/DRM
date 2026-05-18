@@ -16,21 +16,19 @@ public static class AdminGroupsEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<GroupResponse>, Conflict, BadRequest<ErrorResponse>>> CreateGroupAsync(
+    private static async Task<IResult> CreateGroupAsync(
         CreateGroupRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.GroupsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         if (await GroupExistsAsync(dbContext, request.TenantId, request.GroupId, cancellationToken))
-        {
-            return TypedResults.Conflict();
-        }
+            return Results.Conflict();
 
         var group = new TenantGroupEntity
         {
@@ -41,7 +39,7 @@ public static class AdminGroupsEndpoints
         };
 
         dbContext.TenantGroups.Add(group);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "group_created"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "group_created", httpContext));
 
         try
         {
@@ -50,37 +48,29 @@ public static class AdminGroupsEndpoints
         catch (DbUpdateException)
         {
             if (await GroupExistsAsync(dbContext, request.TenantId, request.GroupId, cancellationToken))
-            {
-                return TypedResults.Conflict();
-            }
-
+                return Results.Conflict();
             throw;
         }
 
-        return TypedResults.Created($"/api/admin/groups/{group.GroupId}", GroupResponse.From(group));
+        return Results.Created($"/api/admin/groups/{group.GroupId}", GroupResponse.From(group));
     }
 
-    private static async Task<Results<Created<GroupMemberResponse>, Conflict, NotFound, BadRequest<ErrorResponse>>> AddMemberAsync(
+    private static async Task<IResult> AddMemberAsync(
         Guid groupId,
         AddMemberRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.GroupsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         if (!await GroupExistsAsync(dbContext, request.TenantId, groupId, cancellationToken))
-        {
-            return TypedResults.NotFound();
-        }
-
+            return Results.NotFound();
         if (await GroupMemberExistsAsync(dbContext, request.TenantId, groupId, request.UserId, cancellationToken))
-        {
-            return TypedResults.Conflict();
-        }
+            return Results.Conflict();
 
         var member = new GroupMemberEntity
         {
@@ -91,7 +81,7 @@ public static class AdminGroupsEndpoints
         };
 
         dbContext.GroupMembers.Add(member);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, request.UserId, "group_member_added"));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, request.UserId, "group_member_added", httpContext));
 
         try
         {
@@ -100,28 +90,29 @@ public static class AdminGroupsEndpoints
         catch (DbUpdateException)
         {
             if (await GroupMemberExistsAsync(dbContext, request.TenantId, groupId, request.UserId, cancellationToken))
-            {
-                return TypedResults.Conflict();
-            }
-
+                return Results.Conflict();
             throw;
         }
 
-        return TypedResults.Created($"/api/admin/groups/{member.GroupId}/members/{member.UserId}", GroupMemberResponse.From(member));
+        return Results.Created($"/api/admin/groups/{member.GroupId}/members/{member.UserId}", GroupMemberResponse.From(member));
     }
 
-    private static async Task<IReadOnlyList<GroupMemberResponse>> ListMembersAsync(
+    private static async Task<IResult> ListMembersAsync(
         Guid groupId,
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.GroupMembers
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.GroupsRead, out var fail))
+            return fail!;
+        var members = await dbContext.GroupMembers
             .AsNoTracking()
             .Where(member => member.TenantId == tenantId && member.GroupId == groupId)
             .OrderBy(member => member.UserId)
             .Select(member => GroupMemberResponse.From(member))
             .ToListAsync(cancellationToken);
+        return Results.Ok(members);
     }
 
     private static Task<bool> GroupExistsAsync(

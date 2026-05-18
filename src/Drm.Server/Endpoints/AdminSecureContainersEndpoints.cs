@@ -17,15 +17,17 @@ public static class AdminSecureContainersEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<ContainerResponse>, Conflict, BadRequest<ErrorResponse>>> RegisterAsync(
+    private static async Task<IResult> RegisterAsync(
         RegisterRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         if (request.TenantId == Guid.Empty || request.ContainerId == Guid.Empty || request.OwnerUserId == Guid.Empty)
@@ -77,23 +79,27 @@ public static class AdminSecureContainersEndpoints
         {
             TenantId = request.TenantId,
             FileId = request.ContainerId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
             EventType = "system_changed",
             ReasonCode = "secure_container_registered",
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return TypedResults.Created(
+        return Results.Created(
             $"/api/admin/secure-containers/{request.ContainerId}?tenantId={request.TenantId}",
             await BuildResponseAsync(dbContext, request.TenantId, request.ContainerId, cancellationToken));
     }
 
-    private static async Task<IReadOnlyList<ContainerSummary>> ListAsync(
+    private static async Task<IResult> ListAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        return await dbContext.SecureContainers
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
+        var items = await dbContext.SecureContainers
             .AsNoTracking()
             .Where(c => c.TenantId == tenantId)
             .OrderBy(c => c.DisplayName)
@@ -101,48 +107,54 @@ public static class AdminSecureContainersEndpoints
                 c.TenantId, c.ContainerId, c.OwnerUserId, c.DisplayName,
                 c.FileCount, c.TotalBytes, c.PolicyTemplateId, c.CreatedAtUtc))
             .ToListAsync(cancellationToken);
+        return Results.Ok(items);
     }
 
-    private static async Task<Results<Ok<ContainerResponse>, NotFound>> GetAsync(
-        Guid containerId,
-        Guid tenantId,
-        AppDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var container = await dbContext.SecureContainers
-            .AsNoTracking()
-            .SingleOrDefaultAsync(c => c.TenantId == tenantId && c.ContainerId == containerId, cancellationToken);
-        if (container is null)
-        {
-            return TypedResults.NotFound();
-        }
-        return TypedResults.Ok(await BuildResponseAsync(dbContext, tenantId, containerId, cancellationToken));
-    }
-
-    private static async Task<Results<NoContent, NotFound, BadRequest<ErrorResponse>>> DeleteAsync(
+    private static async Task<IResult> GetAsync(
         Guid containerId,
         Guid tenantId,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+            return fail!;
+        var container = await dbContext.SecureContainers
+            .AsNoTracking()
+            .SingleOrDefaultAsync(c => c.TenantId == tenantId && c.ContainerId == containerId, cancellationToken);
+        if (container is null)
+        {
+            return Results.NotFound();
+        }
+        return Results.Ok(await BuildResponseAsync(dbContext, tenantId, containerId, cancellationToken));
+    }
+
+    private static async Task<IResult> DeleteAsync(
+        Guid containerId,
+        Guid tenantId,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
         }
 
         var container = await dbContext.SecureContainers
             .SingleOrDefaultAsync(c => c.TenantId == tenantId && c.ContainerId == containerId, cancellationToken);
         if (container is null)
         {
-            return TypedResults.NotFound();
+            return Results.NotFound();
         }
         var files = dbContext.SecureContainerFiles
             .Where(f => f.TenantId == tenantId && f.ContainerId == containerId);
         dbContext.SecureContainerFiles.RemoveRange(files);
         dbContext.SecureContainers.Remove(container);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return TypedResults.NoContent();
+        return Results.NoContent();
     }
 
     private static async Task<ContainerResponse> BuildResponseAsync(

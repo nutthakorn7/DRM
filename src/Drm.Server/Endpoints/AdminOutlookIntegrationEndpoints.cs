@@ -16,16 +16,16 @@ public static class AdminOutlookIntegrationEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<OutlookConfigResponse>, Ok<OutlookConfigResponse>, BadRequest<ErrorResponse>>> UpsertConfigAsync(
+    private static async Task<IResult> UpsertConfigAsync(
         OutlookConfigRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+            return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
-        {
-            return TypedResults.BadRequest(new ErrorResponse("tenant_mismatch"));
-        }
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
         var existing = await dbContext.TenantOutlookIntegrationConfigs
             .FirstOrDefaultAsync(c => c.TenantId == request.TenantId, cancellationToken);
@@ -50,46 +50,44 @@ public static class AdminOutlookIntegrationEndpoints
 
         var response = OutlookConfigResponse.From(existing);
         return isNew
-            ? TypedResults.Created("/api/admin/outlook/config", response)
-            : TypedResults.Ok(response);
+            ? Results.Created("/api/admin/outlook/config", response)
+            : Results.Ok(response);
     }
 
-    private static async Task<Results<Ok<OutlookConfigResponse>, NotFound>> GetConfigAsync(
+    private static async Task<IResult> GetConfigAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+            return fail!;
         var config = await dbContext.TenantOutlookIntegrationConfigs
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
-
-        return config is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(OutlookConfigResponse.From(config));
+        return config is null ? Results.NotFound() : Results.Ok(OutlookConfigResponse.From(config));
     }
 
-    private static async Task<IReadOnlyList<OutlookEventResponse>> ListEventsAsync(
+    private static async Task<IResult> ListEventsAsync(
         Guid tenantId,
+        HttpContext httpContext,
         AppDbContext dbContext,
         int? limit,
         CancellationToken cancellationToken)
     {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+            return fail!;
         var pageSize = Math.Clamp(limit ?? 50, 1, 200);
-        return await dbContext.OutlookAttachmentEvents
+        var events = await dbContext.OutlookAttachmentEvents
             .AsNoTracking()
             .Where(e => e.TenantId == tenantId)
             .OrderByDescending(e => e.Id)
             .Take(pageSize)
             .Select(e => new OutlookEventResponse(
-                e.Id,
-                e.SenderEmail,
-                e.RecipientCsv,
-                e.AttachmentName,
-                e.AttachmentSizeBytes,
-                e.Status,
-                e.ProtectedFileId,
-                e.OccurredAtUtc))
+                e.Id, e.SenderEmail, e.RecipientCsv, e.AttachmentName,
+                e.AttachmentSizeBytes, e.Status, e.ProtectedFileId, e.OccurredAtUtc))
             .ToListAsync(cancellationToken);
+        return Results.Ok(events);
     }
 
     private sealed record OutlookConfigRequest(
