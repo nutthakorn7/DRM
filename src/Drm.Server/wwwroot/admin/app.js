@@ -2115,6 +2115,7 @@ document.querySelector("#createAdminForm").addEventListener("submit", async (eve
   const displayName = document.querySelector("#newAdminDisplayName").value.trim();
   const roleId = document.querySelector("#newAdminRoleId").value.trim();
   const tokenLabel = document.querySelector("#newAdminTokenLabel").value.trim();
+  const tenantScopeRaw = document.querySelector("#newAdminTenantScope").value.trim();
 
   if (!roleId) {
     setStatus("Select a role before creating an admin", "error");
@@ -2126,7 +2127,8 @@ document.querySelector("#createAdminForm").addEventListener("submit", async (eve
     displayName: displayName || null,
     roleId,
     tokenLabel: tokenLabel || null,
-    tokenExpiresAtUtc: null
+    tokenExpiresAtUtc: null,
+    tenantScope: tenantScopeRaw || null
   };
 
   const created = await apiFetch("/api/admin/identity/admins", {
@@ -2142,6 +2144,7 @@ document.querySelector("#createAdminForm").addEventListener("submit", async (eve
     `Admin ID : ${created.adminUserId}`,
     `Email    : ${created.email}`,
     `Role     : ${created.roleName}`,
+    `Scope    : ${created.tenantScope || "Global"}`,
     `Token ID : ${created.tokenId}`,
     `Token    : ${created.token}`,
     created.tokenExpiresAtUtc
@@ -2215,7 +2218,7 @@ async function refreshAdmins() {
   const admins = await apiFetch("/api/admin/identity/admins");
   const adminsBody = document.querySelector("#adminsBody");
   if (!admins.length) {
-    adminsBody.innerHTML = '<tr><td colspan="7" class="empty">No admin users found.</td></tr>';
+    adminsBody.innerHTML = '<tr><td colspan="8" class="empty">No admin users found.</td></tr>';
     setStatus("No admins", "ok");
     return;
   }
@@ -2224,6 +2227,7 @@ async function refreshAdmins() {
       <td>${escapeHtml(a.email)}</td>
       <td>${escapeHtml(a.displayName || "")}</td>
       <td>${escapeHtml(a.roleName)}</td>
+      <td>${a.tenantScope ? `<code title="${escapeHtml(a.tenantScope)}">${escapeHtml(a.tenantScope.slice(0, 8))}…</code>` : '<span class="badge">Global</span>'}</td>
       <td>${renderEnabledBadge(!a.disabled)}</td>
       <td>${a.activeTokenCount}</td>
       <td>${escapeHtml(formatDate(a.lastUsedAtUtc) || "—")}</td>

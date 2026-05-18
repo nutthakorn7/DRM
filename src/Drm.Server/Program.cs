@@ -447,6 +447,23 @@ using (var scope = app.Services.CreateScope())
                 """);
         }
 
+        // AdminUsers.TenantScope — added in v1.2 for tenant-scoped admin roles
+        var adminUserColumns = new HashSet<string>(StringComparer.Ordinal);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"AdminUsers\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                adminUserColumns.Add(reader.GetString(1));
+        }
+
+        if (!adminUserColumns.Contains("TenantScope"))
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "AdminUsers" ADD COLUMN "TenantScope" TEXT NULL;
+                """);
+        }
+
         if (openedHere)
         {
             connection.Close();
@@ -551,6 +568,10 @@ using (var scope = app.Services.CreateScope())
         // AuditEvents.ActorAdminId — added in v1.1 Slice 2 for RBAC actor attribution (Postgres)
         dbContext.Database.ExecuteSqlRaw("""
             ALTER TABLE "AuditEvents" ADD COLUMN IF NOT EXISTS "ActorAdminId" uuid NULL;
+            """);
+        // AdminUsers.TenantScope — added in v1.2 for tenant-scoped admin roles (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "AdminUsers" ADD COLUMN IF NOT EXISTS "TenantScope" uuid NULL;
             """);
     }
 

@@ -173,7 +173,7 @@ public sealed class AdminSharedKeyModeTests : IDisposable
         }
     }
 
-    private sealed record WhoamiBody(Guid AdminUserId, Guid RoleId, string DisplayName, string Email, List<string> Permissions, bool SharedKeyFallback);
-    private sealed record CreateAdminBody(Guid AdminUserId, string Email, string DisplayName, Guid RoleId, string RoleName, Guid TokenId, string Token, DateTimeOffset? TokenExpiresAtUtc);
+    private sealed record WhoamiBody(Guid AdminUserId, Guid RoleId, string DisplayName, string Email, List<string> Permissions, bool SharedKeyFallback, Guid? TenantScope = null);
+    private sealed record CreateAdminBody(Guid AdminUserId, string Email, string DisplayName, Guid RoleId, string RoleName, Guid TokenId, string Token, DateTimeOffset? TokenExpiresAtUtc, Guid? TenantScope = null);
     private sealed record ErrorBody(string ReasonCode);
 }

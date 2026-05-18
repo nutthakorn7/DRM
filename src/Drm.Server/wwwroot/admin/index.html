@@ -465,6 +465,7 @@
               <option value="">Select role…</option>
             </select>
             <input id="newAdminTokenLabel" autocomplete="off" placeholder="Token label (optional)">
+            <input id="newAdminTenantScope" autocomplete="off" placeholder="Tenant scope (UUID, blank = global)">
             <button type="submit">Create admin</button>
           </form>
           <pre id="createAdminOutput" class="output-block" hidden></pre>
@@ -479,6 +480,7 @@
                 <th>Email</th>
                 <th>Display name</th>
                 <th>Role</th>
+                <th>Scope</th>
                 <th>Status</th>
                 <th>Tokens</th>
                 <th>Last used</th>
@@ -486,7 +488,7 @@
               </tr>
             </thead>
             <tbody id="adminsBody">
-              <tr><td colspan="7" class="empty">Click "Refresh" to load admin users.</td></tr>
+              <tr><td colspan="8" class="empty">Click "Refresh" to load admin users.</td></tr>
             </tbody>
           </table>
         </div>

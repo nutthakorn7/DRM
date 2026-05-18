@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [Unreleased]
+
+### Added
+- **Tenant-scoped admin roles.** A new optional `TenantScope` field on admin users
+  lets operators create admins whose authority is limited to a single tenant.
+  - `AdminUserEntity.TenantScope` (`Guid?`) — `null` = global (all tenants),
+    non-null = restricted to one tenant.
+  - `AdminIdentity.TenantScope` and `CanAccessTenant(Guid)` helper method.
+  - `AdminIdentityContext.TryRequirePermissionForTenant` — checks both RBAC
+    permission AND tenant scope in a single call; returns 403
+    `tenant_scope_denied` when the caller's scope does not cover the requested
+    tenant.
+  - `POST /api/admin/identity/admins` accepts `tenantScope` (optional UUID).
+  - `GET /api/admin/identity/whoami` returns `tenantScope`.
+  - `GET /api/admin/identity/admins` returns `tenantScope` per admin.
+  - Additive schema migrations for SQLite (`ALTER TABLE "AdminUsers" ADD COLUMN
+    "TenantScope" TEXT NULL`) and Postgres (`... uuid NULL`).
+  - Admin console: "Tenant scope (UUID, blank = global)" input on create-admin
+    form; "Scope" column in the admin user table shows "Global" badge or the
+    first 8 chars of the tenant UUID with full UUID in tooltip.
+- Tenant-scope enforcement on `AdminUsersEndpoints` (list + create) and
+  `AdminGroupsEndpoints` (list + create + add-member) — scoped admins are
+  rejected with 403 `tenant_scope_denied` when they attempt to access another
+  tenant's data.
+
 ## [1.1.0] — 2026-05-18
 
 **v1.1 enterprise — admin identity upgrade (Slices 1–4).**

@@ -18,6 +18,9 @@ public sealed class AdminUserEntity
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset? LastUsedAtUtc { get; set; }
+
+    // Null = global (all tenants). Non-null = scoped to one tenant only.
+    public Guid? TenantScope { get; set; }
 }
 
 public sealed class AdminRoleEntity
@@ -154,13 +157,17 @@ public sealed record AdminIdentity(
     string DisplayName,
     string Email,
     IReadOnlySet<string> Permissions,
-    bool IsSharedKeyFallback)
+    bool IsSharedKeyFallback,
+    Guid? TenantScope = null)
 {
     public bool Has(string permission)
     {
         if (Permissions.Contains(AdminPermissions.Wildcard)) return true;
         return Permissions.Contains(permission);
     }
+
+    public bool CanAccessTenant(Guid tenantId)
+        => TenantScope is null || TenantScope.Value == tenantId;
 }
 
 public static class AdminTokenCrypto
@@ -211,6 +218,21 @@ public static class AdminIdentityContext
         if (!identity.Has(permission))
         {
             failure = Results.Json(new { reasonCode = "permission_denied", required = permission }, statusCode: 403);
+            return false;
+        }
+        failure = null;
+        return true;
+    }
+
+    public static bool TryRequirePermissionForTenant(HttpContext context, string permission, Guid tenantId, out IResult? failure)
+    {
+        if (!TryRequirePermission(context, permission, out failure))
+            return false;
+
+        var identity = Current(context)!;
+        if (!identity.CanAccessTenant(tenantId))
+        {
+            failure = Results.Json(new { reasonCode = "tenant_scope_denied", tenantId }, statusCode: 403);
             return false;
         }
         failure = null;

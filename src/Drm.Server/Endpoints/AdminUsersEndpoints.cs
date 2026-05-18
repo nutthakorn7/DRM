@@ -21,7 +21,7 @@ public static class AdminUsersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
@@ -61,7 +61,7 @@ public static class AdminUsersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersRead, tenantId, out var fail))
             return fail!;
         var users = await dbContext.TenantUsers
             .AsNoTracking()
