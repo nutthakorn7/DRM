@@ -2092,3 +2092,174 @@ function isShareLinkInactive(link) {
 function isDeviceDisabled(device) {
   return device.status === "disabled" || Boolean(device.disabledAtUtc);
 }
+
+// Admin Identity Management
+document.querySelector("#refreshAdminIdentity").addEventListener("click", () => {
+  loadWhoAmI();
+  refreshRoles().then(() => refreshAdmins());
+});
+
+document.querySelector("#refreshRoles").addEventListener("click", () => {
+  refreshRoles();
+});
+
+document.querySelector("#createAdminForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.querySelector("#newAdminEmail").value.trim();
+  const displayName = document.querySelector("#newAdminDisplayName").value.trim();
+  const roleId = document.querySelector("#newAdminRoleId").value.trim();
+  const tokenLabel = document.querySelector("#newAdminTokenLabel").value.trim();
+
+  if (!roleId) {
+    setStatus("Select a role before creating an admin", "error");
+    return;
+  }
+
+  const body = {
+    email,
+    displayName: displayName || null,
+    roleId,
+    tokenLabel: tokenLabel || null,
+    tokenExpiresAtUtc: null
+  };
+
+  const created = await apiFetch("/api/admin/identity/admins", {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  const output = document.querySelector("#createAdminOutput");
+  output.hidden = false;
+  output.textContent = [
+    "Admin created — save this token now, it will not be shown again.",
+    "",
+    `Admin ID : ${created.adminUserId}`,
+    `Email    : ${created.email}`,
+    `Role     : ${created.roleName}`,
+    `Token ID : ${created.tokenId}`,
+    `Token    : ${created.token}`,
+    created.tokenExpiresAtUtc
+      ? `Expires  : ${new Date(created.tokenExpiresAtUtc).toLocaleString()}`
+      : "Expires  : never"
+  ].join("\n");
+
+  event.target.reset();
+  await refreshAdmins();
+  setStatus(`Admin ${email} created`, "ok");
+});
+
+async function loadWhoAmI() {
+  try {
+    const identity = await apiFetch("/api/admin/identity/whoami");
+    const output = document.querySelector("#whoamiOutput");
+    if (output) output.textContent = JSON.stringify(identity, null, 2);
+    setStatus("Session loaded", "ok");
+  } catch (err) {
+    const output = document.querySelector("#whoamiOutput");
+    if (output) output.textContent = `Not authenticated: ${err.message}`;
+  }
+}
+
+async function refreshRoles() {
+  const roles = await apiFetch("/api/admin/identity/roles");
+  const rolesBody = document.querySelector("#rolesBody");
+  if (!roles.length) {
+    rolesBody.innerHTML = '<tr><td colspan="4" class="empty">No roles found.</td></tr>';
+    setStatus("No roles", "ok");
+    return;
+  }
+  rolesBody.innerHTML = roles.map((r) => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td><code>${escapeHtml(r.id)}</code></td>
+      <td><small>${escapeHtml(r.permissions.join(", "))}</small></td>
+      <td>${r.isSystem ? '<span class="badge">System</span>' : ""}</td>
+    </tr>
+  `).join("");
+
+  const select = document.querySelector("#newAdminRoleId");
+  if (select) {
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Select role…</option>' +
+      roles.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join("");
+    if (currentVal) select.value = currentVal;
+  }
+
+  setStatus(`${roles.length} role${roles.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function refreshAdmins() {
+  const admins = await apiFetch("/api/admin/identity/admins");
+  const adminsBody = document.querySelector("#adminsBody");
+  if (!admins.length) {
+    adminsBody.innerHTML = '<tr><td colspan="7" class="empty">No admin users found.</td></tr>';
+    setStatus("No admins", "ok");
+    return;
+  }
+  adminsBody.innerHTML = admins.map((a) => `
+    <tr>
+      <td>${escapeHtml(a.email)}</td>
+      <td>${escapeHtml(a.displayName || "")}</td>
+      <td>${escapeHtml(a.roleName)}</td>
+      <td>${renderEnabledBadge(!a.disabled)}</td>
+      <td>${a.activeTokenCount}</td>
+      <td>${escapeHtml(formatDate(a.lastUsedAtUtc) || "—")}</td>
+      <td>
+        ${a.disabled
+          ? `<button type="button" data-enable-admin="${escapeHtml(a.id)}">Enable</button>`
+          : `<button type="button" class="danger" data-disable-admin="${escapeHtml(a.id)}">Disable</button>`}
+        <button type="button" data-rotate-token-admin="${escapeHtml(a.id)}">Rotate token</button>
+      </td>
+    </tr>
+  `).join("");
+
+  adminsBody.querySelectorAll("[data-disable-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => disableAdminUser(btn.dataset.disableAdmin));
+  });
+  adminsBody.querySelectorAll("[data-enable-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => enableAdminUser(btn.dataset.enableAdmin));
+  });
+  adminsBody.querySelectorAll("[data-rotate-token-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => rotateAdminToken(btn.dataset.rotateTokenAdmin));
+  });
+
+  setStatus(`${admins.length} admin${admins.length === 1 ? "" : "s"} loaded`, "ok");
+}
+
+async function disableAdminUser(adminId) {
+  await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(adminId)}/disable`, {
+    method: "POST"
+  });
+  await refreshAdmins();
+  setStatus("Admin disabled", "ok");
+}
+
+async function enableAdminUser(adminId) {
+  await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(adminId)}/enable`, {
+    method: "POST"
+  });
+  await refreshAdmins();
+  setStatus("Admin enabled", "ok");
+}
+
+async function rotateAdminToken(adminId) {
+  const result = await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(adminId)}/rotate-token`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  const output = document.querySelector("#rotateTokenOutput");
+  if (output) {
+    output.hidden = false;
+    output.textContent = [
+      "New token issued — save it now, it will not be shown again.",
+      "",
+      `Token ID : ${result.tokenId}`,
+      `Token    : ${result.token}`,
+      result.expiresAtUtc
+        ? `Expires  : ${new Date(result.expiresAtUtc).toLocaleString()}`
+        : "Expires  : never"
+    ].join("\n");
+  }
+  await refreshAdmins();
+  setStatus("Token rotated — copy the new token above", "ok");
+}

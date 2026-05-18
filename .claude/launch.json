@@ -5,7 +5,10 @@
       "name": "drm-server",
       "runtimeExecutable": "/Users/pop7/.dotnet/dotnet",
       "runtimeArgs": ["run", "--project", "src/Drm.Server/Drm.Server.csproj", "--no-launch-profile", "--urls", "http://localhost:5188"],
-      "port": 5188
+      "port": 5188,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   ]
 }

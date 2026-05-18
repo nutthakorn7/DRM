@@ -411,6 +411,87 @@
         </div>
       </section>
 
+      <section class="panel" id="adminIdentity" data-tab="identity">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Access control</p>
+            <h3>Admin console access</h3>
+          </div>
+          <button id="refreshAdminIdentity" type="button">Refresh</button>
+        </div>
+
+        <details>
+          <summary>Current session (WhoAmI)</summary>
+          <pre id="whoamiOutput" class="output-block">Load to see session details.</pre>
+        </details>
+
+        <div class="section-head" style="margin-top:1.25rem">
+          <div>
+            <p class="eyebrow">RBAC</p>
+            <h4>Roles</h4>
+          </div>
+          <button id="refreshRoles" type="button" class="ghost">Refresh roles</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role ID</th>
+                <th>Permissions</th>
+                <th>System</th>
+              </tr>
+            </thead>
+            <tbody id="rolesBody">
+              <tr><td colspan="4" class="empty">Click "Refresh" to load roles.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-head" style="margin-top:1.25rem">
+          <div>
+            <p class="eyebrow">Users</p>
+            <h4>Admin users</h4>
+          </div>
+        </div>
+
+        <details class="anti-capture-block">
+          <summary>Create admin user</summary>
+          <form id="createAdminForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+            <input id="newAdminEmail" type="email" autocomplete="off" placeholder="Email" required>
+            <input id="newAdminDisplayName" autocomplete="off" placeholder="Display name (optional)">
+            <select id="newAdminRoleId" aria-label="Role">
+              <option value="">Select role…</option>
+            </select>
+            <input id="newAdminTokenLabel" autocomplete="off" placeholder="Token label (optional)">
+            <button type="submit">Create admin</button>
+          </form>
+          <pre id="createAdminOutput" class="output-block" hidden></pre>
+        </details>
+
+        <pre id="rotateTokenOutput" class="output-block" hidden></pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Display name</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Tokens</th>
+                <th>Last used</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminsBody">
+              <tr><td colspan="7" class="empty">Click "Refresh" to load admin users.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="panel" id="templates" data-tab="policy">
         <div class="section-head">
           <div>
