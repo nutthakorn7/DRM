@@ -1,0 +1,37 @@
+[Unit]
+Description=DRM Management Server
+Documentation=https://github.com/yourorg/DRM/blob/main/deploy/management/README.md
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=exec
+User=drm
+Group=drm
+EnvironmentFile=/etc/drm/env
+WorkingDirectory=/opt/drm/server
+ExecStart=/usr/bin/dotnet /opt/drm/server/Drm.Server.dll
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/drm-management
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
