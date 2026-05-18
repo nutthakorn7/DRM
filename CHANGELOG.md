@@ -6,6 +6,47 @@ All notable changes to this project are documented here. The format follows [Kee
 
 _No unreleased changes — the next release line will appear here._
 
+## [1.0.1] — 2026-05-18
+
+**Security hardening — `X-DRM-Tenant-Id` migration completed.** Closes the
+last coverage gaps in the SECURITY.md migration started in v1.0.0. Every
+admin endpoint that takes a tenant ID in body or query string now rejects
+mismatches between the body and the `X-DRM-Tenant-Id` header with
+400 `tenant_mismatch`, and the cross-check extends one step beyond the
+admin surface to the audit read endpoint.
+
+### Changed
+- `GET /api/admin/audit` + `/api/admin/audit.csv` now assert
+  `X-DRM-Tenant-Id` matches the body tenant ID. Audit log is the highest-
+  sensitivity admin read surface and was the largest remaining gap.
+- `GET /api/admin/files/{id}/convert/zip` now asserts the header. ZIP
+  export bundles manifest + share-link by tenant; mismatch is rejected.
+- `POST /api/admin/policy-simulator` now asserts the header. Prevents
+  cross-tenant policy probing with a leaked admin key.
+- `POST /api/me/share` (quick-share) now asserts the header. `/api/me/*`
+  is in scope per the SECURITY.md "canonical source across all /api/*
+  endpoints" guidance.
+- `GET /api/audit` (client-API-key surface) now asserts the header. The
+  client API key is a single shared secret per deployment, so without the
+  cross-check anyone holding the key could read any tenant's audit log by
+  guessing the tenant GUID — same single-shared-key shape that motivated
+  the admin migration.
+- Admin UI dashboard probe (`admin/app.js`) now sends `X-DRM-Tenant-Id`
+  on the `/api/audit` health check so the new server-side gate doesn't
+  trip the dashboard.
+
+### Tests
+- +6 `tenant_mismatch` tests covering all five newly-protected endpoints
+  (audit JSON + audit CSV + file-zip + policy-simulator + quick-share +
+  client-key audit). Full server suite: 263/263 pass.
+
+### Docs
+- `SECURITY.md` migration log gains a `2026-05-18 expansion` subsection
+  documenting the read-surface + non-admin tenant-scoped reads, and the
+  scope rationale for why `/api/audit` was included but other client-API-
+  key endpoints (Files, SCIM, ExternalShare, BoxWebhook, OutlookAddIn,
+  Agent) were not.
+
 ## [1.0.0] — 2026-05-17
 
 **The parity milestone.** Closes the FinalCode parity roadmap (Phases 5AH → 5AR
