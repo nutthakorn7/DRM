@@ -1271,6 +1271,52 @@
         </div>
       </section>
 
+      <section class="panel" id="registrations" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Self-serve onboarding</p>
+            <h3>Tenant registrations</h3>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select id="registrationStatusFilter" style="min-width:140px">
+              <option value="">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Verified">Verified</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <button id="refreshRegistrations" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant name</th>
+                <th>Admin email</th>
+                <th>Status</th>
+                <th>Requested</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="registrationsBody">
+              <tr><td colspan="5" class="empty">Click "Refresh" to load registrations.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Reject dialog -->
+        <div id="rejectDialog" hidden style="margin-top:1rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem;max-width:520px">
+          <p class="eyebrow" style="margin-bottom:.5rem">Reject registration</p>
+          <form id="rejectForm" class="create-row" style="flex-wrap:wrap;gap:6px">
+            <input id="rejectNotes" autocomplete="off" placeholder="Reason / notes (optional)" style="flex:1;min-width:240px">
+            <button type="submit" class="danger">Reject</button>
+            <button type="button" id="cancelReject" class="ghost">Cancel</button>
+          </form>
+        </div>
+      </section>
+
       <section class="panel" id="usage" data-tab="tenants">
         <div class="section-head">
           <div>

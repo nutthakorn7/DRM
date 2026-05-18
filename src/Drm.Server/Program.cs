@@ -43,6 +43,13 @@ else
     builder.Services.AddSingleton<IAdminNotificationSender, NoopAdminNotificationSender>();
 builder.Services.AddScoped<IAdminNotificationService, AdminNotificationService>();
 
+var registrationSettings = builder.Configuration.GetSection("Drm:Registration").Get<RegistrationSettings>() ?? new RegistrationSettings();
+builder.Services.AddSingleton(registrationSettings);
+if (emailSettings.IsConfigured)
+    builder.Services.AddSingleton<IRegistrationEmailSender, SmtpRegistrationEmailSender>();
+else
+    builder.Services.AddSingleton<IRegistrationEmailSender, NoopRegistrationEmailSender>();
+
 var app = builder.Build();
 
 SecurityStartupGuard.Validate(app.Configuration, app.Environment);
@@ -519,6 +526,37 @@ using (var scope = app.Services.CreateScope())
                 CONSTRAINT "PK_TenantBillingWebhooks" PRIMARY KEY ("TenantId", "WebhookId")
             );
             """);
+        // TenantRegistrations table — added in v1.4 for self-serve tenant onboarding
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRegistrations" (
+                "RegistrationId" TEXT NOT NULL CONSTRAINT "PK_TenantRegistrations" PRIMARY KEY,
+                "TenantName" TEXT NOT NULL DEFAULT '',
+                "DisplayName" TEXT NOT NULL DEFAULT '',
+                "AdminEmail" TEXT NOT NULL DEFAULT '',
+                "AdminDisplayName" TEXT NOT NULL DEFAULT '',
+                "MaxEncrypters" INTEGER NULL,
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "TokenHash" TEXT NOT NULL DEFAULT '',
+                "TokenExpiresAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "RequestedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "ReviewedAtUtc" TEXT NULL,
+                "ReviewNotes" TEXT NULL,
+                "CreatedTenantId" TEXT NULL,
+                "CreatedUserId" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_AdminEmail"
+            ON "TenantRegistrations" ("AdminEmail");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_TenantName"
+            ON "TenantRegistrations" ("TenantName");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantRegistrations_TokenHash"
+            ON "TenantRegistrations" ("TokenHash");
+            """);
 
         if (openedHere)
         {
@@ -684,6 +722,33 @@ using (var scope = app.Services.CreateScope())
                 CONSTRAINT "PK_TenantBillingWebhooks" PRIMARY KEY ("TenantId", "WebhookId")
             );
             """);
+        // TenantRegistrations table — added in v1.4 for self-serve tenant onboarding (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRegistrations" (
+                "RegistrationId" uuid NOT NULL CONSTRAINT "PK_TenantRegistrations" PRIMARY KEY,
+                "TenantName" text NOT NULL DEFAULT '',
+                "DisplayName" text NOT NULL DEFAULT '',
+                "AdminEmail" text NOT NULL DEFAULT '',
+                "AdminDisplayName" text NOT NULL DEFAULT '',
+                "MaxEncrypters" integer NULL,
+                "Status" integer NOT NULL DEFAULT 0,
+                "TokenHash" text NOT NULL DEFAULT '',
+                "TokenExpiresAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "RequestedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "ReviewedAtUtc" timestamp with time zone NULL,
+                "ReviewNotes" text NULL,
+                "CreatedTenantId" uuid NULL,
+                "CreatedUserId" uuid NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_AdminEmail"
+            ON "TenantRegistrations" ("AdminEmail");
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_TenantName"
+            ON "TenantRegistrations" ("TenantName");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantRegistrations_TokenHash"
+            ON "TenantRegistrations" ("TokenHash");
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -751,6 +816,8 @@ app.MapAdminTenantsEndpoints();
 app.MapAdminTenantClientKeysEndpoints();
 app.MapAdminTenantBillingWebhooksEndpoints();
 app.MapAdminUsageEndpoints();
+app.MapPublicRegistrationEndpoints();
+app.MapAdminRegistrationsEndpoints();
 app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();

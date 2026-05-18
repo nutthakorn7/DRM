@@ -2619,3 +2619,99 @@ document.getElementById("exportUsageCsv")?.addEventListener("click", () => {
     })
     .catch(() => setStatus("CSV export failed", "error"));
 });
+
+// ── Tenant registrations ──────────────────────────────────────────────────────
+
+let _pendingRejectId = null;
+
+const REG_STATUS_LABELS = { 0: "Pending", 1: "Verified", 2: "Approved", 3: "Rejected" };
+const REG_STATUS_BADGE  = {
+  0: "badge-warn",
+  1: "badge-info",
+  2: "badge-ok",
+  3: "badge-error",
+};
+
+async function refreshRegistrations() {
+  const tbody = document.getElementById("registrationsBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  const statusFilter = document.getElementById("registrationStatusFilter")?.value ?? "";
+  const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+  try {
+    const rows = await apiFetchGlobal(`/api/admin/registrations${qs}`);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No registrations found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const statusLabel = REG_STATUS_LABELS[r.status] ?? r.status;
+      const badgeClass  = REG_STATUS_BADGE[r.status] ?? "";
+      const badge = `<span class="badge ${badgeClass}">${esc(statusLabel)}</span>`;
+      const canApprove = r.status === 1; // Verified
+      const canReject  = r.status === 0 || r.status === 1; // Pending or Verified
+      const approveBtn = canApprove
+        ? `<button type="button" class="action-btn ok" onclick="approveRegistration('${r.registrationId}')">Approve</button>`
+        : "";
+      const rejectBtn = canReject
+        ? `<button type="button" class="action-btn danger" onclick="openRejectDialog('${r.registrationId}')">Reject</button>`
+        : "";
+      const tenantLink = r.createdTenantId
+        ? ` <small><a href="#" onclick="return false">${esc(r.createdTenantId)}</a></small>` : "";
+      return `<tr>
+        <td><strong>${esc(r.tenantName)}</strong><br><small>${esc(r.displayName)}</small>${tenantLink}</td>
+        <td>${esc(r.adminEmail)}<br><small>${esc(r.adminDisplayName)}</small></td>
+        <td>${badge}${r.reviewNotes ? `<br><small class="hint">${esc(r.reviewNotes)}</small>` : ""}</td>
+        <td>${new Date(r.requestedAtUtc).toLocaleString()}</td>
+        <td style="white-space:nowrap">${approveBtn}${rejectBtn}</td>
+      </tr>`;
+    }).join("");
+    setStatus(`Registrations: ${rows.length} record(s)`, "ok");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Failed to load registrations.</td></tr>';
+  }
+}
+
+async function approveRegistration(registrationId) {
+  try {
+    await apiFetchGlobal(`/api/admin/registrations/${encodeURIComponent(registrationId)}/approve`, { method: "POST" });
+    setStatus("Registration approved — tenant created", "ok");
+    await refreshRegistrations();
+  } catch (e) {
+    setStatus(`Approve failed: ${e?.message ?? "unknown error"}`, "error");
+  }
+}
+
+function openRejectDialog(registrationId) {
+  _pendingRejectId = registrationId;
+  const dialog = document.getElementById("rejectDialog");
+  dialog?.removeAttribute("hidden");
+  document.getElementById("rejectNotes")?.focus();
+}
+
+document.getElementById("cancelReject")?.addEventListener("click", () => {
+  document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+  _pendingRejectId = null;
+});
+
+document.getElementById("rejectForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!_pendingRejectId) return;
+  const notes = document.getElementById("rejectNotes")?.value.trim() || null;
+  try {
+    await apiFetchGlobal(
+      `/api/admin/registrations/${encodeURIComponent(_pendingRejectId)}/reject`,
+      { method: "POST", body: JSON.stringify({ notes }) }
+    );
+    setStatus("Registration rejected", "ok");
+    document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+    document.getElementById("rejectNotes").value = "";
+    _pendingRejectId = null;
+    await refreshRegistrations();
+  } catch (e) {
+    setStatus(`Reject failed: ${e?.message ?? "unknown error"}`, "error");
+  }
+});
+
+document.getElementById("refreshRegistrations")?.addEventListener("click", refreshRegistrations);
+document.getElementById("registrationStatusFilter")?.addEventListener("change", refreshRegistrations);

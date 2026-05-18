@@ -21,6 +21,39 @@ public sealed class TenantClientKeyEntity
     public bool Revoked { get; set; }
 }
 
+public enum RegistrationStatus { Pending = 0, Verified = 1, Approved = 2, Rejected = 3 }
+
+public sealed class TenantRegistrationEntity
+{
+    public Guid RegistrationId { get; set; }
+
+    public string TenantName { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string AdminEmail { get; set; } = string.Empty;
+
+    public string AdminDisplayName { get; set; } = string.Empty;
+
+    public int? MaxEncrypters { get; set; }
+
+    public RegistrationStatus Status { get; set; }
+
+    public string TokenHash { get; set; } = string.Empty;
+
+    public DateTimeOffset TokenExpiresAtUtc { get; set; }
+
+    public DateTimeOffset RequestedAtUtc { get; set; }
+
+    public DateTimeOffset? ReviewedAtUtc { get; set; }
+
+    public string? ReviewNotes { get; set; }
+
+    public Guid? CreatedTenantId { get; set; }
+
+    public Guid? CreatedUserId { get; set; }
+}
+
 public sealed class TenantBillingWebhookEntity
 {
     public Guid TenantId { get; set; }

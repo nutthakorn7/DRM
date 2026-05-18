@@ -10,6 +10,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TenantBillingWebhookEntity> TenantBillingWebhooks => Set<TenantBillingWebhookEntity>();
 
+    public DbSet<TenantRegistrationEntity> TenantRegistrations => Set<TenantRegistrationEntity>();
+
     public DbSet<ProtectedFileEntity> ProtectedFiles => Set<ProtectedFileEntity>();
 
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
@@ -88,6 +90,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(w => w.Url).HasMaxLength(2048);
             entity.Property(w => w.Secret).HasMaxLength(256);
             entity.Property(w => w.Events).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<TenantRegistrationEntity>(entity =>
+        {
+            entity.HasKey(r => r.RegistrationId);
+            entity.HasIndex(r => r.AdminEmail);
+            entity.HasIndex(r => r.TenantName);
+            entity.HasIndex(r => r.TokenHash).IsUnique();
+            entity.Property(r => r.TenantName).HasMaxLength(256);
+            entity.Property(r => r.DisplayName).HasMaxLength(256);
+            entity.Property(r => r.AdminEmail).HasMaxLength(320);
+            entity.Property(r => r.AdminDisplayName).HasMaxLength(256);
+            entity.Property(r => r.TokenHash).HasMaxLength(128);
+            entity.Property(r => r.ReviewNotes).HasMaxLength(1024);
+            entity.Property(r => r.Status).HasConversion<int>();
         });
 
         modelBuilder.Entity<TenantEntity>(entity =>
