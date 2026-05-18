@@ -1,0 +1,88 @@
+# Production compose for DRM Management Server.
+#
+# Stack:
+#   - drm-server: the .NET 10 app (built from the repo Dockerfile)
+#   - postgres:   the metadata database (Postgres 16)
+#   - caddy:      reverse proxy + auto-TLS via Let's Encrypt
+#
+# Usage:
+#   cp .env.example .env && edit .env (set DOMAIN + generate secrets)
+#   docker compose up -d
+#   docker compose logs -f drm-server
+#
+# Upgrade:
+#   git pull && docker compose build drm-server && docker compose up -d drm-server
+#
+# Rollback to a prior image tag:
+#   DRM_IMAGE_TAG=v1.0.1 docker compose up -d drm-server
+#
+# `version:` is intentionally omitted — Compose v2 ignores it and warns when present.
+
+services:
+  drm-server:
+    build:
+      context: ../../..
+      dockerfile: Dockerfile
+    image: drm-server:${DRM_IMAGE_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      Drm__Mode: OnPrem
+      ConnectionStrings__DrmDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-drm};Username=${POSTGRES_USER:-drm};Password=${POSTGRES_PASSWORD}"
+      Drm__KeyWrapping__MasterKeyBase64: ${DRM_MASTER_KEY_BASE64}
+      Drm__Security__AdminApiKey: ${DRM_ADMIN_API_KEY}
+      Drm__Security__ClientApiKey: ${DRM_CLIENT_API_KEY}
+      Drm__Security__TransparentTrailerSecret: ${DRM_TRAILER_SECRET}
+      Drm__License__EnabledTiers: ${DRM_LICENSE_TIERS:-All}
+      Drm__License__PaidEncrypterCount: ${DRM_PAID_ENCRYPTERS:-10}
+    volumes:
+      - drm-data:/var/lib/drm
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-drm}
+      POSTGRES_USER: ${POSTGRES_USER:-drm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drm} -d ${POSTGRES_DB:-drm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      drm-server:
+        condition: service_healthy
+
+volumes:
+  drm-data:
+  postgres-data:
+  caddy-data:
+  caddy-config:
