@@ -81,8 +81,15 @@ public static class FileKeyEndpoints
         AppDbContext dbContext,
         IFileKeyProtector fileKeyProtector,
         PolicyDecisionService policyDecisionService,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
+        // v1.9: IP allowlist enforcement
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
+        var ipDenied = await IpAllowlistService.IsDeniedAsync(dbContext, request.TenantId, clientIp, cancellationToken);
+        if (ipDenied)
+            return Results.Json(new ErrorResponse("ip_not_allowed"), statusCode: StatusCodes.Status403Forbidden);
+
         var decision = await policyDecisionService.DecideAsync(
             request.TenantId,
             fileId,

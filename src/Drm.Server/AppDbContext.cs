@@ -94,6 +94,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<TenantRetentionPolicyEntity> TenantRetentionPolicies => Set<TenantRetentionPolicyEntity>();
 
+    public DbSet<TenantIpAllowlistRuleEntity> TenantIpAllowlistRules => Set<TenantIpAllowlistRuleEntity>();
+
+    public DbSet<TenantDeviceTrustConfigEntity> TenantDeviceTrustConfigs => Set<TenantDeviceTrustConfigEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantClientKeyEntity>(entity =>
@@ -455,6 +459,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<TenantRetentionPolicyEntity>(entity =>
         {
             entity.HasKey(p => p.TenantId);
+        });
+
+        modelBuilder.Entity<TenantIpAllowlistRuleEntity>(entity =>
+        {
+            entity.HasKey(r => r.RuleId);
+            entity.HasIndex(r => r.TenantId);
+            entity.Property(r => r.Cidr).HasMaxLength(50);
+            entity.Property(r => r.Label).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<TenantDeviceTrustConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
         });
     }
 }

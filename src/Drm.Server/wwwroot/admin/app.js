@@ -3226,3 +3226,75 @@ async function doApplyRetention(dryRun) {
 
 document.getElementById("applyRetentionDryRunBtn")?.addEventListener("click", () => doApplyRetention(true));
 document.getElementById("applyRetentionBtn")?.addEventListener("click", () => doApplyRetention(false));
+
+// ─── v1.9: IP allowlist ───────────────────────────────────────────────────
+
+async function refreshIpAllowlist() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const rules = await apiFetch(`/api/admin/tenants/${tenantId}/ip-allowlist`);
+  if (!rules) return;
+  const tbody = document.getElementById("ipAllowlistBody");
+  if (!tbody) return;
+  if (!rules.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);text-align:center">No rules — all IPs allowed</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rules.map(r => `
+    <tr>
+      <td><code>${r.cidr}</code></td>
+      <td>${r.label || "—"}</td>
+      <td>${new Date(r.createdAtUtc).toLocaleDateString()}</td>
+      <td><button type="button" data-rule-id="${r.ruleId}" class="deleteIpRuleBtn" style="background:var(--danger,#e53e3e);color:#fff;padding:2px 8px;font-size:12px">Delete</button></td>
+    </tr>`).join("");
+  tbody.querySelectorAll(".deleteIpRuleBtn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ruleId = btn.dataset.ruleId;
+      await apiFetch(`/api/admin/tenants/${tenantId}/ip-allowlist/${ruleId}`, { method: "DELETE" });
+      await refreshIpAllowlist();
+    });
+  });
+}
+
+document.getElementById("refreshIpAllowlist")?.addEventListener("click", refreshIpAllowlist);
+
+document.getElementById("addIpRuleBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const cidr = document.getElementById("ipRuleCidr")?.value.trim();
+  const label = document.getElementById("ipRuleLabel")?.value.trim();
+  if (!cidr) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/ip-allowlist`, {
+    method: "POST",
+    body: JSON.stringify({ cidr, label }),
+  });
+  document.getElementById("ipRuleCidr").value = "";
+  document.getElementById("ipRuleLabel").value = "";
+  await refreshIpAllowlist();
+});
+
+// ─── v1.9: Device trust ───────────────────────────────────────────────────
+
+async function refreshDeviceTrust() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const config = await apiFetch(`/api/admin/tenants/${tenantId}/device-trust`);
+  if (!config) return;
+  document.getElementById("deviceTrustEnabled").checked = config.enabled;
+  document.getElementById("deviceTrustCheckinDays").value = config.requiredCheckinDays;
+}
+
+document.getElementById("refreshDeviceTrust")?.addEventListener("click", refreshDeviceTrust);
+
+document.getElementById("saveDeviceTrustBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/device-trust`, {
+    method: "PUT",
+    body: JSON.stringify({
+      enabled: document.getElementById("deviceTrustEnabled").checked,
+      requiredCheckinDays: parseInt(document.getElementById("deviceTrustCheckinDays").value, 10) || 7,
+    }),
+  });
+  await refreshDeviceTrust();
+});

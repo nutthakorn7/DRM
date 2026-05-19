@@ -398,6 +398,8 @@ public static class AdminFilesEndpoints
                 SubjectType = normalizedSubjectType,
                 SubjectId = request.SubjectId,
                 Permissions = normalizedPermissions,
+                ValidFromUtc = request.ValidFromUtc,
+                ValidUntilUtc = request.ValidUntilUtc,
                 CreatedAtUtc = DateTimeOffset.UtcNow
             };
             dbContext.FileGrants.Add(grant);
@@ -405,6 +407,8 @@ public static class AdminFilesEndpoints
         else
         {
             grant.Permissions = normalizedPermissions;
+            grant.ValidFromUtc = request.ValidFromUtc;
+            grant.ValidUntilUtc = request.ValidUntilUtc;
         }
 
         dbContext.AuditEvents.Add(AdminAudit.PermissionEvent(request.TenantId, fileId, null, "file_grant_upserted", httpContext));
@@ -511,6 +515,8 @@ public static class AdminFilesEndpoints
                 SubjectType = normalizedSubjectType,
                 SubjectId = grant.SubjectId,
                 Permissions = permissions.ToString(),
+                ValidFromUtc = grant.ValidFromUtc,
+                ValidUntilUtc = grant.ValidUntilUtc,
                 CreatedAtUtc = DateTimeOffset.UtcNow
             });
         }
@@ -762,11 +768,18 @@ public static class AdminFilesEndpoints
         Guid TenantId,
         string SubjectType,
         Guid SubjectId,
-        string Permissions);
+        string Permissions,
+        DateTimeOffset? ValidFromUtc = null,
+        DateTimeOffset? ValidUntilUtc = null);
 
     private sealed record ReplaceGrantsRequest(Guid TenantId, IReadOnlyList<ReplaceGrantItem?>? Grants);
 
-    private sealed record ReplaceGrantItem(string SubjectType, Guid SubjectId, string Permissions);
+    private sealed record ReplaceGrantItem(
+        string SubjectType,
+        Guid SubjectId,
+        string Permissions,
+        DateTimeOffset? ValidFromUtc = null,
+        DateTimeOffset? ValidUntilUtc = null);
 
     private sealed record ApplyPolicyTemplateRequest(Guid TenantId, Guid TemplateId, Guid AdminUserId);
 
@@ -775,7 +788,9 @@ public static class AdminFilesEndpoints
         Guid FileId,
         string SubjectType,
         Guid SubjectId,
-        string Permissions)
+        string Permissions,
+        DateTimeOffset? ValidFromUtc,
+        DateTimeOffset? ValidUntilUtc)
     {
         public static FileGrantResponse From(FileGrantEntity grant)
             => new(
@@ -783,7 +798,9 @@ public static class AdminFilesEndpoints
                 grant.FileId,
                 grant.SubjectType,
                 grant.SubjectId,
-                grant.Permissions);
+                grant.Permissions,
+                grant.ValidFromUtc,
+                grant.ValidUntilUtc);
     }
 
     private sealed record FileResponse(

@@ -746,6 +746,49 @@ using (var scope = app.Services.CreateScope())
                 "UpdatedAtUtc" TEXT NOT NULL
             );
             """);
+
+        // v1.9: TenantIpAllowlistRules, TenantDeviceTrustConfigs (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantIpAllowlistRules" (
+                "RuleId" TEXT NOT NULL CONSTRAINT "PK_TenantIpAllowlistRules" PRIMARY KEY,
+                "TenantId" TEXT NOT NULL,
+                "Cidr" TEXT NOT NULL DEFAULT '',
+                "Label" TEXT NOT NULL DEFAULT '',
+                "CreatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantIpAllowlistRules_TenantId" ON "TenantIpAllowlistRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantDeviceTrustConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantDeviceTrustConfigs" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "RequiredCheckinDays" INTEGER NOT NULL DEFAULT 7,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+
+        // v1.9: time-windowed grants — add columns to existing FileGrants table
+        var hasFileGrantsValidFromUtc = false;
+        var hasFileGrantsValidUntilUtc = false;
+        var grantsConn = dbContext.Database.GetDbConnection();
+        if (grantsConn.State != System.Data.ConnectionState.Open) grantsConn.Open();
+        using (var command = grantsConn.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"FileGrants\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var col = reader.GetString(1);
+                if (string.Equals(col, "ValidFromUtc", StringComparison.Ordinal)) hasFileGrantsValidFromUtc = true;
+                if (string.Equals(col, "ValidUntilUtc", StringComparison.Ordinal)) hasFileGrantsValidUntilUtc = true;
+            }
+        }
+        if (!hasFileGrantsValidFromUtc)
+            dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "FileGrants" ADD COLUMN "ValidFromUtc" TEXT NULL;""");
+        if (!hasFileGrantsValidUntilUtc)
+            dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "FileGrants" ADD COLUMN "ValidUntilUtc" TEXT NULL;""");
     }
     else
     {
@@ -1011,6 +1054,36 @@ using (var scope = app.Services.CreateScope())
                 "UpdatedAtUtc" timestamptz NOT NULL
             );
             """);
+
+        // v1.9: TenantIpAllowlistRules, TenantDeviceTrustConfigs (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantIpAllowlistRules" (
+                "RuleId" uuid NOT NULL CONSTRAINT "PK_TenantIpAllowlistRules" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "Cidr" text NOT NULL DEFAULT '',
+                "Label" text NOT NULL DEFAULT '',
+                "CreatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantIpAllowlistRules_TenantId" ON "TenantIpAllowlistRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantDeviceTrustConfigs" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantDeviceTrustConfigs" PRIMARY KEY,
+                "Enabled" boolean NOT NULL DEFAULT FALSE,
+                "RequiredCheckinDays" integer NOT NULL DEFAULT 7,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+
+        // v1.9: time-windowed grants — add columns to existing FileGrants table (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "FileGrants" ADD COLUMN IF NOT EXISTS "ValidFromUtc" timestamptz NULL;
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "FileGrants" ADD COLUMN IF NOT EXISTS "ValidUntilUtc" timestamptz NULL;
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -1101,6 +1174,8 @@ app.MapAdminBatchFileEndpoints();
 app.MapAdminKeyRotationEndpoints();
 app.MapAdminComplianceEndpoints();
 app.MapAdminRetentionPolicyEndpoints();
+app.MapAdminIpAllowlistEndpoints();
+app.MapAdminDeviceTrustEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();
 app.MapScimGroupsEndpoints();

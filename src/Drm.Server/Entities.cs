@@ -238,6 +238,12 @@ public sealed class FileGrantEntity
     public string Permissions { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAtUtc { get; set; }
+
+    /// <summary>Optional: grant is only active on or after this UTC timestamp.</summary>
+    public DateTimeOffset? ValidFromUtc { get; set; }
+
+    /// <summary>Optional: grant expires at this UTC timestamp.</summary>
+    public DateTimeOffset? ValidUntilUtc { get; set; }
 }
 
 public sealed class ExternalShareLinkEntity
@@ -769,5 +775,25 @@ public sealed class TenantRetentionPolicyEntity
     public Guid TenantId { get; set; }
     public bool Enabled { get; set; }
     public int? FileRetentionDays { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+// v1.9 — advanced access control
+
+public sealed class TenantIpAllowlistRuleEntity
+{
+    public Guid RuleId { get; set; }
+    public Guid TenantId { get; set; }
+    public string Cidr { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class TenantDeviceTrustConfigEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; }
+    /// <summary>Maximum number of days since last heartbeat before access is denied.</summary>
+    public int RequiredCheckinDays { get; set; } = 7;
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }

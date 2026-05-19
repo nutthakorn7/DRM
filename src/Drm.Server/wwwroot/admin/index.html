@@ -1660,6 +1660,48 @@
         </div>
       </section>
 
+      <!-- v1.9 IP allowlist -->
+      <section class="panel" id="ipAllowlist" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h3>IP allowlist</h3>
+          </div>
+          <button id="refreshIpAllowlist" type="button">Refresh</button>
+        </div>
+        <p style="font-size:13px;color:var(--muted)">When rules are configured, only requests from matching CIDR ranges can decrypt files. Leave empty to allow all IPs.</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <input id="ipRuleCidr" type="text" placeholder="e.g. 10.0.0.0/8 or 203.0.113.5/32" style="flex:1;min-width:200px">
+          <input id="ipRuleLabel" type="text" placeholder="Label (optional)" style="flex:1;min-width:160px">
+          <button id="addIpRuleBtn" type="button">Add rule</button>
+        </div>
+        <table>
+          <thead><tr><th>CIDR</th><th>Label</th><th>Added</th><th></th></tr></thead>
+          <tbody id="ipAllowlistBody"></tbody>
+        </table>
+      </section>
+
+      <!-- v1.9 Device trust -->
+      <section class="panel" id="deviceTrust" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h3>Device trust</h3>
+          </div>
+          <button id="refreshDeviceTrust" type="button">Refresh</button>
+        </div>
+        <div class="card" style="padding:16px;max-width:480px">
+          <label style="display:block;margin-bottom:8px;font-size:13px">
+            <input id="deviceTrustEnabled" type="checkbox"> Require device check-in
+          </label>
+          <label style="display:block;margin-bottom:12px;font-size:13px">
+            Max days since last heartbeat:
+            <input id="deviceTrustCheckinDays" type="number" min="1" max="365" value="7" style="width:60px;margin-left:8px">
+          </label>
+          <button id="saveDeviceTrustBtn" type="button">Save</button>
+        </div>
+      </section>
+
       <!-- v1.7 Key rotation -->
       <section class="panel" id="keyRotation" data-tab="tenants">
         <div class="section-head">

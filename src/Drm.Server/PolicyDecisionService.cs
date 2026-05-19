@@ -155,6 +155,62 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
                 InvalidPermission: false);
         }
 
+        // v1.9: device trust enforcement
+        if (deviceId != Guid.Empty)
+        {
+            var trustConfig = await dbContext.TenantDeviceTrustConfigs
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
+
+            if (trustConfig is { Enabled: true })
+            {
+                // Materialize device — DateTimeOffset ORDER/WHERE on SQLite is unreliable
+                var device = await dbContext.AgentDevices
+                    .AsNoTracking()
+                    .Where(d => d.TenantId == tenantId && d.DeviceId == deviceId)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var cutoff = decisionTime.AddDays(-trustConfig.RequiredCheckinDays);
+                var lastCheckin = device?.LastHeartbeatAtUtc;
+
+                if (lastCheckin == null || lastCheckin.Value < cutoff)
+                {
+                    if (writeAudit)
+                    {
+                        dbContext.AuditEvents.Add(new AuditEventEntity
+                        {
+                            TenantId = tenantId,
+                            FileId = fileId,
+                            UserId = userId,
+                            EventType = "access_denied",
+                            ReasonCode = "device_trust_expired",
+                            CreatedAtUtc = decisionTime
+                        });
+                        await dbContext.SaveChangesAsync(cancellationToken);
+                        await notificationService.NotifyAsync(
+                            tenantId,
+                            new AdminNotificationEvent(
+                                "access_denied",
+                                fileId,
+                                userId,
+                                null,
+                                decisionTime,
+                                ReasonCode: "device_trust_expired"),
+                            cancellationToken);
+                    }
+
+                    return new ServerPolicyDecision(
+                        false,
+                        Permission.None,
+                        "device_trust_expired",
+                        null,
+                        null,
+                        FileFound: true,
+                        InvalidPermission: false);
+                }
+            }
+        }
+
         var groupIds = await dbContext.GroupMembers
             .AsNoTracking()
             .Where(member => member.TenantId == tenantId && member.UserId == userId)
@@ -170,8 +226,14 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
                     (grant.SubjectType == GrantSubjectType.Group.ToString() && groupIds.Contains(grant.SubjectId))))
             .ToListAsync(cancellationToken);
 
+        // v1.9: filter grants by time window in-memory (SQLite DateTimeOffset translation is unreliable)
+        var activeGrants = grantRows.Where(g =>
+            (g.ValidFromUtc == null || g.ValidFromUtc.Value <= decisionTime) &&
+            (g.ValidUntilUtc == null || g.ValidUntilUtc.Value > decisionTime)
+        ).ToList();
+
         var effectivePermissions = Permission.None;
-        foreach (var grant in grantRows)
+        foreach (var grant in activeGrants)
         {
             if (PermissionParser.TryParse(grant.Permissions, out var grantPermissions))
             {
@@ -179,7 +241,7 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
             }
         }
 
-        var hasUserGrant = grantRows.Any(grant => grant.SubjectType == GrantSubjectType.User.ToString());
+        var hasUserGrant = activeGrants.Any(grant => grant.SubjectType == GrantSubjectType.User.ToString());
         if (!hasUserGrant && file.OwnerUserId == userId && file.Permissions != Permission.None)
         {
             effectivePermissions |= file.Permissions;
