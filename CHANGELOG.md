@@ -2,6 +2,56 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.2.2] — 2026-05-19
+
+**Admin console A+ polish — SVG icons, Tenants tab fix, design tokens.**
+Follow-on polish targeting A+ grades across every design dimension. Replaces
+emoji icons with inline SVG sprite, fixes a silent bug where the Tenants tab
+was non-functional, and aligns hardcoded font-sizes and animation durations
+to design tokens.
+
+### Added
+- **Inline SVG icon sprite.** All 11 emoji icons in tabs, rail nav, and empty
+  states (📊👥📋📁🔌🏢⚙️📤📥📘🧩) replaced with Lucide-style stroke icons
+  defined once at the top of `index.html` and referenced via `<use href="#icon-*">`.
+  Renders identically across macOS / Windows / Linux / Android.
+
+### Fixed
+- **Tenants tab was broken.** Clicking the Tenants tab silently fell through
+  to Overview because `"tenants"` was missing from the `VALID_TABS` set in
+  `app.js`. Added the entry plus the matching `body[data-active-tab="tenants"]`
+  CSS hide rule so the 10 tenant subtabs (Tenants, Registrations, Access
+  requests, Plans, Compliance, Retention, IP allowlist, Device trust, Key
+  rotation, Usage snapshot) are reachable.
+- **Tab bar overflow at narrow widths.** Changed `.tab-nav` from
+  `flex-wrap: wrap` to `flex-wrap: nowrap` + `overflow-x: auto` so the 6
+  tabs never wrap to a second row at sub-720px container widths. Scrollbar
+  hidden via `scrollbar-width: none` and `::-webkit-scrollbar { display: none }`.
+- **Truncated placeholders.** Shortened 4 placeholders that were getting cut
+  off inside their inputs: `"Per-admin token (drm_admin_…) or shared key"`
+  → `"drm_admin_… or shared key"`, the global search hint, the Entra tenant
+  ID hint, and the directory sync Client ID hint.
+
+### Changed
+- **Typography aligned to tokens.** Replaced `font-size: 11px/12px/14px`
+  literals throughout `app.css` with `var(--text-xs)`, `var(--text-sm)`,
+  `var(--text-body)`. Added `letter-spacing: 0.04em` to `.eyebrow` for
+  better uppercase legibility. Added `gap: 16px` to the `.settings` grid.
+- **Animation durations tokenized.** Replaced 7 hardcoded transition and
+  animation durations (`80ms`/`100ms`/`120ms` → `var(--duration-fast)`;
+  `180ms`/`200ms`/`220ms`/`0.25s` → `var(--duration-base)`) on tab-link,
+  subtab-link, settings-trigger, drawer, backdrop, `welcomeFadeIn`, and
+  `slideIn`. The reduced-motion override in `tokens.css` now fully governs
+  motion across the admin console.
+- **Integrations subtab order.** Moved Outlook ahead of Box per the design
+  audit recommendation (most enterprises use Outlook before Box). New
+  order: Email notifications → Outlook → Box → SIEM → Folder watcher.
+- **Mobile settings framing.** At ≤820px, the settings form section now
+  has a `1px solid var(--line)` border and 8px radius so it reads as an
+  intentional panel rather than an exposed form. Pre-set `data-open="false"`
+  on `#settingsBackdrop` and `#settingsDrawer` in HTML to eliminate any
+  FOUC before JS initializes the drawer state.
+
 ## [1.2.1] — 2026-05-19
 
 **Design audit — admin console polish (v1.9 UI).**
