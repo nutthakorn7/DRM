@@ -649,6 +649,44 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_OperatorAlertsFired_RuleId_FiredAtUtc"
             ON "OperatorAlertsFired" ("RuleId", "FiredAtUtc");
             """);
+        // v1.6: FileAccessRequests, TenantPlans, AuditChain (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileAccessRequests" (
+                "RequestId" TEXT NOT NULL CONSTRAINT "PK_FileAccessRequests" PRIMARY KEY,
+                "TenantId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "RequesterEmail" TEXT NOT NULL DEFAULT '',
+                "Message" TEXT NOT NULL DEFAULT '',
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "ReviewedByAdminId" TEXT NULL,
+                "RequestedAtUtc" TEXT NOT NULL,
+                "ReviewedAtUtc" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_FileId"
+            ON "FileAccessRequests" ("TenantId", "FileId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_Status"
+            ON "FileAccessRequests" ("TenantId", "Status");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantPlans" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantPlans" PRIMARY KEY,
+                "Tier" INTEGER NOT NULL DEFAULT 0,
+                "MaxFiles" INTEGER NULL,
+                "MaxStorageMb" INTEGER NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AuditChain" (
+                "AuditEventId" INTEGER NOT NULL CONSTRAINT "PK_AuditChain" PRIMARY KEY,
+                "Hash" TEXT NOT NULL DEFAULT '',
+                "PrevHash" TEXT NOT NULL DEFAULT ''
+            );
+            """);
     }
     else
     {
@@ -818,6 +856,45 @@ using (var scope = app.Services.CreateScope())
             CREATE INDEX IF NOT EXISTS "IX_OperatorAlertsFired_RuleId_FiredAtUtc"
             ON "OperatorAlertsFired" ("RuleId", "FiredAtUtc");
             """);
+
+        // v1.6: FileAccessRequests, TenantPlans, AuditChain (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileAccessRequests" (
+                "RequestId" uuid NOT NULL CONSTRAINT "PK_FileAccessRequests" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "FileId" uuid NOT NULL,
+                "RequesterEmail" text NOT NULL DEFAULT '',
+                "Message" text NOT NULL DEFAULT '',
+                "Status" integer NOT NULL DEFAULT 0,
+                "ReviewedByAdminId" uuid NULL,
+                "RequestedAtUtc" timestamptz NOT NULL,
+                "ReviewedAtUtc" timestamptz NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_FileId"
+            ON "FileAccessRequests" ("TenantId", "FileId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_Status"
+            ON "FileAccessRequests" ("TenantId", "Status");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantPlans" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantPlans" PRIMARY KEY,
+                "Tier" integer NOT NULL DEFAULT 0,
+                "MaxFiles" integer NULL,
+                "MaxStorageMb" integer NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AuditChain" (
+                "AuditEventId" bigint NOT NULL CONSTRAINT "PK_AuditChain" PRIMARY KEY,
+                "Hash" text NOT NULL DEFAULT '',
+                "PrevHash" text NOT NULL DEFAULT ''
+            );
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -899,6 +976,10 @@ app.MapPersonaEndpoints();
 app.MapQuickShareEndpoints();
 app.MapRecentRecipientsEndpoints();
 app.MapAdminNotificationConfigEndpoints();
+app.MapAdminAuditChainEndpoints();
+app.MapAdminAccessRequestEndpoints();
+app.MapAdminTenantPlanEndpoints();
+app.MapAccessRequestEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();
 app.MapScimGroupsEndpoints();

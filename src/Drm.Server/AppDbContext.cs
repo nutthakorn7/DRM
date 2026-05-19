@@ -78,6 +78,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<OperatorAlertFiredEntity> OperatorAlertsFired => Set<OperatorAlertFiredEntity>();
 
+    public DbSet<FileAccessRequestEntity> FileAccessRequests => Set<FileAccessRequestEntity>();
+
+    public DbSet<TenantPlanEntity> TenantPlans => Set<TenantPlanEntity>();
+
+    public DbSet<AuditChainEntity> AuditChain => Set<AuditChainEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantClientKeyEntity>(entity =>
@@ -385,6 +391,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(f => f.Id);
             entity.HasIndex(f => new { f.RuleId, f.FiredAtUtc });
             entity.Property(f => f.RuleName).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<FileAccessRequestEntity>(entity =>
+        {
+            entity.HasKey(r => r.RequestId);
+            entity.HasIndex(r => new { r.TenantId, r.FileId });
+            entity.HasIndex(r => new { r.TenantId, r.Status });
+            entity.Property(r => r.RequesterEmail).HasMaxLength(320);
+            entity.Property(r => r.Message).HasMaxLength(2048);
+            entity.Property(r => r.Status).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<TenantPlanEntity>(entity =>
+        {
+            entity.HasKey(p => p.TenantId);
+            entity.Property(p => p.Tier).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<AuditChainEntity>(entity =>
+        {
+            entity.HasKey(c => c.AuditEventId);
+            entity.Property(c => c.Hash).HasMaxLength(64);
+            entity.Property(c => c.PrevHash).HasMaxLength(64);
         });
     }
 }

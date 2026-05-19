@@ -668,3 +668,57 @@ public sealed class OperatorAlertFiredEntity
 
     public DateTimeOffset FiredAtUtc { get; set; }
 }
+
+// ── v1.6 ─────────────────────────────────────────────────────────────────────
+
+public enum AccessRequestStatus { Pending = 0, Approved = 1, Rejected = 2 }
+
+public sealed class FileAccessRequestEntity
+{
+    public Guid RequestId { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string RequesterEmail { get; set; } = string.Empty;
+
+    /// <summary>Optional message from the requester.</summary>
+    public string Message { get; set; } = string.Empty;
+
+    public AccessRequestStatus Status { get; set; } = AccessRequestStatus.Pending;
+
+    public Guid? ReviewedByAdminId { get; set; }
+
+    public DateTimeOffset RequestedAtUtc { get; set; }
+
+    public DateTimeOffset? ReviewedAtUtc { get; set; }
+}
+
+public enum PlanTier { Free = 0, Starter = 1, Enterprise = 2 }
+
+public sealed class TenantPlanEntity
+{
+    public Guid TenantId { get; set; }
+
+    public PlanTier Tier { get; set; } = PlanTier.Free;
+
+    /// <summary>Max protected files. Null = unlimited.</summary>
+    public int? MaxFiles { get; set; }
+
+    /// <summary>Max total storage in megabytes. Null = unlimited.</summary>
+    public int? MaxStorageMb { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class AuditChainEntity
+{
+    /// <summary>Mirrors AuditEventEntity.Id — 1:1 relationship.</summary>
+    public long AuditEventId { get; set; }
+
+    /// <summary>HMAC-SHA256 hex of (PrevHash + Id + TenantId + EventType + CreatedAtUtc ISO8601).</summary>
+    public string Hash { get; set; } = string.Empty;
+
+    public string PrevHash { get; set; } = string.Empty;
+}

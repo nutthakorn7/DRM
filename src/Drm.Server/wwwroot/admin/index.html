@@ -1430,6 +1430,111 @@
         </div>
       </section>
 
+      <!-- ── Access Requests ──────────────────────────────────────── -->
+      <section class="panel" id="accessRequests" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Workflow</p>
+            <h3>Access requests</h3>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="arStatusFilter" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--line)">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <button id="refreshAccessRequests" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Requester</th>
+                <th>File ID</th>
+                <th>Message</th>
+                <th>Status</th>
+                <th>Requested</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accessRequestsBody">
+              <tr><td colspan="6" class="empty">Click "Refresh" to load requests.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Tenant Plan Management ──────────────────────────────── -->
+      <section class="panel" id="tenantPlans" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Quotas</p>
+            <h3>Tenant plans</h3>
+          </div>
+          <button id="refreshTenantPlans" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant</th>
+                <th>Plan tier</th>
+                <th>File limit</th>
+                <th>Storage limit</th>
+                <th>Files used</th>
+                <th>Quota status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tenantPlansBody">
+              <tr><td colspan="7" class="empty">Click "Refresh" to load plans.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Edit plan dialog -->
+      <dialog id="editPlanDialog" aria-modal="true" aria-labelledby="editPlanTitle">
+        <form id="editPlanForm" method="dialog">
+          <header class="dialog-head">
+            <h3 id="editPlanTitle">Edit tenant plan</h3>
+            <button type="button" class="dialog-close" aria-label="Close" onclick="document.getElementById('editPlanDialog').close()">×</button>
+          </header>
+          <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px">
+            <input type="hidden" id="editPlanTenantId">
+            <div>
+              <label for="editPlanPreset">Quick preset</label>
+              <select id="editPlanPreset" style="width:100%;margin-top:4px;padding:6px 8px;border-radius:6px;border:1px solid var(--line)">
+                <option value="">Custom</option>
+                <option value="free">Free — 50 files / 500 MB</option>
+                <option value="starter">Starter — 1000 files / 10 GB</option>
+                <option value="enterprise">Enterprise — Unlimited</option>
+              </select>
+            </div>
+            <div>
+              <label for="editPlanTier">Tier name</label>
+              <input id="editPlanTier" type="text" placeholder="free / starter / enterprise" style="width:100%;margin-top:4px">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label for="editPlanMaxFiles">Max files (blank = unlimited)</label>
+                <input id="editPlanMaxFiles" type="number" min="0" placeholder="unlimited" style="width:100%;margin-top:4px">
+              </div>
+              <div>
+                <label for="editPlanMaxStorage">Max storage MB (blank = unlimited)</label>
+                <input id="editPlanMaxStorage" type="number" min="0" placeholder="unlimited" style="width:100%;margin-top:4px">
+              </div>
+            </div>
+          </div>
+          <footer class="dialog-foot">
+            <button type="button" onclick="document.getElementById('editPlanDialog').close()">Cancel</button>
+            <button type="submit" id="editPlanSave">Save plan</button>
+          </footer>
+        </form>
+      </dialog>
+
       <section class="panel" id="usage" data-tab="tenants">
         <div class="section-head">
           <div>

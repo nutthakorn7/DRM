@@ -2881,3 +2881,130 @@ document.getElementById("cancelAlertRuleBtn")?.addEventListener("click", () => {
 });
 document.getElementById("openCreateAlertBtn")?.addEventListener("click", openCreateAlert);
 document.getElementById("refreshAlertsBtn")?.addEventListener("click", refreshAlertRules);
+
+// ── v1.6: Access Requests ─────────────────────────────────────────────────
+
+async function refreshAccessRequests() {
+  const statusFilter = document.getElementById("arStatusFilter")?.value || "";
+  let url = "/api/admin/access-requests?limit=200";
+  if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
+
+  const rows = await apiFetch(url);
+  const tbody = document.getElementById("accessRequestsBody");
+  if (!tbody) return;
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">No access requests found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const isPending = r.status === "pending";
+    const actions = isPending
+      ? `<button class="ghost" onclick="reviewRequest('${r.requestId}','approve')">Approve</button>
+         <button class="ghost danger" onclick="reviewRequest('${r.requestId}','reject')">Reject</button>`
+      : `<span class="pill ${r.status === 'approved' ? 'ok' : 'warn'}">${r.status}</span>`;
+    return `<tr>
+      <td>${esc(r.requesterEmail)}</td>
+      <td style="font-family:monospace;font-size:11px">${r.fileId.slice(0,8)}…</td>
+      <td>${esc(r.message || "—")}</td>
+      <td>${r.status}</td>
+      <td>${new Date(r.requestedAtUtc).toLocaleString()}</td>
+      <td style="display:flex;gap:4px">${actions}</td>
+    </tr>`;
+  }).join("");
+}
+
+async function reviewRequest(requestId, action) {
+  await apiFetch(`/api/admin/access-requests/${requestId}/${action}`, { method: "PATCH" });
+  await refreshAccessRequests();
+}
+
+document.getElementById("refreshAccessRequests")?.addEventListener("click", refreshAccessRequests);
+document.getElementById("arStatusFilter")?.addEventListener("change", refreshAccessRequests);
+
+// ── v1.6: Tenant Plans ────────────────────────────────────────────────────
+
+async function refreshTenantPlans() {
+  const tenants = await apiFetch("/api/admin/tenants");
+  const tbody = document.getElementById("tenantPlansBody");
+  if (!tbody) return;
+
+  if (!tenants || tenants.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">No tenants found.</td></tr>`;
+    return;
+  }
+
+  const planRows = await Promise.all(tenants.map(async t => {
+    try {
+      return { tenant: t, plan: await apiFetch(`/api/admin/tenants/${t.tenantId}/plan`) };
+    } catch {
+      return { tenant: t, plan: null };
+    }
+  }));
+
+  tbody.innerHTML = planRows.map(({ tenant, plan }) => {
+    const tier = plan?.tier ?? "free";
+    const maxFiles = plan?.maxFiles != null ? plan.maxFiles : "∞";
+    const maxStorage = plan?.maxStorageMb != null ? `${plan.maxStorageMb} MB` : "∞";
+    const used = plan?.currentFileCount ?? "—";
+    const exceeded = plan?.filesQuotaExceeded;
+    const quotaCell = exceeded
+      ? `<span style="color:var(--error)">⚠ Quota exceeded</span>`
+      : `<span style="color:var(--ok)">OK</span>`;
+    return `<tr>
+      <td>${esc(tenant.displayName || tenant.name)}</td>
+      <td><span class="pill">${tier}</span></td>
+      <td>${maxFiles}</td>
+      <td>${maxStorage}</td>
+      <td>${used}</td>
+      <td>${quotaCell}</td>
+      <td><button class="ghost" onclick="openEditPlan('${tenant.tenantId}','${tier}',${plan?.maxFiles ?? ''},${plan?.maxStorageMb ?? ''})">Edit</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function openEditPlan(tenantId, tier, maxFiles, maxStorageMb) {
+  document.getElementById("editPlanTenantId").value = tenantId;
+  document.getElementById("editPlanTier").value = tier;
+  document.getElementById("editPlanMaxFiles").value = maxFiles || "";
+  document.getElementById("editPlanMaxStorage").value = maxStorageMb || "";
+  document.getElementById("editPlanPreset").value = "";
+  document.getElementById("editPlanDialog").showModal();
+}
+
+document.getElementById("editPlanPreset")?.addEventListener("change", e => {
+  const v = e.target.value;
+  const presets = { free: [50, 500], starter: [1000, 10000], enterprise: [null, null] };
+  if (v && presets[v]) {
+    const [f, s] = presets[v];
+    document.getElementById("editPlanMaxFiles").value = f ?? "";
+    document.getElementById("editPlanMaxStorage").value = s ?? "";
+    document.getElementById("editPlanTier").value = v;
+  }
+});
+
+document.getElementById("editPlanForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const tenantId = document.getElementById("editPlanTenantId").value;
+  const preset = document.getElementById("editPlanPreset").value || null;
+  const tier = document.getElementById("editPlanTier").value.trim() || "free";
+  const maxFilesRaw = document.getElementById("editPlanMaxFiles").value.trim();
+  const maxStorageRaw = document.getElementById("editPlanMaxStorage").value.trim();
+
+  await apiFetch(`/api/admin/tenants/${tenantId}/plan`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      preset,
+      tier,
+      maxFiles: maxFilesRaw ? parseInt(maxFilesRaw, 10) : null,
+      maxStorageMb: maxStorageRaw ? parseInt(maxStorageRaw, 10) : null,
+    }),
+  });
+
+  document.getElementById("editPlanDialog").close();
+  await refreshTenantPlans();
+});
+
+document.getElementById("refreshTenantPlans")?.addEventListener("click", refreshTenantPlans);

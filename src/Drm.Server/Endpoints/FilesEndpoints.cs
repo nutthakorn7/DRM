@@ -38,6 +38,17 @@ public static class FilesEndpoints
             return TypedResults.Conflict();
         }
 
+        // Enforce tenant plan file quota
+        var plan = await dbContext.TenantPlans.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.TenantId == request.TenantId, cancellationToken);
+        if (plan?.MaxFiles.HasValue == true)
+        {
+            var currentCount = await dbContext.ProtectedFiles
+                .CountAsync(f => f.TenantId == request.TenantId, cancellationToken);
+            if (currentCount >= plan.MaxFiles.Value)
+                return TypedResults.BadRequest(new ErrorResponse("plan_quota_exceeded"));
+        }
+
         var effectivePolicy = await BuildEffectivePolicyAsync(request, dbContext, permissions, cancellationToken);
         if (effectivePolicy is null)
         {
