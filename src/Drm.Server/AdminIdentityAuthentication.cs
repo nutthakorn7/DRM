@@ -151,7 +151,8 @@ public static class AdminIdentityAuthentication
             DisplayName: user.DisplayName,
             Email: user.Email,
             Permissions: ParsePermissions(role.PermissionsCsv),
-            IsSharedKeyFallback: false);
+            IsSharedKeyFallback: false,
+            TenantScope: user.TenantScope);
     }
 
     private static async Task<AdminIdentity> ResolveSharedKeyIdentityAsync(

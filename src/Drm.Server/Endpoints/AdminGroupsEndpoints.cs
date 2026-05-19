@@ -22,7 +22,7 @@ public static class AdminGroupsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.GroupsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.GroupsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
@@ -62,7 +62,7 @@ public static class AdminGroupsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.GroupsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.GroupsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
@@ -104,7 +104,7 @@ public static class AdminGroupsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.GroupsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.GroupsRead, tenantId, out var fail))
             return fail!;
         var members = await dbContext.GroupMembers
             .AsNoTracking()

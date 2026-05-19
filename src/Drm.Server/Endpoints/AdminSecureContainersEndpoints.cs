@@ -23,7 +23,7 @@ public static class AdminSecureContainersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
@@ -97,7 +97,7 @@ public static class AdminSecureContainersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsRead, tenantId, out var fail))
             return fail!;
         var items = await dbContext.SecureContainers
             .AsNoTracking()
@@ -117,7 +117,7 @@ public static class AdminSecureContainersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsRead, tenantId, out var fail))
             return fail!;
         var container = await dbContext.SecureContainers
             .AsNoTracking()
@@ -136,7 +136,7 @@ public static class AdminSecureContainersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.SettingsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsWrite, tenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {

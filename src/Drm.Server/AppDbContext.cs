@@ -4,6 +4,14 @@ namespace Drm.Server;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
+
+    public DbSet<TenantClientKeyEntity> TenantClientKeys => Set<TenantClientKeyEntity>();
+
+    public DbSet<TenantBillingWebhookEntity> TenantBillingWebhooks => Set<TenantBillingWebhookEntity>();
+
+    public DbSet<TenantRegistrationEntity> TenantRegistrations => Set<TenantRegistrationEntity>();
+
     public DbSet<ProtectedFileEntity> ProtectedFiles => Set<ProtectedFileEntity>();
 
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
@@ -66,8 +74,72 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<AdminApiTokenEntity> AdminApiTokens => Set<AdminApiTokenEntity>();
 
+    public DbSet<OperatorAlertRuleEntity> OperatorAlertRules => Set<OperatorAlertRuleEntity>();
+
+    public DbSet<OperatorAlertFiredEntity> OperatorAlertsFired => Set<OperatorAlertFiredEntity>();
+
+    public DbSet<FileAccessRequestEntity> FileAccessRequests => Set<FileAccessRequestEntity>();
+
+    public DbSet<TenantPlanEntity> TenantPlans => Set<TenantPlanEntity>();
+
+    public DbSet<AuditChainEntity> AuditChain => Set<AuditChainEntity>();
+
+    public DbSet<FileCollectionEntity> FileCollections => Set<FileCollectionEntity>();
+
+    public DbSet<FileCollectionItemEntity> FileCollectionItems => Set<FileCollectionItemEntity>();
+
+    public DbSet<TenantKeyRotationConfigEntity> TenantKeyRotationConfigs => Set<TenantKeyRotationConfigEntity>();
+
+    public DbSet<KeyRotationHistoryEntity> KeyRotationHistory => Set<KeyRotationHistoryEntity>();
+
+    public DbSet<TenantRetentionPolicyEntity> TenantRetentionPolicies => Set<TenantRetentionPolicyEntity>();
+
+    public DbSet<TenantIpAllowlistRuleEntity> TenantIpAllowlistRules => Set<TenantIpAllowlistRuleEntity>();
+
+    public DbSet<TenantDeviceTrustConfigEntity> TenantDeviceTrustConfigs => Set<TenantDeviceTrustConfigEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<TenantClientKeyEntity>(entity =>
+        {
+            entity.HasKey(k => new { k.TenantId, k.KeyId });
+            entity.HasIndex(k => k.KeyHash).IsUnique();
+            entity.Property(k => k.KeyHash).HasMaxLength(128);
+            entity.Property(k => k.Label).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<TenantBillingWebhookEntity>(entity =>
+        {
+            entity.HasKey(w => new { w.TenantId, w.WebhookId });
+            entity.Property(w => w.Url).HasMaxLength(2048);
+            entity.Property(w => w.Secret).HasMaxLength(256);
+            entity.Property(w => w.Events).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<TenantRegistrationEntity>(entity =>
+        {
+            entity.HasKey(r => r.RegistrationId);
+            entity.HasIndex(r => r.AdminEmail);
+            entity.HasIndex(r => r.TenantName);
+            entity.HasIndex(r => r.TokenHash).IsUnique();
+            entity.Property(r => r.TenantName).HasMaxLength(256);
+            entity.Property(r => r.DisplayName).HasMaxLength(256);
+            entity.Property(r => r.AdminEmail).HasMaxLength(320);
+            entity.Property(r => r.AdminDisplayName).HasMaxLength(256);
+            entity.Property(r => r.TokenHash).HasMaxLength(128);
+            entity.Property(r => r.ReviewNotes).HasMaxLength(1024);
+            entity.Property(r => r.Status).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<TenantEntity>(entity =>
+        {
+            entity.HasKey(t => t.TenantId);
+            entity.HasIndex(t => t.Name).IsUnique();
+            entity.Property(t => t.Name).HasMaxLength(256);
+            entity.Property(t => t.DisplayName).HasMaxLength(256);
+            entity.Property(t => t.Status).HasConversion<int>();
+        });
+
         modelBuilder.Entity<ProtectedFileEntity>(entity =>
         {
             entity.HasKey(file => new { file.TenantId, file.Id });
@@ -318,6 +390,88 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(t => t.AdminUserId);
             entity.Property(t => t.TokenHash).HasMaxLength(128);
             entity.Property(t => t.Label).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<OperatorAlertRuleEntity>(entity =>
+        {
+            entity.HasKey(r => r.RuleId);
+            entity.HasIndex(r => r.TenantId);
+            entity.Property(r => r.Name).HasMaxLength(256);
+            entity.Property(r => r.Condition).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<OperatorAlertFiredEntity>(entity =>
+        {
+            entity.HasKey(f => f.Id);
+            entity.HasIndex(f => new { f.RuleId, f.FiredAtUtc });
+            entity.Property(f => f.RuleName).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<FileAccessRequestEntity>(entity =>
+        {
+            entity.HasKey(r => r.RequestId);
+            entity.HasIndex(r => new { r.TenantId, r.FileId });
+            entity.HasIndex(r => new { r.TenantId, r.Status });
+            entity.Property(r => r.RequesterEmail).HasMaxLength(320);
+            entity.Property(r => r.Message).HasMaxLength(2048);
+            entity.Property(r => r.Status).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<TenantPlanEntity>(entity =>
+        {
+            entity.HasKey(p => p.TenantId);
+            entity.Property(p => p.Tier).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<AuditChainEntity>(entity =>
+        {
+            entity.HasKey(c => c.AuditEventId);
+            entity.Property(c => c.Hash).HasMaxLength(64);
+            entity.Property(c => c.PrevHash).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<FileCollectionEntity>(entity =>
+        {
+            entity.HasKey(c => c.CollectionId);
+            entity.HasIndex(c => c.TenantId);
+            entity.Property(c => c.Name).HasMaxLength(256);
+            entity.Property(c => c.Description).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<FileCollectionItemEntity>(entity =>
+        {
+            entity.HasKey(i => new { i.CollectionId, i.FileId });
+            entity.HasIndex(i => i.TenantId);
+        });
+
+        modelBuilder.Entity<TenantKeyRotationConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+        });
+
+        modelBuilder.Entity<KeyRotationHistoryEntity>(entity =>
+        {
+            entity.HasKey(h => h.Id);
+            entity.HasIndex(h => h.TenantId);
+            entity.Property(h => h.TriggeredBy).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<TenantRetentionPolicyEntity>(entity =>
+        {
+            entity.HasKey(p => p.TenantId);
+        });
+
+        modelBuilder.Entity<TenantIpAllowlistRuleEntity>(entity =>
+        {
+            entity.HasKey(r => r.RuleId);
+            entity.HasIndex(r => r.TenantId);
+            entity.Property(r => r.Cidr).HasMaxLength(50);
+            entity.Property(r => r.Label).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<TenantDeviceTrustConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
         });
     }
 }

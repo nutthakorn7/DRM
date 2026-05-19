@@ -2115,6 +2115,7 @@ document.querySelector("#createAdminForm").addEventListener("submit", async (eve
   const displayName = document.querySelector("#newAdminDisplayName").value.trim();
   const roleId = document.querySelector("#newAdminRoleId").value.trim();
   const tokenLabel = document.querySelector("#newAdminTokenLabel").value.trim();
+  const tenantScopeRaw = document.querySelector("#newAdminTenantScope").value.trim();
 
   if (!roleId) {
     setStatus("Select a role before creating an admin", "error");
@@ -2126,7 +2127,8 @@ document.querySelector("#createAdminForm").addEventListener("submit", async (eve
     displayName: displayName || null,
     roleId,
     tokenLabel: tokenLabel || null,
-    tokenExpiresAtUtc: null
+    tokenExpiresAtUtc: null,
+    tenantScope: tenantScopeRaw || null
   };
 
   const created = await apiFetch("/api/admin/identity/admins", {
@@ -2142,6 +2144,7 @@ document.querySelector("#createAdminForm").addEventListener("submit", async (eve
     `Admin ID : ${created.adminUserId}`,
     `Email    : ${created.email}`,
     `Role     : ${created.roleName}`,
+    `Scope    : ${created.tenantScope || "Global"}`,
     `Token ID : ${created.tokenId}`,
     `Token    : ${created.token}`,
     created.tokenExpiresAtUtc
@@ -2215,7 +2218,7 @@ async function refreshAdmins() {
   const admins = await apiFetch("/api/admin/identity/admins");
   const adminsBody = document.querySelector("#adminsBody");
   if (!admins.length) {
-    adminsBody.innerHTML = '<tr><td colspan="7" class="empty">No admin users found.</td></tr>';
+    adminsBody.innerHTML = '<tr><td colspan="8" class="empty">No admin users found.</td></tr>';
     setStatus("No admins", "ok");
     return;
   }
@@ -2224,6 +2227,7 @@ async function refreshAdmins() {
       <td>${escapeHtml(a.email)}</td>
       <td>${escapeHtml(a.displayName || "")}</td>
       <td>${escapeHtml(a.roleName)}</td>
+      <td>${a.tenantScope ? `<code title="${escapeHtml(a.tenantScope)}">${escapeHtml(a.tenantScope.slice(0, 8))}…</code>` : '<span class="badge">Global</span>'}</td>
       <td>${renderEnabledBadge(!a.disabled)}</td>
       <td>${a.activeTokenCount}</td>
       <td>${escapeHtml(formatDate(a.lastUsedAtUtc) || "—")}</td>
@@ -2286,3 +2290,1011 @@ async function rotateAdminToken(adminId) {
   await refreshAdmins();
   setStatus("Token rotated — copy the new token above", "ok");
 }
+
+// ── Tenants (operator-level) ────────────────────────────────────────────────
+
+async function apiFetchGlobal(url, options = {}) {
+  const adminKey = requireAdminKey();
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...adminAuthHeader(adminKey),
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) {
+    setStatus(`Request failed: ${response.status}`, "error");
+    throw new Error(`Request failed with HTTP ${response.status}`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+async function refreshTenants() {
+  const tbody = document.getElementById("tenantsBody");
+  tbody.innerHTML = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
+  try {
+    const tenants = await apiFetchGlobal("/api/admin/tenants");
+    if (!tenants.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No tenants yet. Create one above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = tenants.map(t => {
+      const statusLabel = t.status === 0
+        ? '<span class="badge badge-ok">Active</span>'
+        : '<span class="badge badge-error">Suspended</span>';
+      const usedSeats = t.usedSeats ?? 0;
+      const maxSeats = t.maxEncrypters;
+      const seatLabel = maxSeats != null
+        ? `${usedSeats} / ${maxSeats}`
+        : `${usedSeats} / ∞`;
+      const seatPct = maxSeats != null ? Math.min(100, Math.round((usedSeats / maxSeats) * 100)) : 0;
+      const seatBar = maxSeats != null
+        ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? '#ef4444' : '#22c55e'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
+        : '';
+      const toggleLabel = t.status === 0 ? "Suspend" : "Activate";
+      const toggleStatus = t.status === 0 ? 1 : 0;
+      const createdDate = new Date(t.createdAtUtc).toLocaleDateString();
+      return `<tr>
+        <td><code>${esc(t.name)}</code></td>
+        <td>${esc(t.displayName)}</td>
+        <td>${statusLabel}</td>
+        <td>${seatLabel}${seatBar}</td>
+        <td><code class="copy-id" title="Click to copy" style="cursor:pointer" onclick="navigator.clipboard.writeText('${esc(t.tenantId)}')">${esc(t.tenantId)}</code></td>
+        <td>${createdDate}</td>
+        <td style="white-space:nowrap">
+          <button type="button" class="ghost" onclick="toggleTenantStatus('${esc(t.tenantId)}', ${toggleStatus})">${toggleLabel}</button>
+          <button type="button" class="ghost" onclick="openKeyManager('${esc(t.tenantId)}', '${esc(t.name)}')" style="margin-left:4px">Keys</button>
+          <button type="button" class="ghost" onclick="openWebhookManager('${esc(t.tenantId)}', '${esc(t.name)}')" style="margin-left:4px">Webhooks</button>
+        </td>
+      </tr>`;
+    }).join("");
+    setStatus(`Loaded ${tenants.length} tenant(s)`, "ok");
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Failed to load tenants.</td></tr>';
+  }
+}
+
+async function toggleTenantStatus(tenantId, newStatus) {
+  try {
+    await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(tenantId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: newStatus })
+    });
+    setStatus(newStatus === 1 ? "Tenant suspended" : "Tenant activated", "ok");
+    await refreshTenants();
+  } catch (e) {
+    // error already shown by apiFetchGlobal
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+document.getElementById("refreshTenants")?.addEventListener("click", refreshTenants);
+
+// ── Key manager (inline sub-panel per tenant) ────────────────────────────────
+
+let _keyManagerTenantId = null;
+
+async function openKeyManager(tenantId, tenantName) {
+  _keyManagerTenantId = tenantId;
+  const panel = document.getElementById("keyManagerPanel");
+  const title = document.getElementById("keyManagerTitle");
+  if (title) title.textContent = `Client keys — ${tenantName}`;
+  if (panel) panel.hidden = false;
+  panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  await refreshKeys();
+}
+
+async function refreshKeys() {
+  if (!_keyManagerTenantId) return;
+  const tbody = document.getElementById("keysBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  try {
+    const keys = await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(_keyManagerTenantId)}/client-keys`);
+    if (!keys.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No active keys. Create one below.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = keys.map(k => {
+      const lastUsed = k.lastUsedAtUtc ? new Date(k.lastUsedAtUtc).toLocaleString() : "Never";
+      return `<tr>
+        <td>${esc(k.label) || '<em>unlabelled</em>'}</td>
+        <td><code>${esc(k.keyId)}</code></td>
+        <td>${lastUsed}</td>
+        <td><button type="button" class="ghost" onclick="revokeKey('${esc(k.keyId)}')">Revoke</button></td>
+      </tr>`;
+    }).join("");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Failed to load keys.</td></tr>';
+  }
+}
+
+async function revokeKey(keyId) {
+  if (!_keyManagerTenantId) return;
+  try {
+    const response = await fetch(
+      `/api/admin/tenants/${encodeURIComponent(_keyManagerTenantId)}/client-keys/${encodeURIComponent(keyId)}`,
+      { method: "DELETE", headers: adminAuthHeader(requireAdminKey()) }
+    );
+    if (!response.ok) { setStatus(`Revoke failed: ${response.status}`, "error"); return; }
+    setStatus("Key revoked", "ok");
+    await refreshKeys();
+  } catch {
+    setStatus("Failed to revoke key", "error");
+  }
+}
+
+document.getElementById("createKeyForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!_keyManagerTenantId) return;
+  const label = document.getElementById("newKeyLabel").value.trim();
+  const output = document.getElementById("createKeyOutput");
+  output.hidden = false;
+  output.textContent = "Creating…";
+  try {
+    const result = await apiFetchGlobal(
+      `/api/admin/tenants/${encodeURIComponent(_keyManagerTenantId)}/client-keys`,
+      { method: "POST", body: JSON.stringify({ label: label || null }) }
+    );
+    output.textContent = `Key created — save it now, it will not be shown again.\n\nKey: ${result.key}\nKey ID: ${result.keyId}`;
+    document.getElementById("newKeyLabel").value = "";
+    setStatus("Client key created", "ok");
+    await refreshKeys();
+  } catch {
+    output.textContent = "Failed to create key.";
+  }
+});
+
+document.getElementById("closeKeyManager")?.addEventListener("click", () => {
+  document.getElementById("keyManagerPanel")?.setAttribute("hidden", "");
+  _keyManagerTenantId = null;
+});
+
+document.getElementById("createTenantForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("newTenantName").value.trim();
+  const displayName = document.getElementById("newTenantDisplayName").value.trim() || undefined;
+  const tenantId = document.getElementById("newTenantId").value.trim() || undefined;
+  const maxEncryptersRaw = document.getElementById("newTenantMaxEncrypters").value.trim();
+  const maxEncrypters = maxEncryptersRaw ? parseInt(maxEncryptersRaw, 10) : undefined;
+
+  const output = document.getElementById("createTenantOutput");
+  output.hidden = false;
+  output.textContent = "Creating…";
+
+  try {
+    const result = await apiFetchGlobal("/api/admin/tenants", {
+      method: "POST",
+      body: JSON.stringify({ name, displayName, tenantId, maxEncrypters })
+    });
+    output.textContent = `Created: ${result.tenantId}`;
+    document.getElementById("newTenantName").value = "";
+    document.getElementById("newTenantDisplayName").value = "";
+    document.getElementById("newTenantId").value = "";
+    document.getElementById("newTenantMaxEncrypters").value = "";
+    setStatus("Tenant created", "ok");
+    await refreshTenants();
+  } catch (e) {
+    output.textContent = "Failed to create tenant.";
+  }
+});
+
+// ── Billing webhook manager (inline sub-panel per tenant) ────────────────────
+
+let _webhookManagerTenantId = null;
+
+async function openWebhookManager(tenantId, tenantName) {
+  _webhookManagerTenantId = tenantId;
+  const panel = document.getElementById("webhookManagerPanel");
+  const title = document.getElementById("webhookManagerTitle");
+  if (title) title.textContent = `Billing webhooks — ${tenantName}`;
+  if (panel) panel.hidden = false;
+  panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  await refreshWebhooks();
+}
+
+async function refreshWebhooks() {
+  if (!_webhookManagerTenantId) return;
+  const tbody = document.getElementById("webhooksBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  try {
+    const hooks = await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(_webhookManagerTenantId)}/billing-webhooks`);
+    if (!hooks.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No webhooks registered.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = hooks.map(h => {
+      const created = new Date(h.createdAtUtc).toLocaleDateString();
+      return `<tr>
+        <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis"><code title="${esc(h.url)}">${esc(h.url)}</code></td>
+        <td><code>${esc(h.events)}</code></td>
+        <td>${created}</td>
+        <td><button type="button" class="ghost" onclick="deleteWebhook('${esc(h.webhookId)}')">Delete</button></td>
+      </tr>`;
+    }).join("");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Failed to load webhooks.</td></tr>';
+  }
+}
+
+async function deleteWebhook(webhookId) {
+  if (!_webhookManagerTenantId) return;
+  try {
+    const response = await fetch(
+      `/api/admin/tenants/${encodeURIComponent(_webhookManagerTenantId)}/billing-webhooks/${encodeURIComponent(webhookId)}`,
+      { method: "DELETE", headers: adminAuthHeader(requireAdminKey()) }
+    );
+    if (!response.ok) { setStatus(`Delete failed: ${response.status}`, "error"); return; }
+    setStatus("Webhook deleted", "ok");
+    await refreshWebhooks();
+  } catch {
+    setStatus("Failed to delete webhook", "error");
+  }
+}
+
+document.getElementById("createWebhookForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!_webhookManagerTenantId) return;
+  const url = document.getElementById("newWebhookUrl").value.trim();
+  const events = document.getElementById("newWebhookEvents").value;
+  const output = document.getElementById("createWebhookOutput");
+  output.hidden = false;
+  output.textContent = "Registering…";
+  try {
+    const result = await apiFetchGlobal(
+      `/api/admin/tenants/${encodeURIComponent(_webhookManagerTenantId)}/billing-webhooks`,
+      { method: "POST", body: JSON.stringify({ url, events }) }
+    );
+    output.textContent = `Webhook registered — save the signing secret now, it will not be shown again.\n\nSecret: ${result.secret}\nWebhook ID: ${result.webhookId}`;
+    document.getElementById("newWebhookUrl").value = "";
+    setStatus("Billing webhook registered", "ok");
+    await refreshWebhooks();
+  } catch {
+    output.textContent = "Failed to register webhook.";
+  }
+});
+
+document.getElementById("closeWebhookManager")?.addEventListener("click", () => {
+  document.getElementById("webhookManagerPanel")?.setAttribute("hidden", "");
+  _webhookManagerTenantId = null;
+});
+
+// ── Usage snapshot ────────────────────────────────────────────────────────────
+
+async function refreshUsage() {
+  const tbody = document.getElementById("usageBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  try {
+    const rows = await apiFetchGlobal("/api/admin/usage");
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No tenants yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const statusBadge = r.status === 0
+        ? '<span class="badge badge-ok">Active</span>'
+        : '<span class="badge badge-error">Suspended</span>';
+      const seats = r.maxSeats != null ? `${r.usedSeats} / ${r.maxSeats}` : `${r.usedSeats} / ∞`;
+      const seatPct = r.maxSeats != null ? Math.min(100, Math.round((r.usedSeats / r.maxSeats) * 100)) : 0;
+      const seatBar = r.maxSeats != null
+        ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? '#ef4444' : seatPct >= 80 ? '#f59e0b' : '#22c55e'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
+        : '';
+      return `<tr>
+        <td><strong>${esc(r.displayName)}</strong><br><small><code>${esc(r.name)}</code></small></td>
+        <td>${statusBadge}</td>
+        <td>${seats}${seatBar}</td>
+        <td>${r.activeKeys}</td>
+        <td>${r.protectedFiles}</td>
+      </tr>`;
+    }).join("");
+    setStatus(`Usage snapshot: ${rows.length} tenant(s)`, "ok");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Failed to load usage data.</td></tr>';
+  }
+}
+
+document.getElementById("refreshUsage")?.addEventListener("click", refreshUsage);
+
+document.getElementById("exportUsageCsv")?.addEventListener("click", () => {
+  const adminKey = requireAdminKey();
+  if (!adminKey) return;
+  const url = "/api/admin/usage?format=csv";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  const headers = adminAuthHeader(adminKey);
+  fetch(url, { headers: { ...headers } })
+    .then(r => r.blob())
+    .then(blob => {
+      const objectUrl = URL.createObjectURL(blob);
+      a.href = objectUrl;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+    })
+    .catch(() => setStatus("CSV export failed", "error"));
+});
+
+// ── Tenant registrations ──────────────────────────────────────────────────────
+
+let _pendingRejectId = null;
+
+const REG_STATUS_LABELS = { 0: "Pending", 1: "Verified", 2: "Approved", 3: "Rejected" };
+const REG_STATUS_BADGE  = {
+  0: "badge-warn",
+  1: "badge-info",
+  2: "badge-ok",
+  3: "badge-error",
+};
+
+async function refreshRegistrations() {
+  const tbody = document.getElementById("registrationsBody");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  const statusFilter = document.getElementById("registrationStatusFilter")?.value ?? "";
+  const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+  try {
+    const rows = await apiFetchGlobal(`/api/admin/registrations${qs}`);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No registrations found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const statusLabel = REG_STATUS_LABELS[r.status] ?? r.status;
+      const badgeClass  = REG_STATUS_BADGE[r.status] ?? "";
+      const badge = `<span class="badge ${badgeClass}">${esc(statusLabel)}</span>`;
+      const canApprove = r.status === 1; // Verified
+      const canReject  = r.status === 0 || r.status === 1; // Pending or Verified
+      const approveBtn = canApprove
+        ? `<button type="button" class="action-btn ok" onclick="approveRegistration('${r.registrationId}')">Approve</button>`
+        : "";
+      const rejectBtn = canReject
+        ? `<button type="button" class="action-btn danger" onclick="openRejectDialog('${r.registrationId}')">Reject</button>`
+        : "";
+      const tenantLink = r.createdTenantId
+        ? ` <small><a href="#" onclick="return false">${esc(r.createdTenantId)}</a></small>` : "";
+      return `<tr>
+        <td><strong>${esc(r.tenantName)}</strong><br><small>${esc(r.displayName)}</small>${tenantLink}</td>
+        <td>${esc(r.adminEmail)}<br><small>${esc(r.adminDisplayName)}</small></td>
+        <td>${badge}${r.reviewNotes ? `<br><small class="hint">${esc(r.reviewNotes)}</small>` : ""}</td>
+        <td>${new Date(r.requestedAtUtc).toLocaleString()}</td>
+        <td style="white-space:nowrap">${approveBtn}${rejectBtn}</td>
+      </tr>`;
+    }).join("");
+    setStatus(`Registrations: ${rows.length} record(s)`, "ok");
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Failed to load registrations.</td></tr>';
+  }
+}
+
+async function approveRegistration(registrationId) {
+  try {
+    await apiFetchGlobal(`/api/admin/registrations/${encodeURIComponent(registrationId)}/approve`, { method: "POST" });
+    setStatus("Registration approved — tenant created", "ok");
+    await refreshRegistrations();
+  } catch (e) {
+    setStatus(`Approve failed: ${e?.message ?? "unknown error"}`, "error");
+  }
+}
+
+function openRejectDialog(registrationId) {
+  _pendingRejectId = registrationId;
+  const dialog = document.getElementById("rejectDialog");
+  dialog?.removeAttribute("hidden");
+  document.getElementById("rejectNotes")?.focus();
+}
+
+document.getElementById("cancelReject")?.addEventListener("click", () => {
+  document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+  _pendingRejectId = null;
+});
+
+document.getElementById("rejectForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!_pendingRejectId) return;
+  const notes = document.getElementById("rejectNotes")?.value.trim() || null;
+  try {
+    await apiFetchGlobal(
+      `/api/admin/registrations/${encodeURIComponent(_pendingRejectId)}/reject`,
+      { method: "POST", body: JSON.stringify({ notes }) }
+    );
+    setStatus("Registration rejected", "ok");
+    document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+    document.getElementById("rejectNotes").value = "";
+    _pendingRejectId = null;
+    await refreshRegistrations();
+  } catch (e) {
+    setStatus(`Reject failed: ${e?.message ?? "unknown error"}`, "error");
+  }
+});
+
+document.getElementById("refreshRegistrations")?.addEventListener("click", refreshRegistrations);
+document.getElementById("registrationStatusFilter")?.addEventListener("change", refreshRegistrations);
+
+// ── Analytics / metrics ───────────────────────────────────────────────────────
+
+function drawSparkline(svgId, values, color = "#6366f1") {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  svg.innerHTML = "";
+  if (!values || values.length < 2) {
+    svg.innerHTML = `<text x="110" y="28" text-anchor="middle" fill="#9ca3af" font-size="11">No data</text>`;
+    return;
+  }
+  const W = 220, H = 48, pad = 4;
+  const maxVal = Math.max(...values, 1);
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+    const y = H - pad - (v / maxVal) * (H - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const area = `M${pts[0]} ` + pts.slice(1).map(p => `L${p}`).join(" ") +
+    ` L${(W - pad).toFixed(1)},${H} L${pad},${H} Z`;
+  const line = `M${pts[0]} ` + pts.slice(1).map(p => `L${p}`).join(" ");
+  svg.innerHTML =
+    `<defs><linearGradient id="sg-${svgId}" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0%" stop-color="${color}" stop-opacity="0.25"/>` +
+    `<stop offset="100%" stop-color="${color}" stop-opacity="0.02"/></linearGradient></defs>` +
+    `<path d="${area}" fill="url(#sg-${svgId})"/>` +
+    `<path d="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
+}
+
+async function refreshMetrics() {
+  const period = document.getElementById("metricsPeriod")?.value ?? "7";
+  try {
+    const data = await apiFetchGlobal(`/api/admin/metrics?period=${period}`);
+    document.getElementById("mTotalTenants").textContent = data.summary.totalTenants;
+    document.getElementById("mActiveTenants").textContent = data.summary.activeTenants;
+    document.getElementById("mTotalUsers").textContent = data.summary.totalUsers;
+    document.getElementById("mTotalFiles").textContent = data.summary.totalFiles;
+    document.getElementById("mNewRegs").textContent = data.summary.newRegistrations;
+
+    const buckets = data.buckets ?? [];
+    drawSparkline("sparkTotalEvents",    buckets.map(b => b.totalEvents),    "#6366f1");
+    drawSparkline("sparkFilesProtected", buckets.map(b => b.filesProtected), "#10b981");
+    drawSparkline("sparkDecryptions",    buckets.map(b => b.decryptions),    "#f59e0b");
+    drawSparkline("sparkNewUsers",       buckets.map(b => b.newUsers),       "#3b82f6");
+    setStatus(`Metrics loaded (${period}d)`, "ok");
+  } catch {
+    setStatus("Failed to load metrics", "error");
+  }
+}
+
+document.getElementById("refreshMetrics")?.addEventListener("click", refreshMetrics);
+document.getElementById("metricsPeriod")?.addEventListener("change", refreshMetrics);
+
+// === Alert rules ===
+
+let _editingRuleId = null;
+
+async function refreshAlertRules() {
+  const [rulesRes, firedRes] = await Promise.all([
+    apiFetch("/api/admin/alert-rules"),
+    apiFetch("/api/admin/alerts-fired?limit=50"),
+  ]);
+  if (!rulesRes.ok || !firedRes.ok) return;
+  const rules = await rulesRes.json();
+  const fired = await firedRes.json();
+
+  const tbody = document.querySelector("#alertRulesTable tbody");
+  if (tbody) {
+    tbody.innerHTML = rules.map(r => `
+      <tr>
+        <td>${esc(r.name)}</td>
+        <td>${esc(r.conditionName)}</td>
+        <td>${r.threshold}</td>
+        <td>${r.tenantId ? esc(r.tenantId) : '<span class="badge-info">global</span>'}</td>
+        <td>${r.fireWebhook ? '<span class="badge-warn">yes</span>' : 'no'}</td>
+        <td>${r.enabled ? '<span class="badge-ok">on</span>' : '<span class="badge-error">off</span>'}</td>
+        <td>
+          <button type="button" onclick="openEditAlert('${r.ruleId}')">Edit</button>
+          <button type="button" class="danger" onclick="deleteAlertRule('${r.ruleId}')">Delete</button>
+        </td>
+      </tr>`).join("");
+  }
+
+  const firedTbody = document.querySelector("#alertsFiredTable tbody");
+  if (firedTbody) {
+    firedTbody.innerHTML = fired.map(f => `
+      <tr>
+        <td>${esc(f.ruleName)}</td>
+        <td>${f.tenantId ? esc(f.tenantId) : '—'}</td>
+        <td>${f.actualValue.toFixed(2)}</td>
+        <td>${f.threshold}</td>
+        <td>${new Date(f.firedAtUtc).toLocaleString()}</td>
+      </tr>`).join("");
+  }
+}
+
+function openCreateAlert() {
+  _editingRuleId = null;
+  document.getElementById("alertRuleDialogTitle").textContent = "New alert rule";
+  document.getElementById("alertRuleId").value = "";
+  document.getElementById("alertRuleName").value = "";
+  document.getElementById("alertRuleCondition").value = "0";
+  document.getElementById("alertRuleThreshold").value = "80";
+  document.getElementById("alertRuleTenantId").value = "";
+  document.getElementById("alertRuleEnabled").checked = true;
+  document.getElementById("alertRuleFireWebhook").checked = false;
+  document.getElementById("alertRuleDialog").showModal();
+}
+
+async function openEditAlert(ruleId) {
+  const res = await apiFetch("/api/admin/alert-rules");
+  if (!res.ok) return;
+  const rules = await res.json();
+  const rule = rules.find(r => r.ruleId === ruleId);
+  if (!rule) return;
+  _editingRuleId = ruleId;
+  document.getElementById("alertRuleDialogTitle").textContent = "Edit alert rule";
+  document.getElementById("alertRuleId").value = ruleId;
+  document.getElementById("alertRuleName").value = rule.name;
+  document.getElementById("alertRuleCondition").value = String(rule.condition);
+  document.getElementById("alertRuleThreshold").value = String(rule.threshold);
+  document.getElementById("alertRuleTenantId").value = rule.tenantId ?? "";
+  document.getElementById("alertRuleEnabled").checked = rule.enabled;
+  document.getElementById("alertRuleFireWebhook").checked = rule.fireWebhook;
+  document.getElementById("alertRuleDialog").showModal();
+}
+
+async function deleteAlertRule(ruleId) {
+  if (!confirm("Delete this alert rule?")) return;
+  await apiFetch(`/api/admin/alert-rules/${ruleId}`, { method: "DELETE" });
+  await refreshAlertRules();
+}
+
+document.getElementById("alertRuleForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = document.getElementById("alertRuleName").value.trim();
+  const condition = parseInt(document.getElementById("alertRuleCondition").value, 10);
+  const threshold = parseFloat(document.getElementById("alertRuleThreshold").value);
+  const tenantIdRaw = document.getElementById("alertRuleTenantId").value.trim();
+  const tenantId = tenantIdRaw || null;
+  const enabled = document.getElementById("alertRuleEnabled").checked;
+  const fireWebhook = document.getElementById("alertRuleFireWebhook").checked;
+
+  if (_editingRuleId) {
+    await apiFetch(`/api/admin/alert-rules/${_editingRuleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, threshold, enabled, fireWebhook }),
+    });
+  } else {
+    await apiFetch("/api/admin/alert-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, condition, threshold, tenantId, enabled, fireWebhook }),
+    });
+  }
+
+  document.getElementById("alertRuleDialog").close();
+  await refreshAlertRules();
+});
+
+document.getElementById("cancelAlertRuleBtn")?.addEventListener("click", () => {
+  document.getElementById("alertRuleDialog").close();
+});
+document.getElementById("openCreateAlertBtn")?.addEventListener("click", openCreateAlert);
+document.getElementById("refreshAlertsBtn")?.addEventListener("click", refreshAlertRules);
+
+// ── v1.6: Access Requests ─────────────────────────────────────────────────
+
+async function refreshAccessRequests() {
+  const statusFilter = document.getElementById("arStatusFilter")?.value || "";
+  let url = "/api/admin/access-requests?limit=200";
+  if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
+
+  const rows = await apiFetch(url);
+  const tbody = document.getElementById("accessRequestsBody");
+  if (!tbody) return;
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">No access requests found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const isPending = r.status === "pending";
+    const actions = isPending
+      ? `<button class="ghost" onclick="reviewRequest('${r.requestId}','approve')">Approve</button>
+         <button class="ghost danger" onclick="reviewRequest('${r.requestId}','reject')">Reject</button>`
+      : `<span class="pill ${r.status === 'approved' ? 'ok' : 'warn'}">${r.status}</span>`;
+    return `<tr>
+      <td>${esc(r.requesterEmail)}</td>
+      <td style="font-family:monospace;font-size:11px">${r.fileId.slice(0,8)}…</td>
+      <td>${esc(r.message || "—")}</td>
+      <td>${r.status}</td>
+      <td>${new Date(r.requestedAtUtc).toLocaleString()}</td>
+      <td style="display:flex;gap:4px">${actions}</td>
+    </tr>`;
+  }).join("");
+}
+
+async function reviewRequest(requestId, action) {
+  await apiFetch(`/api/admin/access-requests/${requestId}/${action}`, { method: "PATCH" });
+  await refreshAccessRequests();
+}
+
+document.getElementById("refreshAccessRequests")?.addEventListener("click", refreshAccessRequests);
+document.getElementById("arStatusFilter")?.addEventListener("change", refreshAccessRequests);
+
+// ── v1.6: Tenant Plans ────────────────────────────────────────────────────
+
+async function refreshTenantPlans() {
+  const tenants = await apiFetch("/api/admin/tenants");
+  const tbody = document.getElementById("tenantPlansBody");
+  if (!tbody) return;
+
+  if (!tenants || tenants.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">No tenants found.</td></tr>`;
+    return;
+  }
+
+  const planRows = await Promise.all(tenants.map(async t => {
+    try {
+      return { tenant: t, plan: await apiFetch(`/api/admin/tenants/${t.tenantId}/plan`) };
+    } catch {
+      return { tenant: t, plan: null };
+    }
+  }));
+
+  tbody.innerHTML = planRows.map(({ tenant, plan }) => {
+    const tier = plan?.tier ?? "free";
+    const maxFiles = plan?.maxFiles != null ? plan.maxFiles : "∞";
+    const maxStorage = plan?.maxStorageMb != null ? `${plan.maxStorageMb} MB` : "∞";
+    const used = plan?.currentFileCount ?? "—";
+    const exceeded = plan?.filesQuotaExceeded;
+    const quotaCell = exceeded
+      ? `<span style="color:var(--error)">⚠ Quota exceeded</span>`
+      : `<span style="color:var(--ok)">OK</span>`;
+    return `<tr>
+      <td>${esc(tenant.displayName || tenant.name)}</td>
+      <td><span class="pill">${tier}</span></td>
+      <td>${maxFiles}</td>
+      <td>${maxStorage}</td>
+      <td>${used}</td>
+      <td>${quotaCell}</td>
+      <td><button class="ghost" onclick="openEditPlan('${tenant.tenantId}','${tier}',${plan?.maxFiles ?? ''},${plan?.maxStorageMb ?? ''})">Edit</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function openEditPlan(tenantId, tier, maxFiles, maxStorageMb) {
+  document.getElementById("editPlanTenantId").value = tenantId;
+  document.getElementById("editPlanTier").value = tier;
+  document.getElementById("editPlanMaxFiles").value = maxFiles || "";
+  document.getElementById("editPlanMaxStorage").value = maxStorageMb || "";
+  document.getElementById("editPlanPreset").value = "";
+  document.getElementById("editPlanDialog").showModal();
+}
+
+document.getElementById("editPlanPreset")?.addEventListener("change", e => {
+  const v = e.target.value;
+  const presets = { free: [50, 500], starter: [1000, 10000], enterprise: [null, null] };
+  if (v && presets[v]) {
+    const [f, s] = presets[v];
+    document.getElementById("editPlanMaxFiles").value = f ?? "";
+    document.getElementById("editPlanMaxStorage").value = s ?? "";
+    document.getElementById("editPlanTier").value = v;
+  }
+});
+
+document.getElementById("editPlanForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const tenantId = document.getElementById("editPlanTenantId").value;
+  const preset = document.getElementById("editPlanPreset").value || null;
+  const tier = document.getElementById("editPlanTier").value.trim() || "free";
+  const maxFilesRaw = document.getElementById("editPlanMaxFiles").value.trim();
+  const maxStorageRaw = document.getElementById("editPlanMaxStorage").value.trim();
+
+  await apiFetch(`/api/admin/tenants/${tenantId}/plan`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      preset,
+      tier,
+      maxFiles: maxFilesRaw ? parseInt(maxFilesRaw, 10) : null,
+      maxStorageMb: maxStorageRaw ? parseInt(maxStorageRaw, 10) : null,
+    }),
+  });
+
+  document.getElementById("editPlanDialog").close();
+  await refreshTenantPlans();
+});
+
+document.getElementById("refreshTenantPlans")?.addEventListener("click", refreshTenantPlans);
+
+// ─── v1.7: File Collections ───────────────────────────────────────────────
+
+async function refreshCollections() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const rows = await apiFetch(`/api/admin/collections?tenantId=${tenantId}`);
+  const tbody = document.getElementById("collectionsBody");
+  if (!tbody) return;
+  if (!rows?.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No collections yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(c => `<tr>
+    <td>${esc(c.name)}</td>
+    <td>${esc(c.description || "—")}</td>
+    <td>${c.fileCount}</td>
+    <td>${new Date(c.createdAtUtc).toLocaleDateString()}</td>
+    <td>
+      <button class="ghost" onclick="deleteCollection('${c.collectionId}')">Delete</button>
+    </td>
+  </tr>`).join("");
+}
+
+async function deleteCollection(collectionId) {
+  const tenantId = currentTenantId();
+  if (!tenantId || !confirm("Delete this collection? Files are not affected.")) return;
+  await apiFetch(`/api/admin/collections/${collectionId}?tenantId=${tenantId}`, { method: "DELETE" });
+  await refreshCollections();
+}
+
+document.getElementById("refreshCollections")?.addEventListener("click", refreshCollections);
+
+document.getElementById("createCollectionBtn")?.addEventListener("click", () => {
+  document.getElementById("newCollectionName").value = "";
+  document.getElementById("newCollectionDesc").value = "";
+  document.getElementById("newCollectionDialog").showModal();
+});
+
+document.getElementById("newCollectionForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch("/api/admin/collections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tenantId,
+      name: document.getElementById("newCollectionName").value.trim(),
+      description: document.getElementById("newCollectionDesc").value.trim() || null,
+    }),
+  });
+  document.getElementById("newCollectionDialog").close();
+  await refreshCollections();
+});
+
+// ─── v1.7: Batch file operations ─────────────────────────────────────────
+
+document.getElementById("batchRevokeBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const raw = document.getElementById("batchRevokeIds").value.trim();
+  const fileIds = raw.split(/\s+/).filter(Boolean);
+  if (!fileIds.length) return;
+  const data = await apiFetch("/api/admin/files/batch-revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, fileIds }),
+  });
+  document.getElementById("batchRevokeResult").textContent =
+    data?.results?.map(r => `${r.fileId}: ${r.status}`).join("\n") ?? JSON.stringify(data, null, 2);
+});
+
+document.getElementById("batchExpiryBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const raw = document.getElementById("batchExpiryIds").value.trim();
+  const fileIds = raw.split(/\s+/).filter(Boolean);
+  const dateVal = document.getElementById("batchExpiryDate").value;
+  if (!fileIds.length || !dateVal) return;
+  const data = await apiFetch("/api/admin/files/batch-expiry", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, fileIds, expiresAtUtc: new Date(dateVal).toISOString() }),
+  });
+  document.getElementById("batchExpiryResult").textContent =
+    data?.results?.map(r => `${r.fileId}: ${r.status}`).join("\n") ?? JSON.stringify(data, null, 2);
+});
+
+// ─── v1.7: Key rotation ──────────────────────────────────────────────────
+
+async function refreshKeyRotation() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+
+  const [config, history] = await Promise.all([
+    apiFetch(`/api/admin/tenants/${tenantId}/key-rotation`),
+    apiFetch(`/api/admin/tenants/${tenantId}/key-rotation/history`),
+  ]);
+
+  if (config) {
+    document.getElementById("keyRotationEnabled").checked = config.enabled;
+    document.getElementById("keyRotationIntervalDays").value = config.intervalDays ?? 90;
+    const statusEl = document.getElementById("keyRotationStatus");
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div>Enabled: <strong>${config.enabled ? "Yes" : "No"}</strong></div>
+        <div>Interval: <strong>${config.intervalDays} days</strong></div>
+        <div>Last rotated: <strong>${config.lastRotatedAtUtc ? new Date(config.lastRotatedAtUtc).toLocaleString() : "Never"}</strong></div>
+        <div>Next due: <strong>${config.nextRotationDueUtc ? new Date(config.nextRotationDueUtc).toLocaleString() : "—"}</strong></div>
+      `;
+    }
+  }
+
+  const tbody = document.getElementById("keyRotationHistoryBody");
+  if (tbody && history) {
+    if (!history.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="empty">No rotation history yet.</td></tr>`;
+    } else {
+      tbody.innerHTML = history.map(h => `<tr>
+        <td>${new Date(h.rotatedAtUtc).toLocaleString()}</td>
+        <td>${h.filesRotated}</td>
+        <td>${esc(h.triggeredBy)}</td>
+      </tr>`).join("");
+    }
+  }
+}
+
+document.getElementById("refreshKeyRotation")?.addEventListener("click", refreshKeyRotation);
+
+document.getElementById("saveKeyRotationBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/key-rotation`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      enabled: document.getElementById("keyRotationEnabled").checked,
+      intervalDays: parseInt(document.getElementById("keyRotationIntervalDays").value, 10) || 90,
+    }),
+  });
+  await refreshKeyRotation();
+});
+
+document.getElementById("triggerKeyRotationBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId || !confirm("Rotate all file encryption keys for this tenant now?")) return;
+  const result = await apiFetch(`/api/admin/tenants/${tenantId}/key-rotation/trigger`, { method: "POST" });
+  alert(`Rotated ${result?.filesRotated ?? 0} file key(s).`);
+  await refreshKeyRotation();
+});
+
+// ─── v1.8: Compliance export ──────────────────────────────────────────────
+
+document.getElementById("exportComplianceBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const blob = await apiFetchBlob(`/api/admin/tenants/${tenantId}/compliance/export`, {
+    method: "POST",
+  });
+  const filename = `compliance-${tenantId}.zip`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("gdprEraseBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  const userId = document.getElementById("gdprUserId")?.value.trim();
+  if (!tenantId || !userId) return;
+  if (!confirm(`Permanently erase data for user ${userId}? This cannot be undone.`)) return;
+  const body = await apiFetch(`/api/admin/tenants/${tenantId}/users/${userId}/data`, {
+    method: "DELETE",
+  });
+  document.getElementById("gdprEraseResult").textContent = JSON.stringify(body, null, 2);
+});
+
+// ─── v1.8: Data retention policy ─────────────────────────────────────────
+
+async function refreshRetentionPolicy() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const policy = await apiFetch(`/api/admin/tenants/${tenantId}/retention-policy`);
+  if (!policy) return;
+  document.getElementById("retentionEnabled").checked = policy.enabled;
+  document.getElementById("retentionDays").value = policy.fileRetentionDays ?? 365;
+}
+
+document.getElementById("refreshRetentionPolicy")?.addEventListener("click", refreshRetentionPolicy);
+
+document.getElementById("saveRetentionBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/retention-policy`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      enabled: document.getElementById("retentionEnabled").checked,
+      fileRetentionDays: parseInt(document.getElementById("retentionDays").value, 10) || 365,
+    }),
+  });
+  await refreshRetentionPolicy();
+});
+
+async function doApplyRetention(dryRun) {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  if (!dryRun && !confirm("Apply retention policy now? This will permanently delete matching files.")) return;
+  const data = await apiFetch(
+    `/api/admin/tenants/${tenantId}/retention-policy/apply?dryRun=${dryRun}`,
+    { method: "POST" }
+  );
+  document.getElementById("retentionApplyResult").textContent = JSON.stringify(data, null, 2);
+}
+
+document.getElementById("applyRetentionDryRunBtn")?.addEventListener("click", () => doApplyRetention(true));
+document.getElementById("applyRetentionBtn")?.addEventListener("click", () => doApplyRetention(false));
+
+// ─── v1.9: IP allowlist ───────────────────────────────────────────────────
+
+async function refreshIpAllowlist() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const rules = await apiFetch(`/api/admin/tenants/${tenantId}/ip-allowlist`);
+  if (!rules) return;
+  const tbody = document.getElementById("ipAllowlistBody");
+  if (!tbody) return;
+  if (!rules.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);text-align:center">No rules — all IPs allowed</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rules.map(r => `
+    <tr>
+      <td><code>${r.cidr}</code></td>
+      <td>${r.label || "—"}</td>
+      <td>${new Date(r.createdAtUtc).toLocaleDateString()}</td>
+      <td><button type="button" data-rule-id="${r.ruleId}" class="deleteIpRuleBtn" style="background:var(--danger,#e53e3e);color:#fff;padding:2px 8px;font-size:12px">Delete</button></td>
+    </tr>`).join("");
+  tbody.querySelectorAll(".deleteIpRuleBtn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ruleId = btn.dataset.ruleId;
+      await apiFetch(`/api/admin/tenants/${tenantId}/ip-allowlist/${ruleId}`, { method: "DELETE" });
+      await refreshIpAllowlist();
+    });
+  });
+}
+
+document.getElementById("refreshIpAllowlist")?.addEventListener("click", refreshIpAllowlist);
+
+document.getElementById("addIpRuleBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const cidr = document.getElementById("ipRuleCidr")?.value.trim();
+  const label = document.getElementById("ipRuleLabel")?.value.trim();
+  if (!cidr) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/ip-allowlist`, {
+    method: "POST",
+    body: JSON.stringify({ cidr, label }),
+  });
+  document.getElementById("ipRuleCidr").value = "";
+  document.getElementById("ipRuleLabel").value = "";
+  await refreshIpAllowlist();
+});
+
+// ─── v1.9: Device trust ───────────────────────────────────────────────────
+
+async function refreshDeviceTrust() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const config = await apiFetch(`/api/admin/tenants/${tenantId}/device-trust`);
+  if (!config) return;
+  document.getElementById("deviceTrustEnabled").checked = config.enabled;
+  document.getElementById("deviceTrustCheckinDays").value = config.requiredCheckinDays;
+}
+
+document.getElementById("refreshDeviceTrust")?.addEventListener("click", refreshDeviceTrust);
+
+document.getElementById("saveDeviceTrustBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/device-trust`, {
+    method: "PUT",
+    body: JSON.stringify({
+      enabled: document.getElementById("deviceTrustEnabled").checked,
+      requiredCheckinDays: parseInt(document.getElementById("deviceTrustCheckinDays").value, 10) || 7,
+    }),
+  });
+  await refreshDeviceTrust();
+});

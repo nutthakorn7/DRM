@@ -28,7 +28,7 @@ public static class AdminFileTagsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.FilesRevoke, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
@@ -83,7 +83,7 @@ public static class AdminFileTagsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRevoke, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.FilesRevoke, tenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(tenantId))
         {
@@ -117,7 +117,7 @@ public static class AdminFileTagsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.FilesRead, tenantId, out var fail))
             return fail!;
         var tags = await dbContext.FileTags
             .AsNoTracking()
@@ -134,7 +134,7 @@ public static class AdminFileTagsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.FilesRead, tenantId, out var fail))
             return fail!;
         var rows = await dbContext.FileTags
             .AsNoTracking()
@@ -157,7 +157,7 @@ public static class AdminFileTagsEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.FilesRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.FilesRead, tenantId, out var fail))
             return fail!;
         var fileIds = await dbContext.FileTags
             .AsNoTracking()

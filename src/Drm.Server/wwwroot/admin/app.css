@@ -1347,6 +1347,63 @@ pre {
   color: var(--ink);
 }
 
+/* ── Analytics ──────────────────────────────────────────────────────────────── */
+
+.metric-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sparkline-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 16px;
+}
+
+.sparkline-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 48px;
+  overflow: visible;
+}
+
+/* ── Alert badges ────────────────────────────────────────────────────────────── */
+
+.badge-warn  { color: #92400e; background: #fef3c7; }
+.badge-info  { color: #1e40af; background: #dbeafe; }
+.badge-ok    { color: #065f46; background: #d1fae5; }
+.badge-error { color: #991b1b; background: #fee2e2; }
+
+.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
+.danger:hover { background: #dc2626; border-color: #dc2626; }
+
 @media (max-width: 820px) {
   /* Page-header has 3 children competing for ~310px (after the 64px
      rail). On the brand side, drop the "Admin console" hint so the

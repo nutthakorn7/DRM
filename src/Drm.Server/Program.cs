@@ -43,6 +43,21 @@ else
     builder.Services.AddSingleton<IAdminNotificationSender, NoopAdminNotificationSender>();
 builder.Services.AddScoped<IAdminNotificationService, AdminNotificationService>();
 
+var registrationSettings = builder.Configuration.GetSection("Drm:Registration").Get<RegistrationSettings>() ?? new RegistrationSettings();
+builder.Services.AddSingleton(registrationSettings);
+if (emailSettings.IsConfigured)
+    builder.Services.AddSingleton<IRegistrationEmailSender, SmtpRegistrationEmailSender>();
+else
+    builder.Services.AddSingleton<IRegistrationEmailSender, NoopRegistrationEmailSender>();
+
+var auditSettings = builder.Configuration.GetSection("Drm:Audit").Get<AuditSettings>() ?? new AuditSettings();
+builder.Services.AddSingleton(auditSettings);
+builder.Services.AddHostedService<AuditRetentionWorker>();
+builder.Services.AddHostedService<FileExpiryWorker>();
+builder.Services.AddHostedService<AlertEvaluationWorker>();
+builder.Services.AddHostedService<KeyRotationWorker>();
+builder.Services.AddHostedService<DataRetentionWorker>();
+
 var app = builder.Build();
 
 SecurityStartupGuard.Validate(app.Configuration, app.Environment);
@@ -447,6 +462,110 @@ using (var scope = app.Services.CreateScope())
                 """);
         }
 
+        // AdminUsers.TenantScope — added in v1.2 for tenant-scoped admin roles
+        var adminUserColumns = new HashSet<string>(StringComparer.Ordinal);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"AdminUsers\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                adminUserColumns.Add(reader.GetString(1));
+        }
+
+        if (!adminUserColumns.Contains("TenantScope"))
+        {
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "AdminUsers" ADD COLUMN "TenantScope" TEXT NULL;
+                """);
+        }
+
+        // Tenants table — added in v1.3 for multi-tenant SaaS mode
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "Tenants" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_Tenants" PRIMARY KEY,
+                "Name" TEXT NOT NULL DEFAULT '',
+                "DisplayName" TEXT NOT NULL DEFAULT '',
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "MaxEncrypters" INTEGER NULL,
+                "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "SuspendedAtUtc" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Tenants_Name" ON "Tenants" ("Name");
+            """);
+        // Backfill: insert a row for every tenant that already has data but no Tenants row
+        dbContext.Database.ExecuteSqlRaw("""
+            INSERT OR IGNORE INTO "Tenants" ("TenantId", "Name", "DisplayName", "Status", "CreatedAtUtc")
+            SELECT DISTINCT t, t, t, 0, datetime('now')
+            FROM (
+                SELECT TenantId AS t FROM "TenantUsers"
+                UNION SELECT TenantId FROM "TenantGroups"
+                UNION SELECT TenantId FROM "ProtectedFiles"
+            ) all_tenants;
+            """);
+        // TenantClientKeys table — added in v1.3.1 for per-tenant client API keys
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantClientKeys" (
+                "TenantId" TEXT NOT NULL,
+                "KeyId" TEXT NOT NULL,
+                "KeyHash" TEXT NOT NULL,
+                "Label" TEXT NOT NULL DEFAULT '',
+                "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "LastUsedAtUtc" TEXT NULL,
+                "Revoked" INTEGER NOT NULL DEFAULT 0,
+                CONSTRAINT "PK_TenantClientKeys" PRIMARY KEY ("TenantId", "KeyId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantClientKeys_KeyHash"
+            ON "TenantClientKeys" ("KeyHash");
+            """);
+        // TenantBillingWebhooks table — added in v1.3.2 for usage/billing event webhooks
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantBillingWebhooks" (
+                "TenantId" TEXT NOT NULL,
+                "WebhookId" TEXT NOT NULL,
+                "Url" TEXT NOT NULL DEFAULT '',
+                "Secret" TEXT NOT NULL DEFAULT '',
+                "Events" TEXT NOT NULL DEFAULT '*',
+                "Enabled" INTEGER NOT NULL DEFAULT 1,
+                "CreatedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                CONSTRAINT "PK_TenantBillingWebhooks" PRIMARY KEY ("TenantId", "WebhookId")
+            );
+            """);
+        // TenantRegistrations table — added in v1.4 for self-serve tenant onboarding
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRegistrations" (
+                "RegistrationId" TEXT NOT NULL CONSTRAINT "PK_TenantRegistrations" PRIMARY KEY,
+                "TenantName" TEXT NOT NULL DEFAULT '',
+                "DisplayName" TEXT NOT NULL DEFAULT '',
+                "AdminEmail" TEXT NOT NULL DEFAULT '',
+                "AdminDisplayName" TEXT NOT NULL DEFAULT '',
+                "MaxEncrypters" INTEGER NULL,
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "TokenHash" TEXT NOT NULL DEFAULT '',
+                "TokenExpiresAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "RequestedAtUtc" TEXT NOT NULL DEFAULT (datetime('now')),
+                "ReviewedAtUtc" TEXT NULL,
+                "ReviewNotes" TEXT NULL,
+                "CreatedTenantId" TEXT NULL,
+                "CreatedUserId" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_AdminEmail"
+            ON "TenantRegistrations" ("AdminEmail");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_TenantName"
+            ON "TenantRegistrations" ("TenantName");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantRegistrations_TokenHash"
+            ON "TenantRegistrations" ("TokenHash");
+            """);
+
         if (openedHere)
         {
             connection.Close();
@@ -501,6 +620,175 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_AdminApiTokens_AdminUserId" ON "AdminApiTokens" ("AdminUserId");
             """);
+        // OperatorAlertRules + OperatorAlertsFired — added in v1.5 for operator alert engine
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertRules" (
+                "RuleId" TEXT NOT NULL CONSTRAINT "PK_OperatorAlertRules" PRIMARY KEY,
+                "Name" TEXT NOT NULL DEFAULT '',
+                "TenantId" TEXT NULL,
+                "Condition" INTEGER NOT NULL DEFAULT 0,
+                "Threshold" REAL NOT NULL DEFAULT 0,
+                "Enabled" INTEGER NOT NULL DEFAULT 1,
+                "FireWebhook" INTEGER NOT NULL DEFAULT 0,
+                "CreatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertRules_TenantId" ON "OperatorAlertRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertsFired" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_OperatorAlertsFired" PRIMARY KEY AUTOINCREMENT,
+                "RuleId" TEXT NOT NULL,
+                "TenantId" TEXT NULL,
+                "RuleName" TEXT NOT NULL DEFAULT '',
+                "ActualValue" REAL NOT NULL DEFAULT 0,
+                "Threshold" REAL NOT NULL DEFAULT 0,
+                "FiredAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertsFired_RuleId_FiredAtUtc"
+            ON "OperatorAlertsFired" ("RuleId", "FiredAtUtc");
+            """);
+        // v1.6: FileAccessRequests, TenantPlans, AuditChain (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileAccessRequests" (
+                "RequestId" TEXT NOT NULL CONSTRAINT "PK_FileAccessRequests" PRIMARY KEY,
+                "TenantId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "RequesterEmail" TEXT NOT NULL DEFAULT '',
+                "Message" TEXT NOT NULL DEFAULT '',
+                "Status" INTEGER NOT NULL DEFAULT 0,
+                "ReviewedByAdminId" TEXT NULL,
+                "RequestedAtUtc" TEXT NOT NULL,
+                "ReviewedAtUtc" TEXT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_FileId"
+            ON "FileAccessRequests" ("TenantId", "FileId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_Status"
+            ON "FileAccessRequests" ("TenantId", "Status");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantPlans" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantPlans" PRIMARY KEY,
+                "Tier" INTEGER NOT NULL DEFAULT 0,
+                "MaxFiles" INTEGER NULL,
+                "MaxStorageMb" INTEGER NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AuditChain" (
+                "AuditEventId" INTEGER NOT NULL CONSTRAINT "PK_AuditChain" PRIMARY KEY,
+                "Hash" TEXT NOT NULL DEFAULT '',
+                "PrevHash" TEXT NOT NULL DEFAULT ''
+            );
+            """);
+        // v1.7: FileCollections, FileCollectionItems, TenantKeyRotationConfigs, KeyRotationHistory (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollections" (
+                "CollectionId" TEXT NOT NULL CONSTRAINT "PK_FileCollections" PRIMARY KEY,
+                "TenantId" TEXT NOT NULL,
+                "Name" TEXT NOT NULL DEFAULT '',
+                "Description" TEXT NULL,
+                "CreatedAtUtc" TEXT NOT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollections_TenantId" ON "FileCollections" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollectionItems" (
+                "CollectionId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "TenantId" TEXT NOT NULL,
+                "AddedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_FileCollectionItems" PRIMARY KEY ("CollectionId", "FileId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollectionItems_TenantId" ON "FileCollectionItems" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantKeyRotationConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantKeyRotationConfigs" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "IntervalDays" INTEGER NOT NULL DEFAULT 90,
+                "LastRotatedAtUtc" TEXT NULL,
+                "NextRotationDueUtc" TEXT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "KeyRotationHistory" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_KeyRotationHistory" PRIMARY KEY AUTOINCREMENT,
+                "TenantId" TEXT NOT NULL,
+                "FilesRotated" INTEGER NOT NULL DEFAULT 0,
+                "TriggeredBy" TEXT NOT NULL DEFAULT 'schedule',
+                "RotatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_KeyRotationHistory_TenantId" ON "KeyRotationHistory" ("TenantId");
+            """);
+        // v1.8: TenantRetentionPolicies (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRetentionPolicies" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantRetentionPolicies" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "FileRetentionDays" INTEGER NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+
+        // v1.9: TenantIpAllowlistRules, TenantDeviceTrustConfigs (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantIpAllowlistRules" (
+                "RuleId" TEXT NOT NULL CONSTRAINT "PK_TenantIpAllowlistRules" PRIMARY KEY,
+                "TenantId" TEXT NOT NULL,
+                "Cidr" TEXT NOT NULL DEFAULT '',
+                "Label" TEXT NOT NULL DEFAULT '',
+                "CreatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantIpAllowlistRules_TenantId" ON "TenantIpAllowlistRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantDeviceTrustConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantDeviceTrustConfigs" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "RequiredCheckinDays" INTEGER NOT NULL DEFAULT 7,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+
+        // v1.9: time-windowed grants — add columns to existing FileGrants table
+        var hasFileGrantsValidFromUtc = false;
+        var hasFileGrantsValidUntilUtc = false;
+        var grantsConn = dbContext.Database.GetDbConnection();
+        if (grantsConn.State != System.Data.ConnectionState.Open) grantsConn.Open();
+        using (var command = grantsConn.CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info(\"FileGrants\");";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var col = reader.GetString(1);
+                if (string.Equals(col, "ValidFromUtc", StringComparison.Ordinal)) hasFileGrantsValidFromUtc = true;
+                if (string.Equals(col, "ValidUntilUtc", StringComparison.Ordinal)) hasFileGrantsValidUntilUtc = true;
+            }
+        }
+        if (!hasFileGrantsValidFromUtc)
+            dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "FileGrants" ADD COLUMN "ValidFromUtc" TEXT NULL;""");
+        if (!hasFileGrantsValidUntilUtc)
+            dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "FileGrants" ADD COLUMN "ValidUntilUtc" TEXT NULL;""");
     }
     else
     {
@@ -551,6 +839,250 @@ using (var scope = app.Services.CreateScope())
         // AuditEvents.ActorAdminId — added in v1.1 Slice 2 for RBAC actor attribution (Postgres)
         dbContext.Database.ExecuteSqlRaw("""
             ALTER TABLE "AuditEvents" ADD COLUMN IF NOT EXISTS "ActorAdminId" uuid NULL;
+            """);
+        // AdminUsers.TenantScope — added in v1.2 for tenant-scoped admin roles (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "AdminUsers" ADD COLUMN IF NOT EXISTS "TenantScope" uuid NULL;
+            """);
+        // Tenants table — added in v1.3 for multi-tenant SaaS mode (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "Tenants" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_Tenants" PRIMARY KEY,
+                "Name" text NOT NULL DEFAULT '',
+                "DisplayName" text NOT NULL DEFAULT '',
+                "Status" integer NOT NULL DEFAULT 0,
+                "MaxEncrypters" integer NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "SuspendedAtUtc" timestamp with time zone NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Tenants_Name" ON "Tenants" ("Name");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            INSERT INTO "Tenants" ("TenantId", "Name", "DisplayName", "Status", "CreatedAtUtc")
+            SELECT DISTINCT t, t::text, t::text, 0, NOW()
+            FROM (
+                SELECT "TenantId" AS t FROM "TenantUsers"
+                UNION SELECT "TenantId" FROM "TenantGroups"
+                UNION SELECT "TenantId" FROM "ProtectedFiles"
+            ) all_tenants
+            ON CONFLICT DO NOTHING;
+            """);
+        // TenantClientKeys table — added in v1.3.1 for per-tenant client API keys (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantClientKeys" (
+                "TenantId" uuid NOT NULL,
+                "KeyId" uuid NOT NULL,
+                "KeyHash" text NOT NULL,
+                "Label" text NOT NULL DEFAULT '',
+                "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "LastUsedAtUtc" timestamp with time zone NULL,
+                "Revoked" boolean NOT NULL DEFAULT FALSE,
+                CONSTRAINT "PK_TenantClientKeys" PRIMARY KEY ("TenantId", "KeyId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantClientKeys_KeyHash"
+            ON "TenantClientKeys" ("KeyHash");
+            """);
+        // TenantBillingWebhooks table — added in v1.3.2 for usage/billing event webhooks (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantBillingWebhooks" (
+                "TenantId" uuid NOT NULL,
+                "WebhookId" uuid NOT NULL,
+                "Url" text NOT NULL DEFAULT '',
+                "Secret" text NOT NULL DEFAULT '',
+                "Events" text NOT NULL DEFAULT '*',
+                "Enabled" boolean NOT NULL DEFAULT TRUE,
+                "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                CONSTRAINT "PK_TenantBillingWebhooks" PRIMARY KEY ("TenantId", "WebhookId")
+            );
+            """);
+        // TenantRegistrations table — added in v1.4 for self-serve tenant onboarding (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRegistrations" (
+                "RegistrationId" uuid NOT NULL CONSTRAINT "PK_TenantRegistrations" PRIMARY KEY,
+                "TenantName" text NOT NULL DEFAULT '',
+                "DisplayName" text NOT NULL DEFAULT '',
+                "AdminEmail" text NOT NULL DEFAULT '',
+                "AdminDisplayName" text NOT NULL DEFAULT '',
+                "MaxEncrypters" integer NULL,
+                "Status" integer NOT NULL DEFAULT 0,
+                "TokenHash" text NOT NULL DEFAULT '',
+                "TokenExpiresAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "RequestedAtUtc" timestamp with time zone NOT NULL DEFAULT NOW(),
+                "ReviewedAtUtc" timestamp with time zone NULL,
+                "ReviewNotes" text NULL,
+                "CreatedTenantId" uuid NULL,
+                "CreatedUserId" uuid NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_AdminEmail"
+            ON "TenantRegistrations" ("AdminEmail");
+            CREATE INDEX IF NOT EXISTS "IX_TenantRegistrations_TenantName"
+            ON "TenantRegistrations" ("TenantName");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantRegistrations_TokenHash"
+            ON "TenantRegistrations" ("TokenHash");
+            """);
+
+        // OperatorAlertRules + OperatorAlertsFired — added in v1.5 for operator alert engine (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertRules" (
+                "RuleId" uuid NOT NULL CONSTRAINT "PK_OperatorAlertRules" PRIMARY KEY,
+                "Name" text NOT NULL DEFAULT '',
+                "TenantId" uuid NULL,
+                "Condition" integer NOT NULL DEFAULT 0,
+                "Threshold" double precision NOT NULL DEFAULT 0,
+                "Enabled" boolean NOT NULL DEFAULT true,
+                "FireWebhook" boolean NOT NULL DEFAULT false,
+                "CreatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertRules_TenantId" ON "OperatorAlertRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OperatorAlertsFired" (
+                "Id" bigserial NOT NULL CONSTRAINT "PK_OperatorAlertsFired" PRIMARY KEY,
+                "RuleId" uuid NOT NULL,
+                "TenantId" uuid NULL,
+                "RuleName" text NOT NULL DEFAULT '',
+                "ActualValue" double precision NOT NULL DEFAULT 0,
+                "Threshold" double precision NOT NULL DEFAULT 0,
+                "FiredAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OperatorAlertsFired_RuleId_FiredAtUtc"
+            ON "OperatorAlertsFired" ("RuleId", "FiredAtUtc");
+            """);
+
+        // v1.6: FileAccessRequests, TenantPlans, AuditChain (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileAccessRequests" (
+                "RequestId" uuid NOT NULL CONSTRAINT "PK_FileAccessRequests" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "FileId" uuid NOT NULL,
+                "RequesterEmail" text NOT NULL DEFAULT '',
+                "Message" text NOT NULL DEFAULT '',
+                "Status" integer NOT NULL DEFAULT 0,
+                "ReviewedByAdminId" uuid NULL,
+                "RequestedAtUtc" timestamptz NOT NULL,
+                "ReviewedAtUtc" timestamptz NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_FileId"
+            ON "FileAccessRequests" ("TenantId", "FileId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileAccessRequests_TenantId_Status"
+            ON "FileAccessRequests" ("TenantId", "Status");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantPlans" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantPlans" PRIMARY KEY,
+                "Tier" integer NOT NULL DEFAULT 0,
+                "MaxFiles" integer NULL,
+                "MaxStorageMb" integer NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AuditChain" (
+                "AuditEventId" bigint NOT NULL CONSTRAINT "PK_AuditChain" PRIMARY KEY,
+                "Hash" text NOT NULL DEFAULT '',
+                "PrevHash" text NOT NULL DEFAULT ''
+            );
+            """);
+        // v1.7: FileCollections, FileCollectionItems, TenantKeyRotationConfigs, KeyRotationHistory (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollections" (
+                "CollectionId" uuid NOT NULL CONSTRAINT "PK_FileCollections" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "Name" text NOT NULL DEFAULT '',
+                "Description" text NULL,
+                "CreatedAtUtc" timestamptz NOT NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollections_TenantId" ON "FileCollections" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollectionItems" (
+                "CollectionId" uuid NOT NULL,
+                "FileId" uuid NOT NULL,
+                "TenantId" uuid NOT NULL,
+                "AddedAtUtc" timestamptz NOT NULL,
+                CONSTRAINT "PK_FileCollectionItems" PRIMARY KEY ("CollectionId", "FileId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollectionItems_TenantId" ON "FileCollectionItems" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantKeyRotationConfigs" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantKeyRotationConfigs" PRIMARY KEY,
+                "Enabled" boolean NOT NULL DEFAULT FALSE,
+                "IntervalDays" integer NOT NULL DEFAULT 90,
+                "LastRotatedAtUtc" timestamptz NULL,
+                "NextRotationDueUtc" timestamptz NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "KeyRotationHistory" (
+                "Id" bigserial NOT NULL CONSTRAINT "PK_KeyRotationHistory" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "FilesRotated" integer NOT NULL DEFAULT 0,
+                "TriggeredBy" text NOT NULL DEFAULT 'schedule',
+                "RotatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_KeyRotationHistory_TenantId" ON "KeyRotationHistory" ("TenantId");
+            """);
+        // v1.8: TenantRetentionPolicies (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRetentionPolicies" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantRetentionPolicies" PRIMARY KEY,
+                "Enabled" boolean NOT NULL DEFAULT FALSE,
+                "FileRetentionDays" integer NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+
+        // v1.9: TenantIpAllowlistRules, TenantDeviceTrustConfigs (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantIpAllowlistRules" (
+                "RuleId" uuid NOT NULL CONSTRAINT "PK_TenantIpAllowlistRules" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "Cidr" text NOT NULL DEFAULT '',
+                "Label" text NOT NULL DEFAULT '',
+                "CreatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_TenantIpAllowlistRules_TenantId" ON "TenantIpAllowlistRules" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantDeviceTrustConfigs" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantDeviceTrustConfigs" PRIMARY KEY,
+                "Enabled" boolean NOT NULL DEFAULT FALSE,
+                "RequiredCheckinDays" integer NOT NULL DEFAULT 7,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+
+        // v1.9: time-windowed grants — add columns to existing FileGrants table (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "FileGrants" ADD COLUMN IF NOT EXISTS "ValidFromUtc" timestamptz NULL;
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "FileGrants" ADD COLUMN IF NOT EXISTS "ValidUntilUtc" timestamptz NULL;
             """);
     }
 
@@ -615,6 +1147,14 @@ app.MapAdminOutlookIntegrationEndpoints();
 app.MapOutlookAddInEndpoints();
 app.MapAdminFileTagsEndpoints();
 app.MapAdminLicenseEndpoints();
+app.MapAdminTenantsEndpoints();
+app.MapAdminTenantClientKeysEndpoints();
+app.MapAdminTenantBillingWebhooksEndpoints();
+app.MapAdminUsageEndpoints();
+app.MapPublicRegistrationEndpoints();
+app.MapAdminRegistrationsEndpoints();
+app.MapAdminMetricsEndpoints();
+app.MapAdminAlertEndpoints();
 app.MapAdminIdentityEndpoints();
 app.MapAdminFileZipEndpoints();
 app.MapAdminTransparentFilesEndpoints();
@@ -625,6 +1165,17 @@ app.MapPersonaEndpoints();
 app.MapQuickShareEndpoints();
 app.MapRecentRecipientsEndpoints();
 app.MapAdminNotificationConfigEndpoints();
+app.MapAdminAuditChainEndpoints();
+app.MapAdminAccessRequestEndpoints();
+app.MapAdminTenantPlanEndpoints();
+app.MapAccessRequestEndpoints();
+app.MapAdminFileCollectionEndpoints();
+app.MapAdminBatchFileEndpoints();
+app.MapAdminKeyRotationEndpoints();
+app.MapAdminComplianceEndpoints();
+app.MapAdminRetentionPolicyEndpoints();
+app.MapAdminIpAllowlistEndpoints();
+app.MapAdminDeviceTrustEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();
 app.MapScimGroupsEndpoints();

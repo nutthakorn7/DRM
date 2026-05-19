@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.2.0] — 2026-05-18
+
+**v1.2 — tenant-scoped admin roles.**
+Operators can now create admin users whose authority is limited to a single
+tenant. A scoped admin can do anything their role permits, but only within
+their assigned tenant. Global admins (no scope) behave identically to v1.1.
+
+### Added
+- **Tenant-scoped admin roles.**
+  - `AdminUserEntity.TenantScope` (`Guid?`) — `null` = global, non-null =
+    restricted to one tenant.
+  - `AdminIdentity.TenantScope` and `CanAccessTenant(Guid)` helper.
+  - `AdminIdentityContext.TryRequirePermissionForTenant` — checks RBAC
+    permission AND tenant scope; returns 403 `tenant_scope_denied` on mismatch.
+  - `POST /api/admin/identity/admins` accepts optional `tenantScope` UUID.
+  - `GET /api/admin/identity/whoami` and admin list return `tenantScope`.
+  - Additive schema migrations for SQLite and Postgres.
+  - Admin console: tenant scope input on create-admin form; "Scope" column in
+    the admin user table (shows "Global" badge or truncated UUID with tooltip).
+
+### Changed
+- `TryRequirePermissionForTenant` enforced on all 67 tenant-data endpoint
+  call sites across 17 endpoint files (Audit, Box, Devices, DirectorySync,
+  ExternalShareSettings, FileTags, FileZip, Files, FolderWatcher,
+  NotificationConfig, OutlookIntegration, PolicySimulator, PolicyTemplates,
+  SecureContainers, Siem, TransparentFiles, WatermarkTemplates).
+  Remaining global call sites: AdminIdentityEndpoints (admin self-management),
+  AdminLicenseEndpoints, TransparentFiles VerifyAsync + GetTrailerSecret.
+
 ## [1.1.0] — 2026-05-18
 
 **v1.1 enterprise — admin identity upgrade (Slices 1–4).**

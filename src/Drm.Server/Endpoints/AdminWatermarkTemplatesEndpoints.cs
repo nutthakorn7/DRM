@@ -36,7 +36,7 @@ public static class AdminWatermarkTemplatesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.PoliciesWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
@@ -112,7 +112,7 @@ public static class AdminWatermarkTemplatesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.PoliciesWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
         {
@@ -163,7 +163,7 @@ public static class AdminWatermarkTemplatesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.PoliciesRead, tenantId, out var fail))
             return fail!;
         var templates = await dbContext.WatermarkTemplates
             .AsNoTracking()
@@ -182,7 +182,7 @@ public static class AdminWatermarkTemplatesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.PoliciesRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.PoliciesRead, tenantId, out var fail))
             return fail!;
         var template = await dbContext.WatermarkTemplates
             .AsNoTracking()

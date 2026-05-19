@@ -15,6 +15,7 @@ public static class FilesEndpoints
 
         group.MapPost("/", RegisterFileAsync);
         group.MapPost("/{fileId:guid}/revoke", RevokeFileAsync);
+        group.MapPatch("/{fileId:guid}/expiry", PatchExpiryAsync);
 
         return endpoints;
     }
@@ -35,6 +36,17 @@ public static class FilesEndpoints
         if (duplicateExists)
         {
             return TypedResults.Conflict();
+        }
+
+        // Enforce tenant plan file quota
+        var plan = await dbContext.TenantPlans.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.TenantId == request.TenantId, cancellationToken);
+        if (plan?.MaxFiles.HasValue == true)
+        {
+            var currentCount = await dbContext.ProtectedFiles
+                .CountAsync(f => f.TenantId == request.TenantId, cancellationToken);
+            if (currentCount >= plan.MaxFiles.Value)
+                return TypedResults.BadRequest(new ErrorResponse("plan_quota_exceeded"));
         }
 
         var effectivePolicy = await BuildEffectivePolicyAsync(request, dbContext, permissions, cancellationToken);
@@ -214,6 +226,23 @@ public static class FilesEndpoints
         return null;
     }
 
+    private static async Task<IResult> PatchExpiryAsync(
+        Guid fileId,
+        Guid tenantId,
+        PatchExpiryRequest request,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var file = await dbContext.ProtectedFiles
+            .SingleOrDefaultAsync(f => f.TenantId == tenantId && f.Id == fileId, cancellationToken);
+        if (file is null) return Results.NotFound();
+        if (file.Revoked) return Results.BadRequest(new ErrorResponse("file_revoked"));
+
+        file.ExpiresAtUtc = request.ExpiresAtUtc;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Results.Ok(new { fileId = file.Id, expiresAtUtc = file.ExpiresAtUtc });
+    }
+
     private static async Task<Results<Ok<RevokeFileResponse>, NotFound>> RevokeFileAsync(
         Guid fileId,
         Guid tenantId,
@@ -295,6 +324,8 @@ public static class FilesEndpoints
         DateTimeOffset ExpiresAtUtc,
         string Permissions,
         string WatermarkTemplate);
+
+    private sealed record PatchExpiryRequest(DateTimeOffset ExpiresAtUtc);
 
     private sealed record RevokeFileResponse(Guid FileId, bool Revoked);
 

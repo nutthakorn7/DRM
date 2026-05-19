@@ -19,12 +19,31 @@ public static class AdminUsersEndpoints
         CreateUserRequest request,
         HttpContext httpContext,
         AppDbContext dbContext,
+        IServiceScopeFactory scopeFactory,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+
+        // Seat quota: reject if tenant has a MaxEncrypters limit and it is already reached
+        var maxEncrypters = await dbContext.Tenants
+            .AsNoTracking()
+            .Where(t => t.TenantId == request.TenantId)
+            .Select(t => (int?)t.MaxEncrypters)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        int currentCount = 0;
+        if (maxEncrypters.HasValue)
+        {
+            currentCount = await dbContext.TenantUsers
+                .AsNoTracking()
+                .CountAsync(u => u.TenantId == request.TenantId, cancellationToken);
+
+            if (currentCount >= maxEncrypters.Value)
+                return Results.Conflict(new ErrorResponse("seat_limit_exceeded"));
+        }
 
         if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
             return Results.Conflict();
@@ -52,6 +71,17 @@ public static class AdminUsersEndpoints
             throw;
         }
 
+        // Fire seat_limit_approach webhook when crossing >= 80% of the seat limit
+        if (maxEncrypters.HasValue)
+        {
+            var newCount = currentCount + 1;
+            var pct = (double)newCount / maxEncrypters.Value;
+            var prevPct = (double)currentCount / maxEncrypters.Value;
+            if (pct >= 0.8 && prevPct < 0.8)
+                BillingWebhooks.FireAndForget(scopeFactory, request.TenantId, "seat_limit_approach",
+                    new { tenantId = request.TenantId, usedSeats = newCount, maxSeats = maxEncrypters.Value, usagePercent = (int)(pct * 100) });
+        }
+
         return Results.Created($"/api/admin/users/{user.UserId}", UserResponse.From(user));
     }
 
@@ -61,7 +91,7 @@ public static class AdminUsersEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersRead, tenantId, out var fail))
             return fail!;
         var users = await dbContext.TenantUsers
             .AsNoTracking()

@@ -2,6 +2,92 @@ using Drm.Domain;
 
 namespace Drm.Server;
 
+public enum TenantStatus { Active = 0, Suspended = 1 }
+
+public sealed class TenantClientKeyEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid KeyId { get; set; }
+
+    public string KeyHash { get; set; } = string.Empty;
+
+    public string Label { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? LastUsedAtUtc { get; set; }
+
+    public bool Revoked { get; set; }
+}
+
+public enum RegistrationStatus { Pending = 0, Verified = 1, Approved = 2, Rejected = 3 }
+
+public sealed class TenantRegistrationEntity
+{
+    public Guid RegistrationId { get; set; }
+
+    public string TenantName { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string AdminEmail { get; set; } = string.Empty;
+
+    public string AdminDisplayName { get; set; } = string.Empty;
+
+    public int? MaxEncrypters { get; set; }
+
+    public RegistrationStatus Status { get; set; }
+
+    public string TokenHash { get; set; } = string.Empty;
+
+    public DateTimeOffset TokenExpiresAtUtc { get; set; }
+
+    public DateTimeOffset RequestedAtUtc { get; set; }
+
+    public DateTimeOffset? ReviewedAtUtc { get; set; }
+
+    public string? ReviewNotes { get; set; }
+
+    public Guid? CreatedTenantId { get; set; }
+
+    public Guid? CreatedUserId { get; set; }
+}
+
+public sealed class TenantBillingWebhookEntity
+{
+    public Guid TenantId { get; set; }
+
+    public Guid WebhookId { get; set; }
+
+    public string Url { get; set; } = string.Empty;
+
+    public string Secret { get; set; } = string.Empty;
+
+    public string Events { get; set; } = "*";
+
+    public bool Enabled { get; set; } = true;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class TenantEntity
+{
+    public Guid TenantId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public TenantStatus Status { get; set; }
+
+    public int? MaxEncrypters { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public DateTimeOffset? SuspendedAtUtc { get; set; }
+}
+
 public sealed class ProtectedFileEntity
 {
     public Guid Id { get; set; }
@@ -152,6 +238,12 @@ public sealed class FileGrantEntity
     public string Permissions { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAtUtc { get; set; }
+
+    /// <summary>Optional: grant is only active on or after this UTC timestamp.</summary>
+    public DateTimeOffset? ValidFromUtc { get; set; }
+
+    /// <summary>Optional: grant expires at this UTC timestamp.</summary>
+    public DateTimeOffset? ValidUntilUtc { get; set; }
 }
 
 public sealed class ExternalShareLinkEntity
@@ -533,5 +625,175 @@ public sealed class TenantAdminNotificationConfigEntity
 
     public bool NotifyOnShareLinkCreated { get; set; }
 
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+/// <summary>Alert condition types for operator alert rules.</summary>
+public enum AlertCondition
+{
+    SeatUsagePctAbove = 0,   // usedSeats / maxSeats * 100 > threshold
+    FilesProtectedAbove = 1,  // total protected files for tenant > threshold
+    TenantInactiveDays = 2,   // no audit events for tenant in N days
+    NewRegistrationsAbove = 3 // pending/verified registrations > threshold
+}
+
+public sealed class OperatorAlertRuleEntity
+{
+    public Guid RuleId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Optional: if set, rule applies to this tenant only. Null = all tenants.</summary>
+    public Guid? TenantId { get; set; }
+
+    public AlertCondition Condition { get; set; }
+
+    public double Threshold { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>If true, a billing webhook is fired when the alert triggers.</summary>
+    public bool FireWebhook { get; set; } = false;
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class OperatorAlertFiredEntity
+{
+    public long Id { get; set; }
+
+    public Guid RuleId { get; set; }
+
+    public Guid? TenantId { get; set; }
+
+    public string RuleName { get; set; } = string.Empty;
+
+    public double ActualValue { get; set; }
+
+    public double Threshold { get; set; }
+
+    public DateTimeOffset FiredAtUtc { get; set; }
+}
+
+// ── v1.6 ─────────────────────────────────────────────────────────────────────
+
+public enum AccessRequestStatus { Pending = 0, Approved = 1, Rejected = 2 }
+
+public sealed class FileAccessRequestEntity
+{
+    public Guid RequestId { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public Guid FileId { get; set; }
+
+    public string RequesterEmail { get; set; } = string.Empty;
+
+    /// <summary>Optional message from the requester.</summary>
+    public string Message { get; set; } = string.Empty;
+
+    public AccessRequestStatus Status { get; set; } = AccessRequestStatus.Pending;
+
+    public Guid? ReviewedByAdminId { get; set; }
+
+    public DateTimeOffset RequestedAtUtc { get; set; }
+
+    public DateTimeOffset? ReviewedAtUtc { get; set; }
+}
+
+public enum PlanTier { Free = 0, Starter = 1, Enterprise = 2 }
+
+public sealed class TenantPlanEntity
+{
+    public Guid TenantId { get; set; }
+
+    public PlanTier Tier { get; set; } = PlanTier.Free;
+
+    /// <summary>Max protected files. Null = unlimited.</summary>
+    public int? MaxFiles { get; set; }
+
+    /// <summary>Max total storage in megabytes. Null = unlimited.</summary>
+    public int? MaxStorageMb { get; set; }
+
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class AuditChainEntity
+{
+    /// <summary>Mirrors AuditEventEntity.Id — 1:1 relationship.</summary>
+    public long AuditEventId { get; set; }
+
+    /// <summary>HMAC-SHA256 hex of (PrevHash + Id + TenantId + EventType + CreatedAtUtc ISO8601).</summary>
+    public string Hash { get; set; } = string.Empty;
+
+    public string PrevHash { get; set; } = string.Empty;
+}
+
+// v1.7 — file collections, batch ops, key rotation
+
+public sealed class FileCollectionEntity
+{
+    public Guid CollectionId { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class FileCollectionItemEntity
+{
+    public Guid CollectionId { get; set; }
+    public Guid FileId { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTimeOffset AddedAtUtc { get; set; }
+}
+
+public sealed class TenantKeyRotationConfigEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; }
+    public int IntervalDays { get; set; }
+    public DateTimeOffset? LastRotatedAtUtc { get; set; }
+    public DateTimeOffset? NextRotationDueUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class KeyRotationHistoryEntity
+{
+    public long Id { get; set; }
+    public Guid TenantId { get; set; }
+    public int FilesRotated { get; set; }
+    public string TriggeredBy { get; set; } = "schedule";
+    public DateTimeOffset RotatedAtUtc { get; set; }
+}
+
+// v1.8 — compliance export, GDPR erasure, data retention
+
+public sealed class TenantRetentionPolicyEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; }
+    public int? FileRetentionDays { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+// v1.9 — advanced access control
+
+public sealed class TenantIpAllowlistRuleEntity
+{
+    public Guid RuleId { get; set; }
+    public Guid TenantId { get; set; }
+    public string Cidr { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class TenantDeviceTrustConfigEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; }
+    /// <summary>Maximum number of days since last heartbeat before access is denied.</summary>
+    public int RequiredCheckinDays { get; set; } = 7;
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }

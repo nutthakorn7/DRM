@@ -120,6 +120,9 @@
         <button type="button" class="tab-link" data-tab-link="integrations" role="tab" aria-selected="false">
           <span class="tab-icon">🔌</span><span class="tab-label">Integrations</span>
         </button>
+        <button type="button" class="tab-link" data-tab-link="tenants" role="tab" aria-selected="false">
+          <span class="tab-icon">🏢</span><span class="tab-label">Tenants</span>
+        </button>
       </nav>
 
       <nav class="subtab-nav" id="subTabNav" aria-label="Section sub-tabs" role="tablist"></nav>
@@ -465,6 +468,7 @@
               <option value="">Select role…</option>
             </select>
             <input id="newAdminTokenLabel" autocomplete="off" placeholder="Token label (optional)">
+            <input id="newAdminTenantScope" autocomplete="off" placeholder="Tenant scope (UUID, blank = global)">
             <button type="submit">Create admin</button>
           </form>
           <pre id="createAdminOutput" class="output-block" hidden></pre>
@@ -479,6 +483,7 @@
                 <th>Email</th>
                 <th>Display name</th>
                 <th>Role</th>
+                <th>Scope</th>
                 <th>Status</th>
                 <th>Tokens</th>
                 <th>Last used</th>
@@ -486,7 +491,7 @@
               </tr>
             </thead>
             <tbody id="adminsBody">
-              <tr><td colspan="7" class="empty">Click "Refresh" to load admin users.</td></tr>
+              <tr><td colspan="8" class="empty">Click "Refresh" to load admin users.</td></tr>
             </tbody>
           </table>
         </div>
@@ -972,6 +977,119 @@
         </ol>
       </section>
 
+      <section class="panel" id="analytics" data-tab="overview">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Activity</p>
+            <h3>Analytics</h3>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="metricsPeriod" style="min-width:100px">
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+            </select>
+            <button id="refreshMetrics" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1.25rem" id="metricsSummary">
+          <div class="metric-card"><span class="metric-value" id="mTotalTenants">—</span><span class="metric-label">Total tenants</span></div>
+          <div class="metric-card"><span class="metric-value" id="mActiveTenants">—</span><span class="metric-label">Active tenants</span></div>
+          <div class="metric-card"><span class="metric-value" id="mTotalUsers">—</span><span class="metric-label">Total users</span></div>
+          <div class="metric-card"><span class="metric-value" id="mTotalFiles">—</span><span class="metric-label">Protected files</span></div>
+          <div class="metric-card"><span class="metric-value" id="mNewRegs">—</span><span class="metric-label">New registrations</span></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px" id="metricsCharts">
+          <div class="sparkline-card">
+            <p class="sparkline-label">Events / day</p>
+            <svg id="sparkTotalEvents" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="sparkline-card">
+            <p class="sparkline-label">Files protected / day</p>
+            <svg id="sparkFilesProtected" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="sparkline-card">
+            <p class="sparkline-label">Decryptions / day</p>
+            <svg id="sparkDecryptions" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="sparkline-card">
+            <p class="sparkline-label">New users / day</p>
+            <svg id="sparkNewUsers" class="sparkline" viewBox="0 0 220 48" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="alerts" data-tab="overview">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Monitoring</p>
+            <h3>Operator alert rules</h3>
+          </div>
+          <button id="openCreateAlertBtn" type="button">+ New rule</button>
+        </div>
+        <table id="alertRulesTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Condition</th>
+              <th>Threshold</th>
+              <th>Tenant</th>
+              <th>Webhook</th>
+              <th>Enabled</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div class="section-head" style="margin-top:2rem;">
+          <div>
+            <p class="eyebrow">History</p>
+            <h3>Recent alerts fired</h3>
+          </div>
+          <button id="refreshAlertsBtn" type="button">Refresh</button>
+        </div>
+        <table id="alertsFiredTable">
+          <thead>
+            <tr>
+              <th>Rule</th>
+              <th>Tenant</th>
+              <th>Actual</th>
+              <th>Threshold</th>
+              <th>Fired at</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <!-- Create/edit alert rule dialog -->
+        <dialog id="alertRuleDialog">
+          <form id="alertRuleForm" method="dialog">
+            <h4 id="alertRuleDialogTitle">New alert rule</h4>
+            <input type="hidden" id="alertRuleId" value="" />
+            <label>Name<input type="text" id="alertRuleName" required placeholder="e.g. High seat usage" /></label>
+            <label>Condition
+              <select id="alertRuleCondition">
+                <option value="0">Seat usage % above threshold</option>
+                <option value="1">Files protected above threshold</option>
+                <option value="2">Tenant inactive for N days</option>
+                <option value="3">New registrations above threshold</option>
+              </select>
+            </label>
+            <label>Threshold<input type="number" id="alertRuleThreshold" min="0" step="0.1" value="80" required /></label>
+            <label>Tenant ID (leave blank for global)<input type="text" id="alertRuleTenantId" placeholder="optional UUID" /></label>
+            <label class="checkbox-row"><input type="checkbox" id="alertRuleEnabled" checked /> Enabled</label>
+            <label class="checkbox-row"><input type="checkbox" id="alertRuleFireWebhook" /> Fire billing webhook on alert</label>
+            <div class="dialog-actions">
+              <button type="button" id="cancelAlertRuleBtn">Cancel</button>
+              <button type="submit" id="saveAlertRuleBtn">Save</button>
+            </div>
+          </form>
+        </dialog>
+      </section>
+
       <section class="panel" id="dashboard" data-tab="overview">
         <div class="section-head">
           <div>
@@ -1142,6 +1260,516 @@
               <tr>
                 <td colspan="7" class="empty">Click "Refresh recent events" to load activity.</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Tenants (operator-level, no per-tenant scope required) ─────────── -->
+      <section class="panel" id="tenants" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Multi-tenant SaaS</p>
+            <h3>Tenants</h3>
+          </div>
+          <button id="refreshTenants" type="button">Refresh</button>
+        </div>
+
+        <details id="createTenantDetails">
+          <summary>Create tenant</summary>
+          <form id="createTenantForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+            <input id="newTenantName" autocomplete="off" placeholder="Unique name (slug)" required>
+            <input id="newTenantDisplayName" autocomplete="off" placeholder="Display name (optional)">
+            <input id="newTenantId" autocomplete="off" placeholder="Tenant ID (UUID, blank = auto)">
+            <input id="newTenantMaxEncrypters" type="number" min="1" autocomplete="off" placeholder="Seat limit (blank = unlimited)">
+            <button type="submit">Create tenant</button>
+          </form>
+          <pre id="createTenantOutput" class="output-block" hidden></pre>
+        </details>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Display name</th>
+                <th>Status</th>
+                <th>Seats used</th>
+                <th>Tenant ID</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tenantsBody">
+              <tr><td colspan="7" class="empty">Click "Refresh" to load tenants.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Key manager sub-panel (shown when "Keys" is clicked on a tenant row) -->
+        <div id="keyManagerPanel" hidden style="margin-top:1.5rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem">
+          <div class="section-head" style="margin-bottom:.75rem">
+            <div>
+              <p class="eyebrow">API access</p>
+              <h4 id="keyManagerTitle">Client keys</h4>
+            </div>
+            <button type="button" id="closeKeyManager" class="ghost">Close</button>
+          </div>
+
+          <details id="createKeyDetails">
+            <summary>Issue new key</summary>
+            <form id="createKeyForm" class="create-row" style="gap:6px;margin-top:8px">
+              <input id="newKeyLabel" autocomplete="off" placeholder="Label (e.g. production)">
+              <button type="submit">Issue key</button>
+            </form>
+            <pre id="createKeyOutput" class="output-block anti-capture-block" hidden></pre>
+          </details>
+
+          <div class="table-wrap" style="margin-top:.75rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Key ID</th>
+                  <th>Last used</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="keysBody">
+                <tr><td colspan="4" class="empty">Select a tenant to manage keys.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Webhook manager sub-panel (shown when "Webhooks" is clicked on a tenant row) -->
+        <div id="webhookManagerPanel" hidden style="margin-top:1.5rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem">
+          <div class="section-head" style="margin-bottom:.75rem">
+            <div>
+              <p class="eyebrow">Billing events</p>
+              <h4 id="webhookManagerTitle">Billing webhooks</h4>
+            </div>
+            <button type="button" id="closeWebhookManager" class="ghost">Close</button>
+          </div>
+
+          <details id="createWebhookDetails">
+            <summary>Add webhook</summary>
+            <form id="createWebhookForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+              <input id="newWebhookUrl" autocomplete="off" placeholder="https://hooks.example.com/drm" required style="flex:2;min-width:240px">
+              <select id="newWebhookEvents" style="flex:1;min-width:160px">
+                <option value="*">All events</option>
+                <option value="seat_limit_approach">seat_limit_approach only</option>
+                <option value="tenant_suspended">tenant_suspended only</option>
+              </select>
+              <button type="submit">Add webhook</button>
+            </form>
+            <pre id="createWebhookOutput" class="output-block anti-capture-block" hidden></pre>
+          </details>
+
+          <div class="table-wrap" style="margin-top:.75rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th>Events</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="webhooksBody">
+                <tr><td colspan="4" class="empty">Select a tenant to manage webhooks.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="registrations" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Self-serve onboarding</p>
+            <h3>Tenant registrations</h3>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select id="registrationStatusFilter" style="min-width:140px">
+              <option value="">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Verified">Verified</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <button id="refreshRegistrations" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant name</th>
+                <th>Admin email</th>
+                <th>Status</th>
+                <th>Requested</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="registrationsBody">
+              <tr><td colspan="5" class="empty">Click "Refresh" to load registrations.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Reject dialog -->
+        <div id="rejectDialog" hidden style="margin-top:1rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem;max-width:520px">
+          <p class="eyebrow" style="margin-bottom:.5rem">Reject registration</p>
+          <form id="rejectForm" class="create-row" style="flex-wrap:wrap;gap:6px">
+            <input id="rejectNotes" autocomplete="off" placeholder="Reason / notes (optional)" style="flex:1;min-width:240px">
+            <button type="submit" class="danger">Reject</button>
+            <button type="button" id="cancelReject" class="ghost">Cancel</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ── Access Requests ──────────────────────────────────────── -->
+      <section class="panel" id="accessRequests" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Workflow</p>
+            <h3>Access requests</h3>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="arStatusFilter" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--line)">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <button id="refreshAccessRequests" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Requester</th>
+                <th>File ID</th>
+                <th>Message</th>
+                <th>Status</th>
+                <th>Requested</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="accessRequestsBody">
+              <tr><td colspan="6" class="empty">Click "Refresh" to load requests.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Tenant Plan Management ──────────────────────────────── -->
+      <section class="panel" id="tenantPlans" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Quotas</p>
+            <h3>Tenant plans</h3>
+          </div>
+          <button id="refreshTenantPlans" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant</th>
+                <th>Plan tier</th>
+                <th>File limit</th>
+                <th>Storage limit</th>
+                <th>Files used</th>
+                <th>Quota status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tenantPlansBody">
+              <tr><td colspan="7" class="empty">Click "Refresh" to load plans.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Edit plan dialog -->
+      <dialog id="editPlanDialog" aria-modal="true" aria-labelledby="editPlanTitle">
+        <form id="editPlanForm" method="dialog">
+          <header class="dialog-head">
+            <h3 id="editPlanTitle">Edit tenant plan</h3>
+            <button type="button" class="dialog-close" aria-label="Close" onclick="document.getElementById('editPlanDialog').close()">×</button>
+          </header>
+          <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px">
+            <input type="hidden" id="editPlanTenantId">
+            <div>
+              <label for="editPlanPreset">Quick preset</label>
+              <select id="editPlanPreset" style="width:100%;margin-top:4px;padding:6px 8px;border-radius:6px;border:1px solid var(--line)">
+                <option value="">Custom</option>
+                <option value="free">Free — 50 files / 500 MB</option>
+                <option value="starter">Starter — 1000 files / 10 GB</option>
+                <option value="enterprise">Enterprise — Unlimited</option>
+              </select>
+            </div>
+            <div>
+              <label for="editPlanTier">Tier name</label>
+              <input id="editPlanTier" type="text" placeholder="free / starter / enterprise" style="width:100%;margin-top:4px">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label for="editPlanMaxFiles">Max files (blank = unlimited)</label>
+                <input id="editPlanMaxFiles" type="number" min="0" placeholder="unlimited" style="width:100%;margin-top:4px">
+              </div>
+              <div>
+                <label for="editPlanMaxStorage">Max storage MB (blank = unlimited)</label>
+                <input id="editPlanMaxStorage" type="number" min="0" placeholder="unlimited" style="width:100%;margin-top:4px">
+              </div>
+            </div>
+          </div>
+          <footer class="dialog-foot">
+            <button type="button" onclick="document.getElementById('editPlanDialog').close()">Cancel</button>
+            <button type="submit" id="editPlanSave">Save plan</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <!-- v1.7 File Collections -->
+      <section class="panel" id="fileCollections" data-tab="files">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Lifecycle</p>
+            <h3>File collections</h3>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="createCollectionBtn" type="button">+ New collection</button>
+            <button id="refreshCollections" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Files</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="collectionsBody">
+              <tr><td colspan="5" class="empty">Refresh to load collections.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <dialog id="newCollectionDialog" aria-modal="true" aria-labelledby="newCollectionTitle">
+        <form id="newCollectionForm" method="dialog">
+          <div class="dialog-head">
+            <h3 id="newCollectionTitle">New collection</h3>
+            <button type="button" class="dialog-close" aria-label="Close" onclick="document.getElementById('newCollectionDialog').close()">×</button>
+          </div>
+          <div class="dialog-body">
+            <label>Name<input id="newCollectionName" type="text" required placeholder="e.g. Q3 Reports"></label>
+            <label>Description<input id="newCollectionDesc" type="text" placeholder="Optional"></label>
+          </div>
+          <footer class="dialog-foot">
+            <button type="button" onclick="document.getElementById('newCollectionDialog').close()">Cancel</button>
+            <button type="submit">Create</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <!-- v1.7 Batch file operations -->
+      <section class="panel" id="batchOps" data-tab="files">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Lifecycle</p>
+            <h3>Batch file operations</h3>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Batch revoke</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Revoke multiple files at once. Enter one File ID per line.</p>
+            <textarea id="batchRevokeIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <button id="batchRevokeBtn" type="button" style="margin-top:8px;background:var(--danger,#e53e3e);color:#fff">Revoke all</button>
+            <pre id="batchRevokeResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
+          </div>
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Batch update expiry</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Set a new expiry date for multiple files. Enter one File ID per line.</p>
+            <textarea id="batchExpiryIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <label style="display:block;margin-top:8px;font-size:13px">New expiry<input id="batchExpiryDate" type="datetime-local" style="width:100%;margin-top:4px"></label>
+            <button id="batchExpiryBtn" type="button" style="margin-top:8px">Update expiry</button>
+            <pre id="batchExpiryResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- v1.8 Compliance export + GDPR erasure -->
+      <section class="panel" id="compliance" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Compliance</p>
+            <h3>Compliance &amp; data rights</h3>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Export compliance bundle</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Downloads a ZIP containing the file inventory, full audit log, and HMAC chain verification for the selected tenant.</p>
+            <button id="exportComplianceBtn" type="button">Download bundle</button>
+          </div>
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">GDPR right-to-erasure</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Permanently anonymise a user's PII and remove their file grants. This action cannot be undone.</p>
+            <label style="display:block;font-size:13px;margin-bottom:8px">User ID<input id="gdprUserId" type="text" placeholder="00000000-..." style="width:100%;margin-top:4px"></label>
+            <button id="gdprEraseBtn" type="button" style="background:var(--danger,#e53e3e);color:#fff">Erase user data</button>
+            <pre id="gdprEraseResult" style="font-size:11px;margin-top:8px;max-height:100px;overflow:auto"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- v1.8 Data retention policy -->
+      <section class="panel" id="retentionPolicy" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Compliance</p>
+            <h3>File retention policy</h3>
+          </div>
+          <button id="refreshRetentionPolicy" type="button">Refresh</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Policy</h4>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              <input id="retentionEnabled" type="checkbox"> Enable automatic file deletion
+            </label>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              Delete files expired more than
+              <input id="retentionDays" type="number" min="1" max="3650" value="365" style="width:70px;margin:0 4px"> days ago
+            </label>
+            <button id="saveRetentionBtn" type="button">Save policy</button>
+            <button id="applyRetentionDryRunBtn" type="button" style="margin-left:8px">Dry-run</button>
+            <button id="applyRetentionBtn" type="button" style="margin-left:8px;background:var(--danger,#e53e3e);color:#fff">Apply now</button>
+            <pre id="retentionApplyResult" style="font-size:11px;margin-top:8px;max-height:80px;overflow:auto"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- v1.9 IP allowlist -->
+      <section class="panel" id="ipAllowlist" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h3>IP allowlist</h3>
+          </div>
+          <button id="refreshIpAllowlist" type="button">Refresh</button>
+        </div>
+        <p style="font-size:13px;color:var(--muted)">When rules are configured, only requests from matching CIDR ranges can decrypt files. Leave empty to allow all IPs.</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <input id="ipRuleCidr" type="text" placeholder="e.g. 10.0.0.0/8 or 203.0.113.5/32" style="flex:1;min-width:200px">
+          <input id="ipRuleLabel" type="text" placeholder="Label (optional)" style="flex:1;min-width:160px">
+          <button id="addIpRuleBtn" type="button">Add rule</button>
+        </div>
+        <table>
+          <thead><tr><th>CIDR</th><th>Label</th><th>Added</th><th></th></tr></thead>
+          <tbody id="ipAllowlistBody"></tbody>
+        </table>
+      </section>
+
+      <!-- v1.9 Device trust -->
+      <section class="panel" id="deviceTrust" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h3>Device trust</h3>
+          </div>
+          <button id="refreshDeviceTrust" type="button">Refresh</button>
+        </div>
+        <div class="card" style="padding:16px;max-width:480px">
+          <label style="display:block;margin-bottom:8px;font-size:13px">
+            <input id="deviceTrustEnabled" type="checkbox"> Require device check-in
+          </label>
+          <label style="display:block;margin-bottom:12px;font-size:13px">
+            Max days since last heartbeat:
+            <input id="deviceTrustCheckinDays" type="number" min="1" max="365" value="7" style="width:60px;margin-left:8px">
+          </label>
+          <button id="saveDeviceTrustBtn" type="button">Save</button>
+        </div>
+      </section>
+
+      <!-- v1.7 Key rotation -->
+      <section class="panel" id="keyRotation" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h3>Key rotation</h3>
+          </div>
+          <button id="refreshKeyRotation" type="button">Refresh</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Schedule</h4>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              <input id="keyRotationEnabled" type="checkbox"> Enable automatic rotation
+            </label>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              Interval (days)
+              <input id="keyRotationIntervalDays" type="number" min="1" max="365" value="90" style="width:80px;margin-left:8px">
+            </label>
+            <button id="saveKeyRotationBtn" type="button">Save schedule</button>
+            <button id="triggerKeyRotationBtn" type="button" style="margin-left:8px">Rotate now</button>
+          </div>
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Status</h4>
+            <div id="keyRotationStatus" style="font-size:13px">—</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rotated at</th>
+                <th>Files rotated</th>
+                <th>Triggered by</th>
+              </tr>
+            </thead>
+            <tbody id="keyRotationHistoryBody">
+              <tr><td colspan="3" class="empty">Refresh to load rotation history.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="usage" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Billing</p>
+            <h3>Usage snapshot</h3>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="exportUsageCsv" type="button" class="ghost">Export CSV</button>
+            <button id="refreshUsage" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tenant</th>
+                <th>Status</th>
+                <th>Seats used</th>
+                <th>Active keys</th>
+                <th>Protected files</th>
+              </tr>
+            </thead>
+            <tbody id="usageBody">
+              <tr><td colspan="5" class="empty">Click "Refresh" to load usage snapshot.</td></tr>
             </tbody>
           </table>
         </div>

@@ -23,7 +23,7 @@ public static class AdminBoxIntegrationEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.IntegrationsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
@@ -59,7 +59,7 @@ public static class AdminBoxIntegrationEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.IntegrationsRead, tenantId, out var fail))
             return fail!;
         var config = await dbContext.TenantBoxIntegrationConfigs
             .AsNoTracking()
@@ -73,7 +73,7 @@ public static class AdminBoxIntegrationEndpoints
         IBoxIntegrationService boxService,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.IntegrationsWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
@@ -88,7 +88,7 @@ public static class AdminBoxIntegrationEndpoints
         int? limit,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.IntegrationsRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.IntegrationsRead, tenantId, out var fail))
             return fail!;
         var pageSize = Math.Clamp(limit ?? 50, 1, 200);
         var events = await dbContext.BoxWebhookEvents

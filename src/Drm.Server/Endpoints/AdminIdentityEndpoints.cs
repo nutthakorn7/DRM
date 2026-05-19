@@ -28,7 +28,8 @@ public static class AdminIdentityEndpoints
             identity.DisplayName,
             identity.Email,
             identity.Permissions.ToArray(),
-            identity.IsSharedKeyFallback));
+            identity.IsSharedKeyFallback,
+            identity.TenantScope));
     }
 
     private static async Task<Results<Ok<IReadOnlyList<RoleResponse>>, JsonHttpResult<object>>> ListRoles(
@@ -66,7 +67,8 @@ public static class AdminIdentityEndpoints
             a.Disabled,
             a.CreatedAtUtc,
             a.LastUsedAtUtc,
-            tokensByUser.TryGetValue(a.Id, out var count) ? count : 0)).ToArray();
+            tokensByUser.TryGetValue(a.Id, out var count) ? count : 0,
+            a.TenantScope)).ToArray();
         return TypedResults.Ok(response);
     }
 
@@ -96,6 +98,7 @@ public static class AdminIdentityEndpoints
             RoleId = request.RoleId,
             Disabled = false,
             CreatedAtUtc = now,
+            TenantScope = request.TenantScope,
         };
         db.AdminUsers.Add(admin);
 
@@ -124,7 +127,8 @@ public static class AdminIdentityEndpoints
             role.Name,
             token.Id,
             plaintextToken,
-            token.ExpiresAtUtc));
+            token.ExpiresAtUtc,
+            admin.TenantScope));
     }
 
     private static async Task<Results<Ok<object>, JsonHttpResult<object>>> DisableAdmin(
@@ -235,7 +239,8 @@ public static class AdminIdentityEndpoints
         string DisplayName,
         string Email,
         IReadOnlyList<string> Permissions,
-        bool SharedKeyFallback);
+        bool SharedKeyFallback,
+        Guid? TenantScope);
 
     private sealed record RoleResponse(Guid Id, string Name, IReadOnlyList<string> Permissions, bool IsSystem);
 
@@ -248,9 +253,10 @@ public static class AdminIdentityEndpoints
         bool Disabled,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset? LastUsedAtUtc,
-        int ActiveTokenCount);
+        int ActiveTokenCount,
+        Guid? TenantScope);
 
-    public sealed record CreateAdminRequest(string Email, string? DisplayName, Guid RoleId, string? TokenLabel, DateTimeOffset? TokenExpiresAtUtc);
+    public sealed record CreateAdminRequest(string Email, string? DisplayName, Guid RoleId, string? TokenLabel, DateTimeOffset? TokenExpiresAtUtc, Guid? TenantScope = null);
 
     public sealed record CreateAdminResponse(
         Guid AdminUserId,
@@ -260,7 +266,8 @@ public static class AdminIdentityEndpoints
         string RoleName,
         Guid TokenId,
         string Token,
-        DateTimeOffset? TokenExpiresAtUtc);
+        DateTimeOffset? TokenExpiresAtUtc,
+        Guid? TenantScope = null);
 
     public sealed record RotateTokenRequest(string? Label, DateTimeOffset? ExpiresAtUtc);
     public sealed record RotateTokenResponse(Guid TokenId, string Token, DateTimeOffset? ExpiresAtUtc);

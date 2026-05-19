@@ -23,7 +23,7 @@ public static class AdminDevicesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersRead, tenantId, out var fail))
             return fail!;
         var query = dbContext.AgentDevices
             .AsNoTracking()
@@ -55,7 +55,7 @@ public static class AdminDevicesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersRead, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersRead, tenantId, out var fail))
             return fail!;
         var effectiveStaleAfterMinutes = staleAfterMinutes ?? 15;
         if (effectiveStaleAfterMinutes is < 1 or > 10080)
@@ -98,7 +98,7 @@ public static class AdminDevicesEndpoints
         AppDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.UsersWrite, out var fail))
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
             return fail!;
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
