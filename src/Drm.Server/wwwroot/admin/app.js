@@ -185,10 +185,10 @@ if (forgetSessionBtn) {
   refresh();
 })();
 
-// Tab navigation: 5 tabs (overview, identity, policy, files, integrations)
-// collapsing the 19-panel /admin/ console into one tab at a time.
+// Tab navigation: 6 tabs (overview, identity, policy, files, integrations, tenants)
+// collapsing the /admin/ console into one tab at a time.
 (function initTabs() {
-  const VALID_TABS = new Set(["overview", "identity", "policy", "files", "integrations"]);
+  const VALID_TABS = new Set(["overview", "identity", "policy", "files", "integrations", "tenants"]);
   const TAB_KEY = "drm:adminActiveTab";
 
   function readDesiredTab() {
@@ -336,6 +336,7 @@ if (forgetSessionBtn) {
     policy:       "Policy templates, watermark designs, and the policy simulator.",
     files:        "Protected files, transparent-encryption settings, and DRM containers.",
     integrations: "Outside systems: Box, Outlook, SIEM, folder watcher, and notifications.",
+    tenants:      "Multi-tenant management — create tenants, manage plans, billing webhooks, and client API keys.",
   };
 
   Object.entries(PANEL_TIPS).forEach(([id, tip]) => {

@@ -13,6 +13,54 @@
   <link rel="stylesheet" href="/admin/app.css">
 </head>
 <body>
+  <!-- SVG icon sprite — hidden from layout and screen readers.
+       Reference with <svg><use href="#icon-NAME"></use></svg>  -->
+  <svg style="display:none" aria-hidden="true" focusable="false">
+    <!-- bar-chart: Overview -->
+    <symbol id="icon-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="10" width="4" height="11"/><rect x="10" y="6" width="4" height="15"/><rect x="17" y="3" width="4" height="18"/>
+    </symbol>
+    <!-- users: Identity -->
+    <symbol id="icon-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
+    <!-- file-text: Policy -->
+    <symbol id="icon-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>
+    </symbol>
+    <!-- folder: Files -->
+    <symbol id="icon-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </symbol>
+    <!-- plug: Integrations -->
+    <symbol id="icon-plug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><rect x="6" y="8" width="12" height="6" rx="1"/>
+    </symbol>
+    <!-- building: Tenants -->
+    <symbol id="icon-building" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="1"/><line x1="9" y1="7" x2="9.01" y2="7"/><line x1="9" y1="12" x2="9.01" y2="12"/><line x1="9" y1="17" x2="9.01" y2="17"/><line x1="15" y1="7" x2="15.01" y2="7"/><line x1="15" y1="12" x2="15.01" y2="12"/>
+    </symbol>
+    <!-- cog/settings: Admin console -->
+    <symbol id="icon-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+    </symbol>
+    <!-- upload: Send a file -->
+    <symbol id="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+    </symbol>
+    <!-- download: Open shared file -->
+    <symbol id="icon-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+    </symbol>
+    <!-- book: Use cases -->
+    <symbol id="icon-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+    </symbol>
+    <!-- grid: Compatibility -->
+    <symbol id="icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+    </symbol>
+  </svg>
   <a href="#adminMain" class="skip-link">Skip to main content</a>
   <div class="welcome-screen" id="welcomeScreen" hidden role="dialog" aria-labelledby="welcomeTitle">
     <div class="welcome-card">
@@ -48,14 +96,14 @@
         </button>
       </div>
       <nav>
-        <a class="active" href="/admin/"><span class="nav-icon" aria-hidden="true">⚙️</span><span class="nav-label">Admin console</span></a>
-        <a href="/me/"><span class="nav-icon" aria-hidden="true">📤</span><span class="nav-label">Send a file</span></a>
-        <a href="/share/"><span class="nav-icon" aria-hidden="true">📥</span><span class="nav-label">Open shared file</span></a>
+        <a class="active" href="/admin/"><span class="nav-icon" aria-hidden="true"><svg><use href="#icon-cog"></use></svg></span><span class="nav-label">Admin console</span></a>
+        <a href="/me/"><span class="nav-icon" aria-hidden="true"><svg><use href="#icon-upload"></use></svg></span><span class="nav-label">Send a file</span></a>
+        <a href="/share/"><span class="nav-icon" aria-hidden="true"><svg><use href="#icon-download"></use></svg></span><span class="nav-label">Open shared file</span></a>
       </nav>
       <nav class="rail-secondary" aria-label="Documentation">
         <p class="eyebrow">Reference</p>
-        <a href="/admin/cases/" target="_blank"><span class="nav-icon" aria-hidden="true">📘</span><span class="nav-label">Use cases ↗</span></a>
-        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon" aria-hidden="true">🧩</span><span class="nav-label">Compatibility ↗</span></a>
+        <a href="/admin/cases/" target="_blank"><span class="nav-icon" aria-hidden="true"><svg><use href="#icon-book"></use></svg></span><span class="nav-label">Use cases ↗</span></a>
+        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon" aria-hidden="true"><svg><use href="#icon-grid"></use></svg></span><span class="nav-label">Compatibility ↗</span></a>
       </nav>
     </aside>
 
@@ -90,7 +138,7 @@
         </label>
         <label>
           <span>Admin credential</span>
-          <input id="adminKey" type="password" autocomplete="off" placeholder="Per-admin token (drm_admin_…) or shared key">
+          <input id="adminKey" type="password" autocomplete="off" placeholder="drm_admin_… or shared key">
         </label>
         <label>
           <span>Admin user ID</span>
@@ -105,28 +153,28 @@
       <section class="settings global-search-row" aria-label="Search panels">
         <label class="search-label">
           <span>Search panels</span>
-          <input id="globalSearch" type="search" autocomplete="off" placeholder='Press " / " to filter — e.g. watermark, box, audit'>
+          <input id="globalSearch" type="search" autocomplete="off" placeholder="Search panels (press / to focus)">
         </label>
       </section>
 
       <nav class="tab-nav" aria-label="Section tabs" role="tablist">
         <button type="button" class="tab-link" data-tab-link="overview" role="tab" aria-selected="true">
-          <span class="tab-icon" aria-hidden="true">📊</span><span class="tab-label">Overview</span>
+          <span class="tab-icon" aria-hidden="true"><svg><use href="#icon-chart"></use></svg></span><span class="tab-label">Overview</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="identity" role="tab" aria-selected="false">
-          <span class="tab-icon" aria-hidden="true">👥</span><span class="tab-label">Identity</span>
+          <span class="tab-icon" aria-hidden="true"><svg><use href="#icon-users"></use></svg></span><span class="tab-label">Identity</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="policy" role="tab" aria-selected="false">
-          <span class="tab-icon" aria-hidden="true">📋</span><span class="tab-label">Policy</span>
+          <span class="tab-icon" aria-hidden="true"><svg><use href="#icon-file-text"></use></svg></span><span class="tab-label">Policy</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="files" role="tab" aria-selected="false">
-          <span class="tab-icon" aria-hidden="true">📁</span><span class="tab-label">Files</span>
+          <span class="tab-icon" aria-hidden="true"><svg><use href="#icon-folder"></use></svg></span><span class="tab-label">Files</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="integrations" role="tab" aria-selected="false">
-          <span class="tab-icon" aria-hidden="true">🔌</span><span class="tab-label">Integrations</span>
+          <span class="tab-icon" aria-hidden="true"><svg><use href="#icon-plug"></use></svg></span><span class="tab-label">Integrations</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="tenants" role="tab" aria-selected="false">
-          <span class="tab-icon" aria-hidden="true">🏢</span><span class="tab-label">Tenants</span>
+          <span class="tab-icon" aria-hidden="true"><svg><use href="#icon-building"></use></svg></span><span class="tab-label">Tenants</span>
         </button>
       </nav>
 
@@ -164,8 +212,8 @@
         </div>
 
         <form class="create-row" id="directorySyncConfigForm">
-          <input id="dirEntraTenantId" autocomplete="off" placeholder="Entra tenant ID (e.g. contoso.onmicrosoft.com)">
-          <input id="dirClientId" autocomplete="off" placeholder="Client ID (app registration GUID)">
+          <input id="dirEntraTenantId" autocomplete="off" placeholder="Entra tenant ID">
+          <input id="dirClientId" autocomplete="off" placeholder="Client ID">
           <input id="dirClientSecret" type="password" autocomplete="off" placeholder="Client secret">
           <button type="submit">Save config</button>
         </form>
@@ -175,53 +223,6 @@
         </div>
 
         <pre id="syncOutput" class="output-block"></pre>
-      </section>
-
-      <section class="panel" id="box" data-tab="integrations">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Cloud storage</p>
-            <h3>Box integration</h3>
-          </div>
-          <button id="refreshBoxConfig" type="button">Load</button>
-        </div>
-
-        <form class="create-row" id="boxConfigForm">
-          <input id="boxClientId" autocomplete="off" placeholder="Box Client ID">
-          <input id="boxClientSecret" type="password" autocomplete="off" placeholder="Box Client Secret">
-          <input id="boxEnterpriseId" autocomplete="off" placeholder="Enterprise ID">
-          <input id="boxWebhookSecret" type="password" autocomplete="off" placeholder="Webhook signing secret">
-          <label class="inline-check">
-            <input id="boxEnabled" type="checkbox"> Enabled
-          </label>
-          <button type="submit">Save config</button>
-        </form>
-
-        <div class="create-row">
-          <button id="testBoxConnection" type="button">Test connection</button>
-          <button id="refreshBoxEvents" type="button">Refresh events</button>
-        </div>
-
-        <pre id="boxOutput" class="output-block">Box status appears here.</pre>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Received</th>
-                <th>Event</th>
-                <th>Item</th>
-                <th>Item ID</th>
-                <th>Created by</th>
-              </tr>
-            </thead>
-            <tbody id="boxEventsBody">
-              <tr>
-                <td colspan="5" class="empty">Click "Refresh events" to load recent Box webhook events.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </section>
 
       <section class="panel" id="outlook" data-tab="integrations">
@@ -277,6 +278,53 @@
         </div>
       </section>
 
+      <section class="panel" id="box" data-tab="integrations">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Cloud storage</p>
+            <h3>Box integration</h3>
+          </div>
+          <button id="refreshBoxConfig" type="button">Load</button>
+        </div>
+
+        <form class="create-row" id="boxConfigForm">
+          <input id="boxClientId" autocomplete="off" placeholder="Box Client ID">
+          <input id="boxClientSecret" type="password" autocomplete="off" placeholder="Box Client Secret">
+          <input id="boxEnterpriseId" autocomplete="off" placeholder="Enterprise ID">
+          <input id="boxWebhookSecret" type="password" autocomplete="off" placeholder="Webhook signing secret">
+          <label class="inline-check">
+            <input id="boxEnabled" type="checkbox"> Enabled
+          </label>
+          <button type="submit">Save config</button>
+        </form>
+
+        <div class="create-row">
+          <button id="testBoxConnection" type="button">Test connection</button>
+          <button id="refreshBoxEvents" type="button">Refresh events</button>
+        </div>
+
+        <pre id="boxOutput" class="output-block">Box status appears here.</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Received</th>
+                <th>Event</th>
+                <th>Item</th>
+                <th>Item ID</th>
+                <th>Created by</th>
+              </tr>
+            </thead>
+            <tbody id="boxEventsBody">
+              <tr>
+                <td colspan="5" class="empty">Click "Refresh events" to load recent Box webhook events.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="panel" id="users" data-tab="identity">
         <div class="section-head">
           <div>
@@ -306,7 +354,7 @@
               <tr>
                 <td colspan="3">
                   <div class="empty-state">
-                    <span class="empty-icon" aria-hidden="true">👥</span>
+                    <span class="empty-icon" aria-hidden="true"><svg><use href="#icon-users"></use></svg></span>
                     <span class="empty-title">No users yet</span>
                     <span class="empty-hint">Set tenant and admin key, then click Refresh to load users.</span>
                   </div>
@@ -554,7 +602,7 @@
               <tr>
                 <td colspan="6">
                   <div class="empty-state">
-                    <span class="empty-icon" aria-hidden="true">📋</span>
+                    <span class="empty-icon" aria-hidden="true"><svg><use href="#icon-file-text"></use></svg></span>
                     <span class="empty-title">No templates yet</span>
                     <span class="empty-hint">Create a reusable policy template above, or click Refresh to load existing ones.</span>
                   </div>
@@ -924,7 +972,7 @@
               <tr>
                 <td colspan="5">
                   <div class="empty-state">
-                    <span class="empty-icon" aria-hidden="true">📊</span>
+                    <span class="empty-icon" aria-hidden="true"><svg><use href="#icon-chart"></use></svg></span>
                     <span class="empty-title">No events yet</span>
                     <span class="empty-hint">Click Refresh audit to load the event log for this tenant.</span>
                   </div>
@@ -1331,7 +1379,7 @@
               <tr>
                 <td colspan="7">
                   <div class="empty-state">
-                    <span class="empty-icon" aria-hidden="true">🏢</span>
+                    <span class="empty-icon" aria-hidden="true"><svg><use href="#icon-building"></use></svg></span>
                     <span class="empty-title">No tenants</span>
                     <span class="empty-hint">Click Refresh to load tenants, or expand "Create tenant" above to add one.</span>
                   </div>
@@ -1826,8 +1874,8 @@
 
     </main>
   </div>
-  <div class="settings-backdrop" id="settingsBackdrop"></div>
-  <aside class="settings-drawer" id="settingsDrawer" aria-label="Settings">
+  <div class="settings-backdrop" id="settingsBackdrop" data-open="false"></div>
+  <aside class="settings-drawer" id="settingsDrawer" data-open="false" aria-label="Settings">
     <header class="settings-drawer-head">
       <div>
         <p class="eyebrow">Settings</p>
