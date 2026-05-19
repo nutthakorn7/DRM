@@ -709,6 +709,72 @@ button.danger:hover {
   padding: var(--card-padding);
 }
 
+/* ── Card layout utilities (v1.7–1.9 panels) ────────────────────────── */
+.card-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.card-row > .card { flex: 1; min-width: 280px; }
+
+/* Card interior typography — keeps panels on-token without inline overrides */
+.card > h4 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+.card > .hint { margin-top: 0; }
+.card label { margin-bottom: var(--space-2); }
+
+/* Monospaced textarea inside cards (batch ID entry) */
+.card textarea {
+  width: 100%;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
+  color: var(--ink);
+  padding: var(--field-padding-y) var(--field-padding-x);
+}
+
+/* Pre output blocks shown after API actions */
+.pre-output {
+  font-size: 11px;
+  margin-top: var(--space-2);
+  max-height: 120px;
+  overflow: auto;
+}
+
+/* Inline button group (Save + Dry-run + Apply) */
+.btn-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--space-2);
+}
+
+/* Checkbox and sentence-embedded input labels stay on one line */
+.label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+/* Inline add-rule form row (IP allowlist) */
+.field-row {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
 .metric {
   border: 1px solid var(--line);
   border-radius: 6px;
