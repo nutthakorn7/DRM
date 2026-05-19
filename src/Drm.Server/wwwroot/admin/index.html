@@ -1609,6 +1609,57 @@
         </div>
       </section>
 
+      <!-- v1.8 Compliance export + GDPR erasure -->
+      <section class="panel" id="compliance" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Compliance</p>
+            <h3>Compliance &amp; data rights</h3>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Export compliance bundle</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Downloads a ZIP containing the file inventory, full audit log, and HMAC chain verification for the selected tenant.</p>
+            <button id="exportComplianceBtn" type="button">Download bundle</button>
+          </div>
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">GDPR right-to-erasure</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Permanently anonymise a user's PII and remove their file grants. This action cannot be undone.</p>
+            <label style="display:block;font-size:13px;margin-bottom:8px">User ID<input id="gdprUserId" type="text" placeholder="00000000-..." style="width:100%;margin-top:4px"></label>
+            <button id="gdprEraseBtn" type="button" style="background:var(--danger,#e53e3e);color:#fff">Erase user data</button>
+            <pre id="gdprEraseResult" style="font-size:11px;margin-top:8px;max-height:100px;overflow:auto"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- v1.8 Data retention policy -->
+      <section class="panel" id="retentionPolicy" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Compliance</p>
+            <h3>File retention policy</h3>
+          </div>
+          <button id="refreshRetentionPolicy" type="button">Refresh</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Policy</h4>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              <input id="retentionEnabled" type="checkbox"> Enable automatic file deletion
+            </label>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              Delete files expired more than
+              <input id="retentionDays" type="number" min="1" max="3650" value="365" style="width:70px;margin:0 4px"> days ago
+            </label>
+            <button id="saveRetentionBtn" type="button">Save policy</button>
+            <button id="applyRetentionDryRunBtn" type="button" style="margin-left:8px">Dry-run</button>
+            <button id="applyRetentionBtn" type="button" style="margin-left:8px;background:var(--danger,#e53e3e);color:#fff">Apply now</button>
+            <pre id="retentionApplyResult" style="font-size:11px;margin-top:8px;max-height:80px;overflow:auto"></pre>
+          </div>
+        </div>
+      </section>
+
       <!-- v1.7 Key rotation -->
       <section class="panel" id="keyRotation" data-tab="tenants">
         <div class="section-head">

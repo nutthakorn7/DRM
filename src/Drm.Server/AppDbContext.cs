@@ -92,6 +92,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<KeyRotationHistoryEntity> KeyRotationHistory => Set<KeyRotationHistoryEntity>();
 
+    public DbSet<TenantRetentionPolicyEntity> TenantRetentionPolicies => Set<TenantRetentionPolicyEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantClientKeyEntity>(entity =>
@@ -448,6 +450,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(h => h.Id);
             entity.HasIndex(h => h.TenantId);
             entity.Property(h => h.TriggeredBy).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<TenantRetentionPolicyEntity>(entity =>
+        {
+            entity.HasKey(p => p.TenantId);
         });
     }
 }

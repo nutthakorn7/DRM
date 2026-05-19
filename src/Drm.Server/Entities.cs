@@ -761,3 +761,13 @@ public sealed class KeyRotationHistoryEntity
     public string TriggeredBy { get; set; } = "schedule";
     public DateTimeOffset RotatedAtUtc { get; set; }
 }
+
+// v1.8 — compliance export, GDPR erasure, data retention
+
+public sealed class TenantRetentionPolicyEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; }
+    public int? FileRetentionDays { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}

@@ -3159,3 +3159,70 @@ document.getElementById("triggerKeyRotationBtn")?.addEventListener("click", asyn
   alert(`Rotated ${result?.filesRotated ?? 0} file key(s).`);
   await refreshKeyRotation();
 });
+
+// ─── v1.8: Compliance export ──────────────────────────────────────────────
+
+document.getElementById("exportComplianceBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const blob = await apiFetchBlob(`/api/admin/tenants/${tenantId}/compliance/export`, {
+    method: "POST",
+  });
+  const filename = `compliance-${tenantId}.zip`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("gdprEraseBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  const userId = document.getElementById("gdprUserId")?.value.trim();
+  if (!tenantId || !userId) return;
+  if (!confirm(`Permanently erase data for user ${userId}? This cannot be undone.`)) return;
+  const body = await apiFetch(`/api/admin/tenants/${tenantId}/users/${userId}/data`, {
+    method: "DELETE",
+  });
+  document.getElementById("gdprEraseResult").textContent = JSON.stringify(body, null, 2);
+});
+
+// ─── v1.8: Data retention policy ─────────────────────────────────────────
+
+async function refreshRetentionPolicy() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const policy = await apiFetch(`/api/admin/tenants/${tenantId}/retention-policy`);
+  if (!policy) return;
+  document.getElementById("retentionEnabled").checked = policy.enabled;
+  document.getElementById("retentionDays").value = policy.fileRetentionDays ?? 365;
+}
+
+document.getElementById("refreshRetentionPolicy")?.addEventListener("click", refreshRetentionPolicy);
+
+document.getElementById("saveRetentionBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/retention-policy`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      enabled: document.getElementById("retentionEnabled").checked,
+      fileRetentionDays: parseInt(document.getElementById("retentionDays").value, 10) || 365,
+    }),
+  });
+  await refreshRetentionPolicy();
+});
+
+async function doApplyRetention(dryRun) {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  if (!dryRun && !confirm("Apply retention policy now? This will permanently delete matching files.")) return;
+  const data = await apiFetch(
+    `/api/admin/tenants/${tenantId}/retention-policy/apply?dryRun=${dryRun}`,
+    { method: "POST" }
+  );
+  document.getElementById("retentionApplyResult").textContent = JSON.stringify(data, null, 2);
+}
+
+document.getElementById("applyRetentionDryRunBtn")?.addEventListener("click", () => doApplyRetention(true));
+document.getElementById("applyRetentionBtn")?.addEventListener("click", () => doApplyRetention(false));

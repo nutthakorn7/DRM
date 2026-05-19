@@ -56,6 +56,7 @@ builder.Services.AddHostedService<AuditRetentionWorker>();
 builder.Services.AddHostedService<FileExpiryWorker>();
 builder.Services.AddHostedService<AlertEvaluationWorker>();
 builder.Services.AddHostedService<KeyRotationWorker>();
+builder.Services.AddHostedService<DataRetentionWorker>();
 
 var app = builder.Build();
 
@@ -736,6 +737,15 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_KeyRotationHistory_TenantId" ON "KeyRotationHistory" ("TenantId");
             """);
+        // v1.8: TenantRetentionPolicies (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRetentionPolicies" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantRetentionPolicies" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "FileRetentionDays" INTEGER NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
     }
     else
     {
@@ -992,6 +1002,15 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.ExecuteSqlRaw("""
             CREATE INDEX IF NOT EXISTS "IX_KeyRotationHistory_TenantId" ON "KeyRotationHistory" ("TenantId");
             """);
+        // v1.8: TenantRetentionPolicies (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantRetentionPolicies" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantRetentionPolicies" PRIMARY KEY,
+                "Enabled" boolean NOT NULL DEFAULT FALSE,
+                "FileRetentionDays" integer NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -1080,6 +1099,8 @@ app.MapAccessRequestEndpoints();
 app.MapAdminFileCollectionEndpoints();
 app.MapAdminBatchFileEndpoints();
 app.MapAdminKeyRotationEndpoints();
+app.MapAdminComplianceEndpoints();
+app.MapAdminRetentionPolicyEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();
 app.MapScimGroupsEndpoints();
