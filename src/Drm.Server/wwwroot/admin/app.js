@@ -43,6 +43,12 @@ tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
 adminUserIdInput.value = state.adminUserId;
 
+// Show disconnected badge when no session is loaded
+if (!state.tenantId || !state.adminKey) {
+  connectionState.textContent = "Not connected";
+  connectionState.className = "status-line disconnected";
+}
+
 document.querySelector("#saveSession").addEventListener("click", () => {
   state.tenantId = tenantIdInput.value.trim();
   state.adminKey = adminKeyInput.value.trim();
@@ -50,6 +56,8 @@ document.querySelector("#saveSession").addEventListener("click", () => {
   localStorage.setItem("drm:tenantId", state.tenantId);
   localStorage.setItem("drm:adminKey", state.adminKey);
   localStorage.setItem("drm:adminUserId", state.adminUserId);
+  // Remove disconnected styling when a session is saved
+  connectionState.className = "status-line";
   setStatus("Session saved (persists across browser sessions)", "ok");
 });
 
@@ -65,6 +73,7 @@ if (forgetSessionBtn) {
     tenantIdInput.value = "";
     adminKeyInput.value = "";
     adminUserIdInput.value = "";
+    connectionState.className = "status-line disconnected";
     setStatus("Session cleared from this browser", "ok");
   });
 }

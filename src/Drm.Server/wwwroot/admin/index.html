@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- design-audit-20260519: fixes applied (aria-hidden icons, skip-nav, danger class, step count, Forget placement) -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DRM Management</title>
@@ -12,6 +13,7 @@
   <link rel="stylesheet" href="/admin/app.css">
 </head>
 <body>
+  <a href="#adminMain" class="skip-link">Skip to main content</a>
   <div class="welcome-screen" id="welcomeScreen" hidden role="dialog" aria-labelledby="welcomeTitle">
     <div class="welcome-card">
       <div class="welcome-logo" aria-hidden="true">🔒</div>
@@ -20,10 +22,11 @@
       <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, admin credential, and Admin user ID for you — you can replace them with real credentials anytime.</p>
 
       <ul class="welcome-steps">
-        <li><span class="step-num">1</span> Generate credentials</li>
-        <li><span class="step-num">2</span> Add your first user</li>
-        <li><span class="step-num">3</span> Create a policy template</li>
-        <li><span class="step-num">4</span> Protect &amp; send a file</li>
+        <li><span class="step-num">1</span> Enter or generate a Tenant ID</li>
+        <li><span class="step-num">2</span> Set admin credential</li>
+        <li><span class="step-num">3</span> Add your first user</li>
+        <li><span class="step-num">4</span> Create a policy template</li>
+        <li><span class="step-num">5</span> Protect &amp; send a file</li>
       </ul>
 
       <div class="welcome-actions">
@@ -45,14 +48,14 @@
         </button>
       </div>
       <nav>
-        <a class="active" href="/admin/"><span class="nav-icon">⚙️</span><span class="nav-label">Admin console</span></a>
-        <a href="/me/"><span class="nav-icon">📤</span><span class="nav-label">Send a file</span></a>
-        <a href="/share/"><span class="nav-icon">📥</span><span class="nav-label">Open shared file</span></a>
+        <a class="active" href="/admin/"><span class="nav-icon" aria-hidden="true">⚙️</span><span class="nav-label">Admin console</span></a>
+        <a href="/me/"><span class="nav-icon" aria-hidden="true">📤</span><span class="nav-label">Send a file</span></a>
+        <a href="/share/"><span class="nav-icon" aria-hidden="true">📥</span><span class="nav-label">Open shared file</span></a>
       </nav>
       <nav class="rail-secondary" aria-label="Documentation">
         <p class="eyebrow">Reference</p>
-        <a href="/admin/cases/" target="_blank"><span class="nav-icon">📘</span><span class="nav-label">Use cases ↗</span></a>
-        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon">🧩</span><span class="nav-label">Compatibility ↗</span></a>
+        <a href="/admin/cases/" target="_blank"><span class="nav-icon" aria-hidden="true">📘</span><span class="nav-label">Use cases ↗</span></a>
+        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon" aria-hidden="true">🧩</span><span class="nav-label">Compatibility ↗</span></a>
       </nav>
     </aside>
 
@@ -93,8 +96,10 @@
           <span>Admin user ID</span>
           <input id="adminUserId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
         </label>
-        <button id="saveSession" type="button">Save session</button>
-        <button id="forgetSession" type="button" class="ghost">Forget</button>
+        <div class="save-forget-group">
+          <button id="saveSession" type="button">Save session</button>
+          <button id="forgetSession" type="button" class="ghost">Forget</button>
+        </div>
       </section>
 
       <section class="settings global-search-row" aria-label="Search panels">
@@ -106,22 +111,22 @@
 
       <nav class="tab-nav" aria-label="Section tabs" role="tablist">
         <button type="button" class="tab-link" data-tab-link="overview" role="tab" aria-selected="true">
-          <span class="tab-icon">📊</span><span class="tab-label">Overview</span>
+          <span class="tab-icon" aria-hidden="true">📊</span><span class="tab-label">Overview</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="identity" role="tab" aria-selected="false">
-          <span class="tab-icon">👥</span><span class="tab-label">Identity</span>
+          <span class="tab-icon" aria-hidden="true">👥</span><span class="tab-label">Identity</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="policy" role="tab" aria-selected="false">
-          <span class="tab-icon">📋</span><span class="tab-label">Policy</span>
+          <span class="tab-icon" aria-hidden="true">📋</span><span class="tab-label">Policy</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="files" role="tab" aria-selected="false">
-          <span class="tab-icon">📁</span><span class="tab-label">Files</span>
+          <span class="tab-icon" aria-hidden="true">📁</span><span class="tab-label">Files</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="integrations" role="tab" aria-selected="false">
-          <span class="tab-icon">🔌</span><span class="tab-label">Integrations</span>
+          <span class="tab-icon" aria-hidden="true">🔌</span><span class="tab-label">Integrations</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="tenants" role="tab" aria-selected="false">
-          <span class="tab-icon">🏢</span><span class="tab-label">Tenants</span>
+          <span class="tab-icon" aria-hidden="true">🏢</span><span class="tab-label">Tenants</span>
         </button>
       </nav>
 
@@ -1595,7 +1600,7 @@
             <h4 style="margin:0 0 8px">Batch revoke</h4>
             <p class="muted" style="font-size:13px;margin:0 0 12px">Revoke multiple files at once. Enter one File ID per line.</p>
             <textarea id="batchRevokeIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
-            <button id="batchRevokeBtn" type="button" style="margin-top:8px;background:var(--danger,#e53e3e);color:#fff">Revoke all</button>
+            <button id="batchRevokeBtn" type="button" class="danger" style="margin-top:8px">Revoke all</button>
             <pre id="batchRevokeResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
           </div>
           <div class="card" style="flex:1;min-width:280px;padding:16px">
@@ -1627,7 +1632,7 @@
             <h4 style="margin:0 0 8px">GDPR right-to-erasure</h4>
             <p class="muted" style="font-size:13px;margin:0 0 12px">Permanently anonymise a user's PII and remove their file grants. This action cannot be undone.</p>
             <label style="display:block;font-size:13px;margin-bottom:8px">User ID<input id="gdprUserId" type="text" placeholder="00000000-..." style="width:100%;margin-top:4px"></label>
-            <button id="gdprEraseBtn" type="button" style="background:var(--danger,#e53e3e);color:#fff">Erase user data</button>
+            <button id="gdprEraseBtn" type="button" class="danger">Erase user data</button>
             <pre id="gdprEraseResult" style="font-size:11px;margin-top:8px;max-height:100px;overflow:auto"></pre>
           </div>
         </div>
@@ -1654,7 +1659,7 @@
             </label>
             <button id="saveRetentionBtn" type="button">Save policy</button>
             <button id="applyRetentionDryRunBtn" type="button" style="margin-left:8px">Dry-run</button>
-            <button id="applyRetentionBtn" type="button" style="margin-left:8px;background:var(--danger,#e53e3e);color:#fff">Apply now</button>
+            <button id="applyRetentionBtn" type="button" class="danger" style="margin-left:8px">Apply now</button>
             <pre id="retentionApplyResult" style="font-size:11px;margin-top:8px;max-height:80px;overflow:auto"></pre>
           </div>
         </div>
