@@ -43,6 +43,12 @@ tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
 adminUserIdInput.value = state.adminUserId;
 
+// Show disconnected badge when no session is loaded
+if (!state.tenantId || !state.adminKey) {
+  connectionState.textContent = "Not connected";
+  connectionState.className = "status-line disconnected";
+}
+
 document.querySelector("#saveSession").addEventListener("click", () => {
   state.tenantId = tenantIdInput.value.trim();
   state.adminKey = adminKeyInput.value.trim();
@@ -50,6 +56,8 @@ document.querySelector("#saveSession").addEventListener("click", () => {
   localStorage.setItem("drm:tenantId", state.tenantId);
   localStorage.setItem("drm:adminKey", state.adminKey);
   localStorage.setItem("drm:adminUserId", state.adminUserId);
+  // Remove disconnected styling when a session is saved
+  connectionState.className = "status-line";
   setStatus("Session saved (persists across browser sessions)", "ok");
 });
 
@@ -65,6 +73,7 @@ if (forgetSessionBtn) {
     tenantIdInput.value = "";
     adminKeyInput.value = "";
     adminUserIdInput.value = "";
+    connectionState.className = "status-line disconnected";
     setStatus("Session cleared from this browser", "ok");
   });
 }
@@ -903,6 +912,33 @@ document.querySelector("#triggerSync").addEventListener("click", async () => {
     : "Sync returned no result.";
 });
 
+// ── Integration panel status helpers ────────────────────────────────────────
+/**
+ * Set the active/inactive badge and border on an integration panel.
+ * @param {string} panelId   – section element id (e.g. "box")
+ * @param {boolean} isActive – true → green "Active", false → grey "Inactive"
+ */
+function setIntegrationStatus(panelId, isActive) {
+  const panel = document.querySelector(`#${panelId}`);
+  if (!panel) return;
+
+  // Left accent stripe via data attribute + CSS
+  panel.dataset.integrationStatus = isActive ? "active" : "inactive";
+
+  // Create or update the badge pill in the section-head
+  let badge = panel.querySelector(".integration-badge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "integration-badge";
+    const head = panel.querySelector(".section-head");
+    const btn = head?.querySelector("button");
+    if (btn) head.insertBefore(badge, btn);
+    else head?.appendChild(badge);
+  }
+  badge.textContent = isActive ? "Active" : "Inactive";
+  badge.dataset.status = isActive ? "active" : "inactive";
+}
+
 document.querySelector("#boxConfigForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const body = {
@@ -914,6 +950,7 @@ document.querySelector("#boxConfigForm").addEventListener("submit", async (event
     enabled: document.querySelector("#boxEnabled").checked
   };
   await apiFetch("/api/admin/box/config", { method: "PUT", body: JSON.stringify(body) });
+  setIntegrationStatus("box", body.enabled);
   setStatus("Box config saved", "ok");
 });
 
@@ -924,6 +961,7 @@ document.querySelector("#refreshBoxConfig").addEventListener("click", async () =
       document.querySelector("#boxClientId").value = config.clientId ?? "";
       document.querySelector("#boxEnterpriseId").value = config.enterpriseId ?? "";
       document.querySelector("#boxEnabled").checked = !!config.enabled;
+      setIntegrationStatus("box", !!config.enabled);
       boxOutput.textContent = JSON.stringify({
         enabled: config.enabled,
         lastConnectionStatus: config.lastConnectionStatus,
@@ -980,6 +1018,7 @@ document.querySelector("#outlookConfigForm").addEventListener("submit", async (e
     defaultPolicyTemplateId: document.querySelector("#outlookDefaultTemplate").value.trim() || null
   };
   await apiFetch("/api/admin/outlook/config", { method: "PUT", body: JSON.stringify(body) });
+  setIntegrationStatus("outlook", body.enabled);
   setStatus("Outlook config saved", "ok");
 });
 
@@ -990,6 +1029,7 @@ document.querySelector("#refreshOutlookConfig").addEventListener("click", async 
     const config = await apiFetch(`/api/admin/outlook/config?tenantId=${encodeURIComponent(requireTenantId())}`);
     if (config) {
       document.querySelector("#outlookEnabled").checked = !!config.enabled;
+      setIntegrationStatus("outlook", !!config.enabled);
       document.querySelector("#outlookAutoEncrypt").checked = !!config.autoEncryptOutgoingAttachments;
       document.querySelector("#outlookMinSize").value = config.minAttachmentSizeKb ?? 0;
       document.querySelector("#outlookSkipDomains").value = config.skipDomainsCsv ?? "";
@@ -1040,6 +1080,7 @@ document.querySelector("#loadNotificationConfig").addEventListener("click", asyn
   const config = await apiFetch(`/api/admin/notification-config?tenantId=${requireTenantId()}`);
   if (config) {
     document.querySelector("#notifyAdminEmails").value = config.adminEmailsCsv ?? "";
+    setIntegrationStatus("notifications", !!(config.adminEmailsCsv));
     document.querySelector("#notifyOnExternalShareViewed").checked = config.notifyOnExternalShareViewed;
     document.querySelector("#notifyOnFileRevoked").checked = config.notifyOnFileRevoked;
     document.querySelector("#notifyOnAccessDenied").checked = config.notifyOnAccessDenied;
@@ -1061,6 +1102,7 @@ document.querySelector("#notificationConfigForm").addEventListener("submit", asy
     method: "PUT",
     body: JSON.stringify(body)
   });
+  setIntegrationStatus("notifications", !!body.adminEmailsCsv);
   setStatus("Notification config saved", "ok");
 });
 
@@ -1218,6 +1260,7 @@ document.querySelector("#folderWatcherForm").addEventListener("submit", async (e
     method: "PUT",
     body: JSON.stringify(body)
   });
+  setIntegrationStatus("folder-watcher", body.enabled);
   setStatus("Folder watcher config saved", "ok");
   await loadFolderWatcherConfig();
 });
@@ -1228,6 +1271,7 @@ async function loadFolderWatcherConfig() {
   try {
     const config = await apiFetch(`/api/admin/folder-watcher/config?tenantId=${encodeURIComponent(requireTenantId())}`);
     document.querySelector("#folderWatcherEnabled").checked = !!config.enabled;
+    setIntegrationStatus("folder-watcher", !!config.enabled);
     document.querySelector("#folderWatcherPaths").value =
       (config.watchedFolders ?? []).map((f) => f.path).join("\n");
     document.querySelector("#folderWatcherStatus").textContent = JSON.stringify({
@@ -1903,6 +1947,7 @@ function renderSimulation(decision) {
 function renderSiemWebhooks(webhooks) {
   if (!webhooks.length) {
     siemWebhooksBody.innerHTML = '<tr><td colspan="4" class="empty">No SIEM webhooks in this tenant.</td></tr>';
+    setIntegrationStatus("siem", false);
     return;
   }
 
@@ -1914,6 +1959,7 @@ function renderSiemWebhooks(webhooks) {
       <td>${escapeHtml(formatDate(webhook.createdAtUtc))}</td>
     </tr>
   `).join("");
+  setIntegrationStatus("siem", webhooks.some((w) => w.enabled));
 }
 
 function renderAuditEvents(events) {
@@ -2685,12 +2731,12 @@ async function approveRegistration(registrationId) {
 function openRejectDialog(registrationId) {
   _pendingRejectId = registrationId;
   const dialog = document.getElementById("rejectDialog");
-  dialog?.removeAttribute("hidden");
+  dialog?.showModal();
   document.getElementById("rejectNotes")?.focus();
 }
 
 document.getElementById("cancelReject")?.addEventListener("click", () => {
-  document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+  document.getElementById("rejectDialog")?.close();
   _pendingRejectId = null;
 });
 
@@ -2704,7 +2750,7 @@ document.getElementById("rejectForm")?.addEventListener("submit", async (e) => {
       { method: "POST", body: JSON.stringify({ notes }) }
     );
     setStatus("Registration rejected", "ok");
-    document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+    document.getElementById("rejectDialog")?.close();
     document.getElementById("rejectNotes").value = "";
     _pendingRejectId = null;
     await refreshRegistrations();

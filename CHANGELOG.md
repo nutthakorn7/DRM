@@ -2,6 +2,52 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.2.1] — 2026-05-19
+
+**Design audit — admin console polish (v1.9 UI).**
+Full design audit of the admin console resulting in 12 resolved issues across
+accessibility, visual hierarchy, token consistency, and layout density.
+
+### Changed
+- **Design token consistency.** Replaced raw inline `style=""` attributes in
+  the v1.7–v1.9 panels (`#batchOps`, `#compliance`, `#retentionPolicy`,
+  `#keyRotation`, `#ipAllowlist`, `#deviceTrust`) with `.card`, `.card-row`,
+  `.btn-row`, `.label-row`, `.field-row`, and `.pre-output` utility classes.
+  Added matching CSS utilities to `app.css`.
+- **Danger button token.** `gdprEraseBtn`, `batchRevokeBtn`, and
+  `applyRetentionBtn` now use the `.danger` CSS class instead of an inline
+  `style="background:var(--danger,#e53e3e)"` fallback that resolved to the
+  wrong brand red on CSS variable failure.
+- **Accessibility.** Added `aria-hidden="true"` to all `.nav-icon` and
+  `.tab-icon` emoji spans. Added a visually-hidden skip-navigation link
+  (`<a class="skip-link" href="#adminMain">`).
+- **Welcome modal.** Expanded from 4 to 5 steps to align with the Getting
+  Started checklist (separate "Set admin credential" from "Generate Tenant
+  ID").
+- **Connection status badge.** `#connectionState` now shows a coloured pill
+  with amber dot when disconnected and a green pill when connected, replacing
+  the plain muted text.
+- **Files tab.** Reorganised into four subtabs — Files, Sharing, Commands,
+  Containers — using the existing pill subtab system. Reduces visible form
+  density from 9 stacked sections to a focussed subset per subtab.
+- **Empty states.** Main tables (Users, Policy templates, Audit events,
+  Tenants) now use the rich `.empty-state` component (icon + title + hint)
+  instead of bare `.empty` text cells.
+- **Forget button placement.** Moved adjacent to Save in the settings grid
+  row, eliminating the orphaned second-row button.
+- **`#rejectDialog`.** Converted from `<div hidden>` to a native `<dialog>`
+  element for built-in focus trapping and Escape dismissal.
+- **Integrations tab.** Active integrations show a green "Active" badge and
+  accent left-border; unconfigured ones show a muted "Inactive" badge.
+  Status is set dynamically when configuration is saved or loaded.
+
+### Fixed
+- `ManagementConsoleTests.Admin_console_index_is_served` updated to match the
+  redesigned Files tab section heading ("External sharing" replaces
+  "External share links").
+
+---
+
 ## [1.2.0] — 2026-05-18
 
 **v1.2 — tenant-scoped admin roles.**

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- design-audit-20260519: fixes applied (aria-hidden icons, skip-nav, danger class, step count, Forget placement) -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DRM Management</title>
@@ -12,6 +13,7 @@
   <link rel="stylesheet" href="/admin/app.css">
 </head>
 <body>
+  <a href="#adminMain" class="skip-link">Skip to main content</a>
   <div class="welcome-screen" id="welcomeScreen" hidden role="dialog" aria-labelledby="welcomeTitle">
     <div class="welcome-card">
       <div class="welcome-logo" aria-hidden="true">🔒</div>
@@ -20,10 +22,11 @@
       <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, admin credential, and Admin user ID for you — you can replace them with real credentials anytime.</p>
 
       <ul class="welcome-steps">
-        <li><span class="step-num">1</span> Generate credentials</li>
-        <li><span class="step-num">2</span> Add your first user</li>
-        <li><span class="step-num">3</span> Create a policy template</li>
-        <li><span class="step-num">4</span> Protect &amp; send a file</li>
+        <li><span class="step-num">1</span> Enter or generate a Tenant ID</li>
+        <li><span class="step-num">2</span> Set admin credential</li>
+        <li><span class="step-num">3</span> Add your first user</li>
+        <li><span class="step-num">4</span> Create a policy template</li>
+        <li><span class="step-num">5</span> Protect &amp; send a file</li>
       </ul>
 
       <div class="welcome-actions">
@@ -45,14 +48,14 @@
         </button>
       </div>
       <nav>
-        <a class="active" href="/admin/"><span class="nav-icon">⚙️</span><span class="nav-label">Admin console</span></a>
-        <a href="/me/"><span class="nav-icon">📤</span><span class="nav-label">Send a file</span></a>
-        <a href="/share/"><span class="nav-icon">📥</span><span class="nav-label">Open shared file</span></a>
+        <a class="active" href="/admin/"><span class="nav-icon" aria-hidden="true">⚙️</span><span class="nav-label">Admin console</span></a>
+        <a href="/me/"><span class="nav-icon" aria-hidden="true">📤</span><span class="nav-label">Send a file</span></a>
+        <a href="/share/"><span class="nav-icon" aria-hidden="true">📥</span><span class="nav-label">Open shared file</span></a>
       </nav>
       <nav class="rail-secondary" aria-label="Documentation">
         <p class="eyebrow">Reference</p>
-        <a href="/admin/cases/" target="_blank"><span class="nav-icon">📘</span><span class="nav-label">Use cases ↗</span></a>
-        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon">🧩</span><span class="nav-label">Compatibility ↗</span></a>
+        <a href="/admin/cases/" target="_blank"><span class="nav-icon" aria-hidden="true">📘</span><span class="nav-label">Use cases ↗</span></a>
+        <a href="/admin/compatibility/" target="_blank"><span class="nav-icon" aria-hidden="true">🧩</span><span class="nav-label">Compatibility ↗</span></a>
       </nav>
     </aside>
 
@@ -93,8 +96,10 @@
           <span>Admin user ID</span>
           <input id="adminUserId" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
         </label>
-        <button id="saveSession" type="button">Save session</button>
-        <button id="forgetSession" type="button" class="ghost">Forget</button>
+        <div class="save-forget-group">
+          <button id="saveSession" type="button">Save session</button>
+          <button id="forgetSession" type="button" class="ghost">Forget</button>
+        </div>
       </section>
 
       <section class="settings global-search-row" aria-label="Search panels">
@@ -106,22 +111,22 @@
 
       <nav class="tab-nav" aria-label="Section tabs" role="tablist">
         <button type="button" class="tab-link" data-tab-link="overview" role="tab" aria-selected="true">
-          <span class="tab-icon">📊</span><span class="tab-label">Overview</span>
+          <span class="tab-icon" aria-hidden="true">📊</span><span class="tab-label">Overview</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="identity" role="tab" aria-selected="false">
-          <span class="tab-icon">👥</span><span class="tab-label">Identity</span>
+          <span class="tab-icon" aria-hidden="true">👥</span><span class="tab-label">Identity</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="policy" role="tab" aria-selected="false">
-          <span class="tab-icon">📋</span><span class="tab-label">Policy</span>
+          <span class="tab-icon" aria-hidden="true">📋</span><span class="tab-label">Policy</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="files" role="tab" aria-selected="false">
-          <span class="tab-icon">📁</span><span class="tab-label">Files</span>
+          <span class="tab-icon" aria-hidden="true">📁</span><span class="tab-label">Files</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="integrations" role="tab" aria-selected="false">
-          <span class="tab-icon">🔌</span><span class="tab-label">Integrations</span>
+          <span class="tab-icon" aria-hidden="true">🔌</span><span class="tab-label">Integrations</span>
         </button>
         <button type="button" class="tab-link" data-tab-link="tenants" role="tab" aria-selected="false">
-          <span class="tab-icon">🏢</span><span class="tab-label">Tenants</span>
+          <span class="tab-icon" aria-hidden="true">🏢</span><span class="tab-label">Tenants</span>
         </button>
       </nav>
 
@@ -299,7 +304,13 @@
             </thead>
             <tbody id="usersBody">
               <tr>
-                <td colspan="3" class="empty">Set tenant and admin key, then refresh.</td>
+                <td colspan="3">
+                  <div class="empty-state">
+                    <span class="empty-icon" aria-hidden="true">👥</span>
+                    <span class="empty-title">No users yet</span>
+                    <span class="empty-hint">Set tenant and admin key, then click Refresh to load users.</span>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -541,7 +552,13 @@
             </thead>
             <tbody id="policyTemplatesBody">
               <tr>
-                <td colspan="6" class="empty">Refresh to load policy templates.</td>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <span class="empty-icon" aria-hidden="true">📋</span>
+                    <span class="empty-title">No templates yet</span>
+                    <span class="empty-hint">Create a reusable policy template above, or click Refresh to load existing ones.</span>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -735,10 +752,33 @@
           <button id="refreshTags" type="button">Refresh tag list</button>
         </div>
 
-        <div class="section-head compact-head">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>File ID</th>
+                <th>Owner</th>
+                <th>Type</th>
+                <th>Permissions</th>
+                <th>Status</th>
+                <th>Expires</th>
+                <th>Revoke</th>
+              </tr>
+            </thead>
+            <tbody id="filesBody">
+              <tr>
+                <td colspan="7" class="empty">Refresh to load protected files.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="shareLinks" data-tab="files">
+        <div class="section-head">
           <div>
             <p class="eyebrow">External sharing</p>
-            <h4>External share links</h4>
+            <h3>Share links</h3>
           </div>
           <button id="refreshShareLinks" type="button">Refresh share links</button>
         </div>
@@ -777,11 +817,13 @@
             </tbody>
           </table>
         </div>
+      </section>
 
-        <div class="section-head compact-head">
+      <section class="panel" id="remoteCommands" data-tab="files">
+        <div class="section-head">
           <div>
             <p class="eyebrow">Command status</p>
-            <h4>Remote delete commands</h4>
+            <h3>Remote delete commands</h3>
           </div>
           <button id="refreshCommands" type="button">Refresh commands</button>
         </div>
@@ -789,27 +831,6 @@
         <div class="command-filter-row">
           <input id="commandFileId" autocomplete="off" placeholder="File ID">
           <input id="commandDeviceId" autocomplete="off" placeholder="Device ID filter">
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>File ID</th>
-                <th>Owner</th>
-                <th>Type</th>
-                <th>Permissions</th>
-                <th>Status</th>
-                <th>Expires</th>
-                <th>Revoke</th>
-              </tr>
-            </thead>
-            <tbody id="filesBody">
-              <tr>
-                <td colspan="7" class="empty">Refresh to load protected files.</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
 
         <div class="table-wrap">
@@ -901,7 +922,13 @@
             </thead>
             <tbody id="auditEventsBody">
               <tr>
-                <td colspan="5" class="empty">Refresh to load audit events.</td>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <span class="empty-icon" aria-hidden="true">📊</span>
+                    <span class="empty-title">No events yet</span>
+                    <span class="empty-hint">Click Refresh audit to load the event log for this tenant.</span>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1301,13 +1328,21 @@
               </tr>
             </thead>
             <tbody id="tenantsBody">
-              <tr><td colspan="7" class="empty">Click "Refresh" to load tenants.</td></tr>
+              <tr>
+                <td colspan="7">
+                  <div class="empty-state">
+                    <span class="empty-icon" aria-hidden="true">🏢</span>
+                    <span class="empty-title">No tenants</span>
+                    <span class="empty-hint">Click Refresh to load tenants, or expand "Create tenant" above to add one.</span>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
 
         <!-- Key manager sub-panel (shown when "Keys" is clicked on a tenant row) -->
-        <div id="keyManagerPanel" hidden style="margin-top:1.5rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem">
+        <div id="keyManagerPanel" hidden class="card" style="margin-top:1.5rem">
           <div class="section-head" style="margin-bottom:.75rem">
             <div>
               <p class="eyebrow">API access</p>
@@ -1343,7 +1378,7 @@
         </div>
 
         <!-- Webhook manager sub-panel (shown when "Webhooks" is clicked on a tenant row) -->
-        <div id="webhookManagerPanel" hidden style="margin-top:1.5rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem">
+        <div id="webhookManagerPanel" hidden class="card" style="margin-top:1.5rem">
           <div class="section-head" style="margin-bottom:.75rem">
             <div>
               <p class="eyebrow">Billing events</p>
@@ -1420,14 +1455,18 @@
         </div>
 
         <!-- Reject dialog -->
-        <div id="rejectDialog" hidden style="margin-top:1rem;border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:1rem;max-width:520px">
-          <p class="eyebrow" style="margin-bottom:.5rem">Reject registration</p>
-          <form id="rejectForm" class="create-row" style="flex-wrap:wrap;gap:6px">
-            <input id="rejectNotes" autocomplete="off" placeholder="Reason / notes (optional)" style="flex:1;min-width:240px">
-            <button type="submit" class="danger">Reject</button>
-            <button type="button" id="cancelReject" class="ghost">Cancel</button>
-          </form>
-        </div>
+        <dialog id="rejectDialog" aria-modal="true" aria-labelledby="rejectDialogTitle">
+          <div class="dialog-head">
+            <p class="eyebrow" id="rejectDialogTitle">Reject registration</p>
+            <button type="button" class="dialog-close" aria-label="Close" id="cancelReject">×</button>
+          </div>
+          <div class="dialog-body">
+            <form id="rejectForm" class="create-row" style="flex-wrap:wrap;gap:6px">
+              <input id="rejectNotes" autocomplete="off" placeholder="Reason / notes (optional)" style="flex:1;min-width:240px">
+              <button type="submit" class="danger">Reject</button>
+            </form>
+          </div>
+        </dialog>
       </section>
 
       <!-- ── Access Requests ──────────────────────────────────────── -->
@@ -1590,21 +1629,25 @@
             <h3>Batch file operations</h3>
           </div>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">Batch revoke</h4>
-            <p class="muted" style="font-size:13px;margin:0 0 12px">Revoke multiple files at once. Enter one File ID per line.</p>
-            <textarea id="batchRevokeIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
-            <button id="batchRevokeBtn" type="button" style="margin-top:8px;background:var(--danger,#e53e3e);color:#fff">Revoke all</button>
-            <pre id="batchRevokeResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
+        <div class="card-row">
+          <div class="card">
+            <h4>Batch revoke</h4>
+            <p class="hint">Revoke multiple files at once. Enter one File ID per line.</p>
+            <textarea id="batchRevokeIds" rows="4" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <div class="btn-row">
+              <button id="batchRevokeBtn" type="button" class="danger">Revoke all</button>
+            </div>
+            <pre id="batchRevokeResult" class="pre-output"></pre>
           </div>
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">Batch update expiry</h4>
-            <p class="muted" style="font-size:13px;margin:0 0 12px">Set a new expiry date for multiple files. Enter one File ID per line.</p>
-            <textarea id="batchExpiryIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
-            <label style="display:block;margin-top:8px;font-size:13px">New expiry<input id="batchExpiryDate" type="datetime-local" style="width:100%;margin-top:4px"></label>
-            <button id="batchExpiryBtn" type="button" style="margin-top:8px">Update expiry</button>
-            <pre id="batchExpiryResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
+          <div class="card">
+            <h4>Batch update expiry</h4>
+            <p class="hint">Set a new expiry date for multiple files. Enter one File ID per line.</p>
+            <textarea id="batchExpiryIds" rows="4" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <label>New expiry<input id="batchExpiryDate" type="datetime-local"></label>
+            <div class="btn-row">
+              <button id="batchExpiryBtn" type="button">Update expiry</button>
+            </div>
+            <pre id="batchExpiryResult" class="pre-output"></pre>
           </div>
         </div>
       </section>
@@ -1617,18 +1660,20 @@
             <h3>Compliance &amp; data rights</h3>
           </div>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">Export compliance bundle</h4>
-            <p class="muted" style="font-size:13px;margin:0 0 12px">Downloads a ZIP containing the file inventory, full audit log, and HMAC chain verification for the selected tenant.</p>
+        <div class="card-row">
+          <div class="card">
+            <h4>Export compliance bundle</h4>
+            <p class="hint">Downloads a ZIP containing the file inventory, full audit log, and HMAC chain verification for the selected tenant.</p>
             <button id="exportComplianceBtn" type="button">Download bundle</button>
           </div>
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">GDPR right-to-erasure</h4>
-            <p class="muted" style="font-size:13px;margin:0 0 12px">Permanently anonymise a user's PII and remove their file grants. This action cannot be undone.</p>
-            <label style="display:block;font-size:13px;margin-bottom:8px">User ID<input id="gdprUserId" type="text" placeholder="00000000-..." style="width:100%;margin-top:4px"></label>
-            <button id="gdprEraseBtn" type="button" style="background:var(--danger,#e53e3e);color:#fff">Erase user data</button>
-            <pre id="gdprEraseResult" style="font-size:11px;margin-top:8px;max-height:100px;overflow:auto"></pre>
+          <div class="card">
+            <h4>GDPR right-to-erasure</h4>
+            <p class="hint">Permanently anonymise a user's PII and remove their file grants. This action cannot be undone.</p>
+            <label>User ID<input id="gdprUserId" type="text" placeholder="00000000-..."></label>
+            <div class="btn-row">
+              <button id="gdprEraseBtn" type="button" class="danger">Erase user data</button>
+            </div>
+            <pre id="gdprEraseResult" class="pre-output" style="max-height:100px"></pre>
           </div>
         </div>
       </section>
@@ -1642,20 +1687,22 @@
           </div>
           <button id="refreshRetentionPolicy" type="button">Refresh</button>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">Policy</h4>
-            <label style="display:block;margin-bottom:8px;font-size:13px">
+        <div class="card-row" style="margin-bottom:16px">
+          <div class="card">
+            <h4>Policy</h4>
+            <label class="label-row">
               <input id="retentionEnabled" type="checkbox"> Enable automatic file deletion
             </label>
-            <label style="display:block;margin-bottom:8px;font-size:13px">
+            <label class="label-row">
               Delete files expired more than
-              <input id="retentionDays" type="number" min="1" max="3650" value="365" style="width:70px;margin:0 4px"> days ago
+              <input id="retentionDays" type="number" min="1" max="3650" value="365" style="width:70px"> days ago
             </label>
-            <button id="saveRetentionBtn" type="button">Save policy</button>
-            <button id="applyRetentionDryRunBtn" type="button" style="margin-left:8px">Dry-run</button>
-            <button id="applyRetentionBtn" type="button" style="margin-left:8px;background:var(--danger,#e53e3e);color:#fff">Apply now</button>
-            <pre id="retentionApplyResult" style="font-size:11px;margin-top:8px;max-height:80px;overflow:auto"></pre>
+            <div class="btn-row">
+              <button id="saveRetentionBtn" type="button">Save policy</button>
+              <button id="applyRetentionDryRunBtn" type="button">Dry-run</button>
+              <button id="applyRetentionBtn" type="button" class="danger">Apply now</button>
+            </div>
+            <pre id="retentionApplyResult" class="pre-output" style="max-height:80px"></pre>
           </div>
         </div>
       </section>
@@ -1669,8 +1716,8 @@
           </div>
           <button id="refreshIpAllowlist" type="button">Refresh</button>
         </div>
-        <p style="font-size:13px;color:var(--muted)">When rules are configured, only requests from matching CIDR ranges can decrypt files. Leave empty to allow all IPs.</p>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <p class="hint">When rules are configured, only requests from matching CIDR ranges can decrypt files. Leave empty to allow all IPs.</p>
+        <div class="field-row">
           <input id="ipRuleCidr" type="text" placeholder="e.g. 10.0.0.0/8 or 203.0.113.5/32" style="flex:1;min-width:200px">
           <input id="ipRuleLabel" type="text" placeholder="Label (optional)" style="flex:1;min-width:160px">
           <button id="addIpRuleBtn" type="button">Add rule</button>
@@ -1690,13 +1737,13 @@
           </div>
           <button id="refreshDeviceTrust" type="button">Refresh</button>
         </div>
-        <div class="card" style="padding:16px;max-width:480px">
-          <label style="display:block;margin-bottom:8px;font-size:13px">
+        <div class="card" style="max-width:480px">
+          <label class="label-row">
             <input id="deviceTrustEnabled" type="checkbox"> Require device check-in
           </label>
-          <label style="display:block;margin-bottom:12px;font-size:13px">
+          <label class="label-row">
             Max days since last heartbeat:
-            <input id="deviceTrustCheckinDays" type="number" min="1" max="365" value="7" style="width:60px;margin-left:8px">
+            <input id="deviceTrustCheckinDays" type="number" min="1" max="365" value="7" style="width:60px">
           </label>
           <button id="saveDeviceTrustBtn" type="button">Save</button>
         </div>
@@ -1711,22 +1758,24 @@
           </div>
           <button id="refreshKeyRotation" type="button">Refresh</button>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">Schedule</h4>
-            <label style="display:block;margin-bottom:8px;font-size:13px">
+        <div class="card-row" style="margin-bottom:16px">
+          <div class="card">
+            <h4>Schedule</h4>
+            <label class="label-row">
               <input id="keyRotationEnabled" type="checkbox"> Enable automatic rotation
             </label>
-            <label style="display:block;margin-bottom:8px;font-size:13px">
+            <label class="label-row">
               Interval (days)
-              <input id="keyRotationIntervalDays" type="number" min="1" max="365" value="90" style="width:80px;margin-left:8px">
+              <input id="keyRotationIntervalDays" type="number" min="1" max="365" value="90" style="width:80px">
             </label>
-            <button id="saveKeyRotationBtn" type="button">Save schedule</button>
-            <button id="triggerKeyRotationBtn" type="button" style="margin-left:8px">Rotate now</button>
+            <div class="btn-row">
+              <button id="saveKeyRotationBtn" type="button">Save schedule</button>
+              <button id="triggerKeyRotationBtn" type="button">Rotate now</button>
+            </div>
           </div>
-          <div class="card" style="flex:1;min-width:280px;padding:16px">
-            <h4 style="margin:0 0 8px">Status</h4>
-            <div id="keyRotationStatus" style="font-size:13px">—</div>
+          <div class="card">
+            <h4>Status</h4>
+            <div id="keyRotationStatus" class="muted">—</div>
           </div>
         </div>
         <div class="table-wrap">

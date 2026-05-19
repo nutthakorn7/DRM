@@ -58,7 +58,7 @@ public sealed class ManagementConsoleTests : IDisposable
         html.Should().Contain("Command status");
         html.Should().Contain("commandsBody");
         html.Should().Contain("Refresh commands");
-        html.Should().Contain("External share links");
+        html.Should().Contain("External sharing");
         html.Should().Contain("createShareLinkForm");
         html.Should().Contain("shareLinksBody");
         html.Should().Contain("Refresh share links");
