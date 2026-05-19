@@ -1381,6 +1381,33 @@ body[data-active-tab="all"] section.panel {
   font-size: 0.85rem;
 }
 
+/* ── Integration panel active / inactive status ──────────────────────── */
+
+/* Left accent stripe on the panel when integration is active */
+.panel[data-integration-status="active"] {
+  border-left: 3px solid var(--accent);
+  padding-left: calc(var(--space-5) - 3px);
+}
+
+/* Status pill rendered by JS inside every integration section-head */
+.integration-badge {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.integration-badge[data-status="active"] {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.integration-badge[data-status="inactive"] {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
 .simulator-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
