@@ -55,6 +55,7 @@ builder.Services.AddSingleton(auditSettings);
 builder.Services.AddHostedService<AuditRetentionWorker>();
 builder.Services.AddHostedService<FileExpiryWorker>();
 builder.Services.AddHostedService<AlertEvaluationWorker>();
+builder.Services.AddHostedService<KeyRotationWorker>();
 
 var app = builder.Build();
 
@@ -687,6 +688,54 @@ using (var scope = app.Services.CreateScope())
                 "PrevHash" TEXT NOT NULL DEFAULT ''
             );
             """);
+        // v1.7: FileCollections, FileCollectionItems, TenantKeyRotationConfigs, KeyRotationHistory (SQLite)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollections" (
+                "CollectionId" TEXT NOT NULL CONSTRAINT "PK_FileCollections" PRIMARY KEY,
+                "TenantId" TEXT NOT NULL,
+                "Name" TEXT NOT NULL DEFAULT '',
+                "Description" TEXT NULL,
+                "CreatedAtUtc" TEXT NOT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollections_TenantId" ON "FileCollections" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollectionItems" (
+                "CollectionId" TEXT NOT NULL,
+                "FileId" TEXT NOT NULL,
+                "TenantId" TEXT NOT NULL,
+                "AddedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_FileCollectionItems" PRIMARY KEY ("CollectionId", "FileId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollectionItems_TenantId" ON "FileCollectionItems" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantKeyRotationConfigs" (
+                "TenantId" TEXT NOT NULL CONSTRAINT "PK_TenantKeyRotationConfigs" PRIMARY KEY,
+                "Enabled" INTEGER NOT NULL DEFAULT 0,
+                "IntervalDays" INTEGER NOT NULL DEFAULT 90,
+                "LastRotatedAtUtc" TEXT NULL,
+                "NextRotationDueUtc" TEXT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "KeyRotationHistory" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_KeyRotationHistory" PRIMARY KEY AUTOINCREMENT,
+                "TenantId" TEXT NOT NULL,
+                "FilesRotated" INTEGER NOT NULL DEFAULT 0,
+                "TriggeredBy" TEXT NOT NULL DEFAULT 'schedule',
+                "RotatedAtUtc" TEXT NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_KeyRotationHistory_TenantId" ON "KeyRotationHistory" ("TenantId");
+            """);
     }
     else
     {
@@ -895,6 +944,54 @@ using (var scope = app.Services.CreateScope())
                 "PrevHash" text NOT NULL DEFAULT ''
             );
             """);
+        // v1.7: FileCollections, FileCollectionItems, TenantKeyRotationConfigs, KeyRotationHistory (Postgres)
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollections" (
+                "CollectionId" uuid NOT NULL CONSTRAINT "PK_FileCollections" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "Name" text NOT NULL DEFAULT '',
+                "Description" text NULL,
+                "CreatedAtUtc" timestamptz NOT NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollections_TenantId" ON "FileCollections" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "FileCollectionItems" (
+                "CollectionId" uuid NOT NULL,
+                "FileId" uuid NOT NULL,
+                "TenantId" uuid NOT NULL,
+                "AddedAtUtc" timestamptz NOT NULL,
+                CONSTRAINT "PK_FileCollectionItems" PRIMARY KEY ("CollectionId", "FileId")
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_FileCollectionItems_TenantId" ON "FileCollectionItems" ("TenantId");
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "TenantKeyRotationConfigs" (
+                "TenantId" uuid NOT NULL CONSTRAINT "PK_TenantKeyRotationConfigs" PRIMARY KEY,
+                "Enabled" boolean NOT NULL DEFAULT FALSE,
+                "IntervalDays" integer NOT NULL DEFAULT 90,
+                "LastRotatedAtUtc" timestamptz NULL,
+                "NextRotationDueUtc" timestamptz NULL,
+                "UpdatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "KeyRotationHistory" (
+                "Id" bigserial NOT NULL CONSTRAINT "PK_KeyRotationHistory" PRIMARY KEY,
+                "TenantId" uuid NOT NULL,
+                "FilesRotated" integer NOT NULL DEFAULT 0,
+                "TriggeredBy" text NOT NULL DEFAULT 'schedule',
+                "RotatedAtUtc" timestamptz NOT NULL
+            );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_KeyRotationHistory_TenantId" ON "KeyRotationHistory" ("TenantId");
+            """);
     }
 
     AdminIdentitySeed.Run(dbContext);
@@ -980,6 +1077,9 @@ app.MapAdminAuditChainEndpoints();
 app.MapAdminAccessRequestEndpoints();
 app.MapAdminTenantPlanEndpoints();
 app.MapAccessRequestEndpoints();
+app.MapAdminFileCollectionEndpoints();
+app.MapAdminBatchFileEndpoints();
+app.MapAdminKeyRotationEndpoints();
 app.MapScimEndpoints();
 app.MapScimUsersEndpoints();
 app.MapScimGroupsEndpoints();

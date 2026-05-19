@@ -1535,6 +1535,123 @@
         </form>
       </dialog>
 
+      <!-- v1.7 File Collections -->
+      <section class="panel" id="fileCollections" data-tab="files">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Lifecycle</p>
+            <h3>File collections</h3>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="createCollectionBtn" type="button">+ New collection</button>
+            <button id="refreshCollections" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Files</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="collectionsBody">
+              <tr><td colspan="5" class="empty">Refresh to load collections.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <dialog id="newCollectionDialog" aria-modal="true" aria-labelledby="newCollectionTitle">
+        <form id="newCollectionForm" method="dialog">
+          <div class="dialog-head">
+            <h3 id="newCollectionTitle">New collection</h3>
+            <button type="button" class="dialog-close" aria-label="Close" onclick="document.getElementById('newCollectionDialog').close()">×</button>
+          </div>
+          <div class="dialog-body">
+            <label>Name<input id="newCollectionName" type="text" required placeholder="e.g. Q3 Reports"></label>
+            <label>Description<input id="newCollectionDesc" type="text" placeholder="Optional"></label>
+          </div>
+          <footer class="dialog-foot">
+            <button type="button" onclick="document.getElementById('newCollectionDialog').close()">Cancel</button>
+            <button type="submit">Create</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <!-- v1.7 Batch file operations -->
+      <section class="panel" id="batchOps" data-tab="files">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Lifecycle</p>
+            <h3>Batch file operations</h3>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Batch revoke</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Revoke multiple files at once. Enter one File ID per line.</p>
+            <textarea id="batchRevokeIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <button id="batchRevokeBtn" type="button" style="margin-top:8px;background:var(--danger,#e53e3e);color:#fff">Revoke all</button>
+            <pre id="batchRevokeResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
+          </div>
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Batch update expiry</h4>
+            <p class="muted" style="font-size:13px;margin:0 0 12px">Set a new expiry date for multiple files. Enter one File ID per line.</p>
+            <textarea id="batchExpiryIds" rows="4" style="width:100%;font-size:12px;font-family:monospace" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <label style="display:block;margin-top:8px;font-size:13px">New expiry<input id="batchExpiryDate" type="datetime-local" style="width:100%;margin-top:4px"></label>
+            <button id="batchExpiryBtn" type="button" style="margin-top:8px">Update expiry</button>
+            <pre id="batchExpiryResult" style="font-size:11px;margin-top:8px;max-height:120px;overflow:auto"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- v1.7 Key rotation -->
+      <section class="panel" id="keyRotation" data-tab="tenants">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h3>Key rotation</h3>
+          </div>
+          <button id="refreshKeyRotation" type="button">Refresh</button>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Schedule</h4>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              <input id="keyRotationEnabled" type="checkbox"> Enable automatic rotation
+            </label>
+            <label style="display:block;margin-bottom:8px;font-size:13px">
+              Interval (days)
+              <input id="keyRotationIntervalDays" type="number" min="1" max="365" value="90" style="width:80px;margin-left:8px">
+            </label>
+            <button id="saveKeyRotationBtn" type="button">Save schedule</button>
+            <button id="triggerKeyRotationBtn" type="button" style="margin-left:8px">Rotate now</button>
+          </div>
+          <div class="card" style="flex:1;min-width:280px;padding:16px">
+            <h4 style="margin:0 0 8px">Status</h4>
+            <div id="keyRotationStatus" style="font-size:13px">—</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rotated at</th>
+                <th>Files rotated</th>
+                <th>Triggered by</th>
+              </tr>
+            </thead>
+            <tbody id="keyRotationHistoryBody">
+              <tr><td colspan="3" class="empty">Refresh to load rotation history.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="panel" id="usage" data-tab="tenants">
         <div class="section-head">
           <div>

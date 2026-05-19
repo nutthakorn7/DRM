@@ -84,6 +84,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<AuditChainEntity> AuditChain => Set<AuditChainEntity>();
 
+    public DbSet<FileCollectionEntity> FileCollections => Set<FileCollectionEntity>();
+
+    public DbSet<FileCollectionItemEntity> FileCollectionItems => Set<FileCollectionItemEntity>();
+
+    public DbSet<TenantKeyRotationConfigEntity> TenantKeyRotationConfigs => Set<TenantKeyRotationConfigEntity>();
+
+    public DbSet<KeyRotationHistoryEntity> KeyRotationHistory => Set<KeyRotationHistoryEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantClientKeyEntity>(entity =>
@@ -414,6 +422,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(c => c.AuditEventId);
             entity.Property(c => c.Hash).HasMaxLength(64);
             entity.Property(c => c.PrevHash).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<FileCollectionEntity>(entity =>
+        {
+            entity.HasKey(c => c.CollectionId);
+            entity.HasIndex(c => c.TenantId);
+            entity.Property(c => c.Name).HasMaxLength(256);
+            entity.Property(c => c.Description).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<FileCollectionItemEntity>(entity =>
+        {
+            entity.HasKey(i => new { i.CollectionId, i.FileId });
+            entity.HasIndex(i => i.TenantId);
+        });
+
+        modelBuilder.Entity<TenantKeyRotationConfigEntity>(entity =>
+        {
+            entity.HasKey(c => c.TenantId);
+        });
+
+        modelBuilder.Entity<KeyRotationHistoryEntity>(entity =>
+        {
+            entity.HasKey(h => h.Id);
+            entity.HasIndex(h => h.TenantId);
+            entity.Property(h => h.TriggeredBy).HasMaxLength(32);
         });
     }
 }

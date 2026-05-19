@@ -722,3 +722,42 @@ public sealed class AuditChainEntity
 
     public string PrevHash { get; set; } = string.Empty;
 }
+
+// v1.7 — file collections, batch ops, key rotation
+
+public sealed class FileCollectionEntity
+{
+    public Guid CollectionId { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class FileCollectionItemEntity
+{
+    public Guid CollectionId { get; set; }
+    public Guid FileId { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTimeOffset AddedAtUtc { get; set; }
+}
+
+public sealed class TenantKeyRotationConfigEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; }
+    public int IntervalDays { get; set; }
+    public DateTimeOffset? LastRotatedAtUtc { get; set; }
+    public DateTimeOffset? NextRotationDueUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
+public sealed class KeyRotationHistoryEntity
+{
+    public long Id { get; set; }
+    public Guid TenantId { get; set; }
+    public int FilesRotated { get; set; }
+    public string TriggeredBy { get; set; } = "schedule";
+    public DateTimeOffset RotatedAtUtc { get; set; }
+}

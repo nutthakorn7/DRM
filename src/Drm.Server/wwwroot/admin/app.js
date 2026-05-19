@@ -3008,3 +3008,154 @@ document.getElementById("editPlanForm")?.addEventListener("submit", async e => {
 });
 
 document.getElementById("refreshTenantPlans")?.addEventListener("click", refreshTenantPlans);
+
+// ─── v1.7: File Collections ───────────────────────────────────────────────
+
+async function refreshCollections() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const rows = await apiFetch(`/api/admin/collections?tenantId=${tenantId}`);
+  const tbody = document.getElementById("collectionsBody");
+  if (!tbody) return;
+  if (!rows?.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No collections yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(c => `<tr>
+    <td>${esc(c.name)}</td>
+    <td>${esc(c.description || "—")}</td>
+    <td>${c.fileCount}</td>
+    <td>${new Date(c.createdAtUtc).toLocaleDateString()}</td>
+    <td>
+      <button class="ghost" onclick="deleteCollection('${c.collectionId}')">Delete</button>
+    </td>
+  </tr>`).join("");
+}
+
+async function deleteCollection(collectionId) {
+  const tenantId = currentTenantId();
+  if (!tenantId || !confirm("Delete this collection? Files are not affected.")) return;
+  await apiFetch(`/api/admin/collections/${collectionId}?tenantId=${tenantId}`, { method: "DELETE" });
+  await refreshCollections();
+}
+
+document.getElementById("refreshCollections")?.addEventListener("click", refreshCollections);
+
+document.getElementById("createCollectionBtn")?.addEventListener("click", () => {
+  document.getElementById("newCollectionName").value = "";
+  document.getElementById("newCollectionDesc").value = "";
+  document.getElementById("newCollectionDialog").showModal();
+});
+
+document.getElementById("newCollectionForm")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch("/api/admin/collections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tenantId,
+      name: document.getElementById("newCollectionName").value.trim(),
+      description: document.getElementById("newCollectionDesc").value.trim() || null,
+    }),
+  });
+  document.getElementById("newCollectionDialog").close();
+  await refreshCollections();
+});
+
+// ─── v1.7: Batch file operations ─────────────────────────────────────────
+
+document.getElementById("batchRevokeBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const raw = document.getElementById("batchRevokeIds").value.trim();
+  const fileIds = raw.split(/\s+/).filter(Boolean);
+  if (!fileIds.length) return;
+  const data = await apiFetch("/api/admin/files/batch-revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, fileIds }),
+  });
+  document.getElementById("batchRevokeResult").textContent =
+    data?.results?.map(r => `${r.fileId}: ${r.status}`).join("\n") ?? JSON.stringify(data, null, 2);
+});
+
+document.getElementById("batchExpiryBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  const raw = document.getElementById("batchExpiryIds").value.trim();
+  const fileIds = raw.split(/\s+/).filter(Boolean);
+  const dateVal = document.getElementById("batchExpiryDate").value;
+  if (!fileIds.length || !dateVal) return;
+  const data = await apiFetch("/api/admin/files/batch-expiry", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, fileIds, expiresAtUtc: new Date(dateVal).toISOString() }),
+  });
+  document.getElementById("batchExpiryResult").textContent =
+    data?.results?.map(r => `${r.fileId}: ${r.status}`).join("\n") ?? JSON.stringify(data, null, 2);
+});
+
+// ─── v1.7: Key rotation ──────────────────────────────────────────────────
+
+async function refreshKeyRotation() {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+
+  const [config, history] = await Promise.all([
+    apiFetch(`/api/admin/tenants/${tenantId}/key-rotation`),
+    apiFetch(`/api/admin/tenants/${tenantId}/key-rotation/history`),
+  ]);
+
+  if (config) {
+    document.getElementById("keyRotationEnabled").checked = config.enabled;
+    document.getElementById("keyRotationIntervalDays").value = config.intervalDays ?? 90;
+    const statusEl = document.getElementById("keyRotationStatus");
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div>Enabled: <strong>${config.enabled ? "Yes" : "No"}</strong></div>
+        <div>Interval: <strong>${config.intervalDays} days</strong></div>
+        <div>Last rotated: <strong>${config.lastRotatedAtUtc ? new Date(config.lastRotatedAtUtc).toLocaleString() : "Never"}</strong></div>
+        <div>Next due: <strong>${config.nextRotationDueUtc ? new Date(config.nextRotationDueUtc).toLocaleString() : "—"}</strong></div>
+      `;
+    }
+  }
+
+  const tbody = document.getElementById("keyRotationHistoryBody");
+  if (tbody && history) {
+    if (!history.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="empty">No rotation history yet.</td></tr>`;
+    } else {
+      tbody.innerHTML = history.map(h => `<tr>
+        <td>${new Date(h.rotatedAtUtc).toLocaleString()}</td>
+        <td>${h.filesRotated}</td>
+        <td>${esc(h.triggeredBy)}</td>
+      </tr>`).join("");
+    }
+  }
+}
+
+document.getElementById("refreshKeyRotation")?.addEventListener("click", refreshKeyRotation);
+
+document.getElementById("saveKeyRotationBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId) return;
+  await apiFetch(`/api/admin/tenants/${tenantId}/key-rotation`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      enabled: document.getElementById("keyRotationEnabled").checked,
+      intervalDays: parseInt(document.getElementById("keyRotationIntervalDays").value, 10) || 90,
+    }),
+  });
+  await refreshKeyRotation();
+});
+
+document.getElementById("triggerKeyRotationBtn")?.addEventListener("click", async () => {
+  const tenantId = currentTenantId();
+  if (!tenantId || !confirm("Rotate all file encryption keys for this tenant now?")) return;
+  const result = await apiFetch(`/api/admin/tenants/${tenantId}/key-rotation/trigger`, { method: "POST" });
+  alert(`Rotated ${result?.filesRotated ?? 0} file key(s).`);
+  await refreshKeyRotation();
+});
