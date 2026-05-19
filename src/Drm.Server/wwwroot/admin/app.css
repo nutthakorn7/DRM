@@ -55,7 +55,7 @@ select {
   place-items: center;
   padding: 24px;
   background: radial-gradient(circle at 30% 20%, #f0f5f7 0%, var(--page) 55%, #dde3e8 100%);
-  animation: welcomeFadeIn 220ms ease;
+  animation: welcomeFadeIn var(--duration-base) ease;
 }
 
 @keyframes welcomeFadeIn {
@@ -95,7 +95,7 @@ select {
 .welcome-card .welcome-lede {
   margin: 0 0 20px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-body);
   line-height: 1.55;
 }
 
@@ -167,7 +167,7 @@ select {
 
 .welcome-foot {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -175,7 +175,7 @@ select {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
-  transition: grid-template-columns 180ms ease;
+  transition: grid-template-columns var(--duration-base) ease;
 }
 
 .workspace[data-rail-collapsed="true"] {
@@ -194,7 +194,7 @@ select {
   align-self: start;
   height: 100vh;
   overflow: hidden;
-  transition: padding 180ms ease;
+  transition: padding var(--duration-base) ease;
 }
 
 .workspace[data-rail-collapsed="true"] .rail {
@@ -249,7 +249,7 @@ select {
 
 .page-header .brand-text .hint {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -271,7 +271,7 @@ select {
   font-size: 16px;
   cursor: pointer;
   padding: 0;
-  transition: background 100ms, color 100ms, border-color 100ms, transform 200ms;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast), transform var(--duration-base);
 }
 
 .settings-trigger:hover {
@@ -294,7 +294,7 @@ select {
   background: rgba(20, 16, 8, 0.35);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 180ms ease;
+  transition: opacity var(--duration-base) ease;
 }
 
 .settings-backdrop[data-open="true"] {
@@ -314,7 +314,7 @@ select {
   border-left: 1px solid var(--line);
   box-shadow: -16px 0 48px -16px rgba(60, 40, 10, 0.18);
   transform: translateX(100%);
-  transition: transform 220ms ease;
+  transition: transform var(--duration-base) ease;
   display: flex;
   flex-direction: column;
 }
@@ -380,7 +380,7 @@ select {
   cursor: pointer;
   font-size: 13px;
   padding: 0;
-  transition: background 120ms ease, color 120ms ease, transform 180ms ease;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease, transform var(--duration-base) ease;
 }
 
 .rail-toggle:hover {
@@ -442,9 +442,9 @@ select {
 .eyebrow {
   margin: 0 0 7px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -539,6 +539,7 @@ nav a.active {
 
 .settings {
   display: grid;
+  gap: 16px;
   grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr) auto;
 }
 
@@ -546,7 +547,7 @@ label {
   display: grid;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 700;
 }
 
@@ -741,7 +742,7 @@ button.danger:hover {
 
 /* Pre output blocks shown after API actions */
 .pre-output {
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-top: var(--space-2);
   max-height: 120px;
   overflow: auto;
@@ -789,7 +790,7 @@ button.danger:hover {
 
 .metric span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -927,7 +928,8 @@ button.ghost:hover {
 
 .tab-nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 4px;
   margin: 4px 0 18px 0;
   padding: 6px;
@@ -938,13 +940,16 @@ button.ghost:hover {
   top: 0;
   z-index: 50;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  /* Hide scrollbar on all platforms while keeping scroll functionality */
+  scrollbar-width: none;
 }
+.tab-nav::-webkit-scrollbar { display: none; }
 
 .tab-nav .tab-link {
   flex: 1 1 0;
-  min-width: 120px;
+  min-width: 110px;
   min-height: 44px;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -955,8 +960,9 @@ button.ghost:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  transition: background 80ms, color 80ms, border-color 80ms;
+  gap: 7px;
+  white-space: nowrap;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
 }
 
 .tab-nav .tab-link:hover {
@@ -976,6 +982,26 @@ button.ghost:hover {
 }
 
 .tab-nav .tab-icon { font-size: 1.05em; }
+
+/* SVG icon sizing — inline SVG icons in tab-nav, rail nav, and empty states.
+   font-size-relative em sizing inherits context so icons scale with text. */
+.tab-icon svg,
+.nav-icon svg {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.rail .nav-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.empty-state .empty-icon svg {
+  width: 1em;
+  height: 1em;
+}
 
 /* Info pill — small ⓘ injected next to jargon panel headings; hovering
    it shows a plain-language tooltip via the title attribute. */
@@ -1024,7 +1050,7 @@ button.ghost:hover {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 80ms, color 80ms, border-color 80ms;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
 }
 
 .subtab-nav .subtab-link:hover {
@@ -1051,7 +1077,8 @@ body[data-active-tab="overview"]     .surface section.panel:not([data-tab="overv
 body[data-active-tab="identity"]     .surface section.panel:not([data-tab="identity"]),
 body[data-active-tab="policy"]       .surface section.panel:not([data-tab="policy"]),
 body[data-active-tab="files"]        .surface section.panel:not([data-tab="files"]),
-body[data-active-tab="integrations"] .surface section.panel:not([data-tab="integrations"]) {
+body[data-active-tab="integrations"] .surface section.panel:not([data-tab="integrations"]),
+body[data-active-tab="tenants"]      .surface section.panel:not([data-tab="tenants"]) {
   display: none;
 }
 
@@ -1360,7 +1387,7 @@ body[data-active-tab="all"] section.panel {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   font-size: 0.9rem;
   max-width: 360px;
-  animation: slideIn 0.25s ease-out;
+  animation: slideIn var(--duration-base) ease-out;
 }
 
 @keyframes slideIn {
@@ -1672,6 +1699,15 @@ dialog::backdrop {
   .workspace[data-rail-collapsed="true"] .rail .nav-label,
   .workspace[data-rail-collapsed="true"] .rail .rail-secondary .eyebrow {
     display: none;
+  }
+
+  .settings[aria-label="API settings"] {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 4px;
+    gap: 10px;
+    background: var(--surface);
   }
 
   .settings,
