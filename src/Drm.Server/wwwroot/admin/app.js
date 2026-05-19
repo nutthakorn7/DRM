@@ -2694,12 +2694,12 @@ async function approveRegistration(registrationId) {
 function openRejectDialog(registrationId) {
   _pendingRejectId = registrationId;
   const dialog = document.getElementById("rejectDialog");
-  dialog?.removeAttribute("hidden");
+  dialog?.showModal();
   document.getElementById("rejectNotes")?.focus();
 }
 
 document.getElementById("cancelReject")?.addEventListener("click", () => {
-  document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+  document.getElementById("rejectDialog")?.close();
   _pendingRejectId = null;
 });
 
@@ -2713,7 +2713,7 @@ document.getElementById("rejectForm")?.addEventListener("submit", async (e) => {
       { method: "POST", body: JSON.stringify({ notes }) }
     );
     setStatus("Registration rejected", "ok");
-    document.getElementById("rejectDialog")?.setAttribute("hidden", "");
+    document.getElementById("rejectDialog")?.close();
     document.getElementById("rejectNotes").value = "";
     _pendingRejectId = null;
     await refreshRegistrations();
