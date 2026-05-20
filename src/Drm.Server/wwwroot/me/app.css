@@ -73,6 +73,17 @@ body {
   cursor: pointer;
 }
 
+/* The `.topbar nav a` selector above (specificity 0,2,1) outranks the
+   user-agent `[hidden] { display: none }` (specificity 0,1,0), so links
+   with the `hidden` attribute still render as inline-block. That makes the
+   `#adminLink` show up for users without an admin role. This rule lifts
+   the `[hidden]` constraint back to the higher specificity tier so the
+   attribute does what HTML says it does. */
+.topbar nav a[hidden],
+.topbar nav .topbar-link[hidden] {
+  display: none;
+}
+
 .topbar nav .topbar-link {
   color: var(--accent);
   font-size: 0.9rem;
