@@ -1,6 +1,21 @@
-# Enterprise DRM
+# zcrDRM — Enterprise DRM
 
-This repository contains an independently designed enterprise DRM/IRM platform.
+[![Production](https://img.shields.io/badge/live-drm.zcr.ai-275d72)](https://drm.zcr.ai/admin/)
+[![Encryption](https://img.shields.io/badge/encryption-AES--256%20%2F%20RSA--2048-275d72)](#)
+[![Deploy](https://img.shields.io/badge/deploy-Docker%20%2B%20Postgres%20%2B%20Caddy-275d72)](deploy/management/docker/)
+
+**Self-hosted DRM, ready in 5 minutes. No SaaS lock-in.**
+
+`zcrDRM` is an independently designed Information Rights Management platform.
+Protect files the moment they are created, persistently audit every open
+and every device, and revoke access from anywhere after the file has left
+the network.
+
+- **Encrypt** — AES-256 per file, RSA-2048 key wrap, FIPS 140-2 ready
+- **Audit** — tamper-proof chain, SIEM webhook stream, PDPA / ISO 27001 / SOC 2 export
+- **Revoke** — kill files from anywhere; remote delete protected copies on disconnect
+
+Production: <https://drm.zcr.ai>
 
 ## Foundation MVP
 

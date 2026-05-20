@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title>zcrDRM — self-hosted DRM, ready in 5 minutes</title>
+
+  <!-- Background: cool slate with subtle teal glow top-left -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f3f4f6"/>
+      <stop offset="100%" stop-color="#dde3e8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1">
+      <stop offset="0%" stop-color="#275d72" stop-opacity="0.12"/>
+      <stop offset="60%" stop-color="#275d72" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Top-left brand cluster: padlock tile + wordmark -->
+  <g transform="translate(72, 80)">
+    <!-- Padlock-seal tile -->
+    <rect x="0" y="0" width="72" height="72" rx="12" fill="#275d72"/>
+    <g transform="translate(36, 36)" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="-18" y="-6" width="36" height="22" rx="3"/>
+      <path d="M-10 -6 V-14 a10 10 0 0 1 20 0 V-6"/>
+    </g>
+    <circle cx="36" cy="46" r="3.6" fill="#ffffff"/>
+
+    <!-- Wordmark -->
+    <text x="96" y="50" font-size="44" font-weight="700" letter-spacing="-0.4">
+      <tspan fill="#275d72">zcr</tspan><tspan fill="#1a2330">DRM</tspan>
+    </text>
+    <text x="96" y="74" font-size="14" font-weight="500" fill="#5b6470" font-family="IBM Plex Mono, ui-monospace, monospace" letter-spacing="0">drm.zcr.ai</text>
+  </g>
+
+  <!-- Hero headline -->
+  <text x="72" y="260" font-size="64" font-weight="700" fill="#1a2330" letter-spacing="-1">Self-hosted DRM,</text>
+  <text x="72" y="338" font-size="64" font-weight="700" fill="#275d72" letter-spacing="-1">ready in 5 minutes.</text>
+
+  <!-- Sub-line -->
+  <text x="72" y="392" font-size="22" font-weight="400" fill="#5b6470">No SaaS lock-in. AES-256 per file. Tamper-proof audit. Remote revoke.</text>
+
+  <!-- Three pillars at the bottom -->
+  <g transform="translate(72, 458)">
+    <!-- Pillar 1: Encrypt -->
+    <g>
+      <rect x="0" y="0" width="44" height="44" rx="8" fill="#275d72" opacity="0.10"/>
+      <g transform="translate(22, 22)" fill="none" stroke="#275d72" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="-10" y="-3" width="20" height="13" rx="2"/>
+        <path d="M-6 -3 V-8 a6 6 0 0 1 12 0 V-3"/>
+      </g>
+      <text x="60" y="20" font-size="14" font-weight="700" fill="#275d72" letter-spacing="1.5">ENCRYPT</text>
+      <text x="60" y="42" font-size="18" font-weight="600" fill="#1a2330">AES-256 per file</text>
+    </g>
+
+    <!-- Pillar 2: Audit -->
+    <g transform="translate(380, 0)">
+      <rect x="0" y="0" width="44" height="44" rx="8" fill="#275d72" opacity="0.10"/>
+      <g transform="translate(22, 22)" fill="none" stroke="#275d72" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="0" cy="0" r="10"/>
+        <polyline points="0 -6 0 0 4 2"/>
+      </g>
+      <text x="60" y="20" font-size="14" font-weight="700" fill="#275d72" letter-spacing="1.5">AUDIT</text>
+      <text x="60" y="42" font-size="18" font-weight="600" fill="#1a2330">Every open, every device</text>
+    </g>
+
+    <!-- Pillar 3: Revoke -->
+    <g transform="translate(760, 0)">
+      <rect x="0" y="0" width="44" height="44" rx="8" fill="#275d72" opacity="0.10"/>
+      <g transform="translate(22, 22)" fill="none" stroke="#275d72" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="-9 -5 -7 -5 7 -5"/>
+        <path d="M5 -5 L4 7 a2 2 0 0 1 -2 2 H-2 a2 2 0 0 1 -2 -2 L-5 -5"/>
+      </g>
+      <text x="60" y="20" font-size="14" font-weight="700" fill="#275d72" letter-spacing="1.5">REVOKE</text>
+      <text x="60" y="42" font-size="18" font-weight="600" fill="#1a2330">Kill files from anywhere</text>
+    </g>
+  </g>
+
+  <!-- Bottom-right: trust badges chip -->
+  <g transform="translate(72, 558)">
+    <text font-size="13" font-weight="500" fill="#5b6470" font-family="IBM Plex Mono, ui-monospace, monospace">
+      AES-256  ·  RSA-2048  ·  FIPS 140-2 ready  ·  PostgreSQL  ·  Docker  ·  On-prem first
+    </text>
+  </g>
+</svg>

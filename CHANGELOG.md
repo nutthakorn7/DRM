@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.3.1] — 2026-05-20
+
+**Docs + social card.**
+
+### Added
+- **1200×630 OpenGraph social card** at `/static/og-card.svg` — full-bleed
+  brand poster with wordmark, headline ("Self-hosted DRM, ready in 5 minutes"),
+  three pillars (Encrypt/Audit/Revoke), and the trust-badge line. When a
+  zcrDRM URL is pasted into Slack, LinkedIn, Twitter, or email, recipients
+  see a real product preview instead of a 32×32 favicon thumbnail.
+- All three surfaces (`/admin/`, `/me/`, `/share/`) now declare
+  `og:image:width=1200`, `og:image:height=630` alongside the og-card URL
+  so social platforms render at the intended aspect ratio.
+
+### Changed
+- **README.md** renamed from "Enterprise DRM" to "**zcrDRM** — Enterprise DRM",
+  with three Shields.io status badges (production URL, encryption stack,
+  deployment stack), the brand tagline, the three pillars, and a production
+  link to <https://drm.zcr.ai>.
+- **CONTRIBUTING.md** retitled "Contributing to zcrDRM" with the production
+  URL in the opening paragraph so new contributors know what they're shipping.
+
 ## [1.3.0] — 2026-05-20
 
 **Brand identity — zcrDRM.**
