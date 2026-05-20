@@ -32,6 +32,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<ExternalShareLinkEntity> ExternalShareLinks => Set<ExternalShareLinkEntity>();
 
+    public DbSet<ShareLinkFailedAttemptEntity> ShareLinkFailedAttempts => Set<ShareLinkFailedAttemptEntity>();
+
+    public DbSet<TenantBruteForcePolicyEntity> TenantBruteForcePolicies => Set<TenantBruteForcePolicyEntity>();
+
     public DbSet<ExternalShareVerificationEntity> ExternalShareVerifications => Set<ExternalShareVerificationEntity>();
 
     public DbSet<TenantExternalShareSettingsEntity> TenantExternalShareSettings => Set<TenantExternalShareSettingsEntity>();
@@ -218,6 +222,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(shareLink => new { shareLink.TenantId, shareLink.TokenHash }).IsUnique();
             entity.Property(shareLink => shareLink.TokenHash).HasMaxLength(128);
             entity.Property(shareLink => shareLink.GuestEmail).HasMaxLength(320);
+            entity.Property(shareLink => shareLink.RevocationReason).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<ShareLinkFailedAttemptEntity>(entity =>
+        {
+            entity.HasKey(attempt => attempt.Id);
+            // Critical query — find recent failures for a share link in a time window.
+            entity.HasIndex(attempt => new { attempt.TenantId, attempt.ShareLinkId, attempt.OccurredAtUtc });
+            entity.Property(attempt => attempt.GuestEmail).HasMaxLength(320);
+            entity.Property(attempt => attempt.IpAddress).HasMaxLength(45); // IPv6 + zone-id ceiling
+            entity.Property(attempt => attempt.ReasonCode).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<TenantBruteForcePolicyEntity>(entity =>
+        {
+            entity.HasKey(policy => policy.TenantId);
         });
 
         modelBuilder.Entity<ExternalShareVerificationEntity>(entity =>

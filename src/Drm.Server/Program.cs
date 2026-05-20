@@ -25,6 +25,7 @@ builder.Services
     .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(5));
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
+builder.Services.AddScoped<BruteForceProtectionService>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
 builder.Services.AddHttpClient("EntraGraph");
 builder.Services.AddScoped<IDirectorySyncService, EntraIdDirectorySyncService>();
@@ -1140,6 +1141,7 @@ app.MapAdminPolicySimulatorEndpoints();
 app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
 app.MapAdminExternalShareSettingsEndpoints();
+app.MapAdminBruteForcePolicyEndpoints();
 app.MapAdminDirectorySyncEndpoints();
 app.MapAdminBoxIntegrationEndpoints();
 app.MapBoxWebhookEndpoints();

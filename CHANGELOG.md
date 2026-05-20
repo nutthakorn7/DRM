@@ -2,6 +2,78 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.5.0] — 2026-05-20
+
+**Brute-force auto-revoke for share links (FinalCode parity, item C2).**
+External share links now self-defend against guessing attacks. When the same
+share link receives more than N failed verification attempts within a window,
+the link is auto-revoked and an admin alert fires. Per-tenant configurable;
+defaults to 10 failures in 60 minutes.
+
+### Why
+The previous per-verification cap (`MaxAttempts = 5`) only locked one
+verification at a time — an attacker could restart verification and get a
+fresh counter, attempting indefinitely. This change closes that loop by
+tracking failures **per share link** across all verification sessions.
+
+### Added
+- **`ShareLinkFailedAttemptEntity`** — append-only log of every failed
+  verification attempt: tenant, share link, guest email, IP address, reason,
+  timestamp. Indexed `(TenantId, ShareLinkId, OccurredAtUtc)` for the
+  windowed-count query.
+- **`TenantBruteForcePolicyEntity`** — per-tenant `Enabled` / `Threshold` /
+  `WindowMinutes`. Conservative defaults baked in (`10 / 60`) so existing
+  tenants get protection without configuring anything.
+- **`ExternalShareLinkEntity.RevocationReason`** — distinguishes
+  `"brute_force_threshold"` auto-revokes from manual admin revokes in the
+  admin console and audit log.
+- **`BruteForceProtectionService`** — encapsulates the record-and-decide
+  flow. Wired into `POST /api/external-share/verification/confirm` on the
+  wrong-code path. SQLite DateTimeOffset translation is known unreliable in
+  this codebase, so the windowed count materialises and filters in-memory
+  (mirrors the pattern in `PolicyDecisionService`).
+- **Admin endpoints** under `/api/admin/brute-force-policy`:
+  - `GET ?tenantId=...` — returns current policy or defaults if no row,
+    with `usingDefaults: true/false` so the UI can show the source.
+  - `PUT` — upsert. Validates `Threshold ∈ [1, 1000]` and
+    `WindowMinutes ∈ [1, 10080]` (one week).
+  - `GET /recent-failures?tenantId=...&shareLinkId=...&limit=N` — last N
+    failures across the tenant, optionally scoped to one share link.
+- **Audit event** `share_link_auto_revoked` (reason: `brute_force_threshold`)
+  is appended when auto-revoke fires.
+- **Admin notification** with the same event type goes out via the existing
+  `IAdminNotificationService` (email + webhook depending on tenant config).
+- **`ExternalShareLinkResponse.RevocationReason`** surfaced in the
+  `GET /api/admin/files/{id}/share-links` list so the admin console can
+  show "Auto-revoked (brute force)" next to a dead share link.
+
+### Behaviour
+- Disabled (`Enabled = false`) → the policy is a no-op. The per-verification
+  `MaxAttempts = 5` cap still applies as before.
+- Threshold = 1 → first wrong code revokes. (Useful when you suspect a
+  specific share link is actively being attacked.)
+- A legitimate user who hits the threshold via typo sees the dedicated
+  error `share_link_auto_revoked` instead of the generic
+  `invalid_verification_code`, so they stop retrying and contact the sender.
+- An attacker sees the same error — no information leak about whether the
+  link still exists.
+- Auto-revoked share links cannot be re-redeemed even with the correct
+  code; admin must issue a new link.
+
+### Tests (+4 new, 406/406 green)
+- `Brute_force_threshold_auto_revokes_share_link_after_repeated_failures` —
+  threshold=3, 2 wrong codes still allowed, 3rd revokes, response carries
+  `share_link_auto_revoked`, share link row shows
+  `RevocationReason="brute_force_threshold"`, correct code afterwards is
+  also rejected.
+- `Brute_force_protection_can_be_disabled_per_tenant` — even with
+  threshold=1, 3 wrong codes don't revoke when `Enabled=false`.
+- `Brute_force_policy_get_returns_defaults_when_no_row` — `GET` on a
+  fresh tenant returns `enabled=true threshold=10 windowMinutes=60
+  usingDefaults=true`.
+- `Brute_force_policy_rejects_invalid_threshold_and_window` — `PUT` with
+  `threshold=0` or `windowMinutes=999999` returns 400.
+
 ## [1.4.0] — 2026-05-20
 
 **Access count limit per user (FinalCode parity, item C1).**

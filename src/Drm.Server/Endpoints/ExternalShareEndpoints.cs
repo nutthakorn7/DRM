@@ -182,6 +182,8 @@ public static class ExternalShareEndpoints
     private static async Task<Results<Ok<ExternalShareVerificationConfirmResponse>, BadRequest<ErrorResponse>, NotFound>> ConfirmVerificationAsync(
         ConfirmExternalShareVerificationRequest request,
         AppDbContext dbContext,
+        BruteForceProtectionService bruteForce,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         if (request.TenantId == Guid.Empty)
@@ -209,8 +211,11 @@ public static class ExternalShareEndpoints
             return TypedResults.NotFound();
         }
 
+        // Tracked load so the brute-force service can mutate Revoked + RevocationReason
+        // inline when the threshold is reached. The previous AsNoTracking() was a
+        // safe default for a pure read, but ConfirmVerification now needs to be able
+        // to revoke this share link as a side-effect of a wrong code.
         var shareLink = await dbContext.ExternalShareLinks
-            .AsNoTracking()
             .SingleOrDefaultAsync(
                 candidate => candidate.TenantId == verification.TenantId && candidate.ShareLinkId == verification.ShareLinkId,
                 cancellationToken);
@@ -256,7 +261,31 @@ public static class ExternalShareEndpoints
         if (!ExternalShareVerificationCode.Matches(verification.VerificationId, request.Code, verification.CodeHash))
         {
             verification.AttemptCount += 1;
+
+            // Log this against the share link's running failure tally. If the
+            // tenant's brute-force threshold is reached within the window,
+            // the service revokes the share link in-place (we then return
+            // the same invalid_code error — the caller learns the link is
+            // dead on their next attempt, no information leak from a
+            // different error code on the breaking attempt).
+            var autoRevoked = await bruteForce.RecordFailedAttemptAsync(
+                shareLink,
+                verification.GuestEmail,
+                httpContext.Connection.RemoteIpAddress?.ToString(),
+                "invalid_verification_code",
+                now,
+                cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            if (autoRevoked)
+            {
+                // Surface a distinct error so a legitimate user who hits the
+                // wall (e.g. typo storm) knows the link is now unusable
+                // rather than retrying forever. Attackers see the same code.
+                return TypedResults.BadRequest(new ErrorResponse("share_link_auto_revoked"));
+            }
+
             return TypedResults.BadRequest(new ErrorResponse("invalid_verification_code"));
         }
 
