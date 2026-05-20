@@ -1,18 +1,39 @@
 using System.Globalization;
-using System.IO;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 
-namespace Drm.Viewer.Windows;
+namespace Drm.Watermark;
 
+/// <summary>
+/// Options for a single watermark stamp pass.
+/// </summary>
+/// <param name="Text">The fully-resolved watermark text. Empty/whitespace skips stamping.</param>
+/// <param name="OpacityPercent">5–100. Lower = more transparent. Clamped on use.</param>
+/// <param name="Position">"diagonal" (default), "top", "bottom", or "all-pages".</param>
 public sealed record PrintWatermarkOptions(
     string Text,
     int OpacityPercent,
     string Position);
 
+/// <summary>
+/// Stamps a watermark onto every page of a PDF before it is sent to print or
+/// exported as a hard copy. Used by the WPF viewer's PrintButton and any
+/// other surface that needs a watermarked deliverable.
+///
+/// Pure PdfSharp — no Windows API dependency — so this lives in a
+/// cross-platform library and gets unit-test coverage on Linux CI. The
+/// physical print invocation that consumes the stamped bytes remains in the
+/// Windows viewer.
+/// </summary>
 public static class PrintWatermarkComposer
 {
+    /// <summary>
+    /// Returns a new PDF byte stream with <paramref name="options"/>.Text
+    /// stamped onto every page. If the text is empty, the original bytes
+    /// are returned unmodified (no-op so callers can drop unconditionally
+    /// into a print pipeline).
+    /// </summary>
     public static byte[] Stamp(byte[] originalPdfBytes, PrintWatermarkOptions options)
     {
         if (originalPdfBytes is null || originalPdfBytes.Length == 0)
@@ -92,6 +113,11 @@ public static class PrintWatermarkComposer
             XStringFormats.Center);
     }
 
+    /// <summary>
+    /// Resolves <c>{user}</c>, <c>{userId}</c>, <c>{file}</c>, <c>{fileId}</c>,
+    /// and <c>{time}</c> tokens in a watermark template. Unknown tokens are
+    /// left as-is so a template author can spot a typo on the rendered output.
+    /// </summary>
     public static string ResolveTokens(string pattern, Guid? userId, Guid? fileId, DateTimeOffset? utcNow = null)
     {
         if (string.IsNullOrEmpty(pattern)) return string.Empty;

@@ -2,6 +2,86 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.6.0] — 2026-05-21
+
+**Screen-capture protection + cross-platform watermark library (FinalCode parity, item C3 — Windows surface).**
+The WPF viewer now blocks Snipping Tool, Win+Shift+S, Print Screen, OBS
+display capture, Teams/Zoom/Meet screen-share, and the rest of the
+Windows screen-capture pipeline. Existing PDF print-watermark stamping
+extracted to a cross-platform library with full test coverage on Linux CI.
+
+### Added
+- **`Drm.Watermark`** — new cross-platform library. `PrintWatermarkComposer`
+  (Stamp + ResolveTokens) moved out of `Drm.Viewer.Windows` so it lives
+  somewhere that the Linux CI build + Mac dev box can compile and test.
+  Production behaviour unchanged — same PdfSharp 6.2.1 dependency, same
+  Stamp signature, same token resolution rules.
+- **`Drm.Watermark.Tests`** — 24 new tests covering:
+  - Stamp no-op on empty/whitespace text (same byte-array reference back)
+  - Stamp throws on null/empty PDF bytes
+  - Diagonal stamping produces larger PDF + still parses to same page count
+  - All-pages stamping handles multi-page documents
+  - Every documented position works: `diagonal` / `top` / `bottom` /
+    `all-pages` + case-insensitive + unknown position falls back to diagonal
+  - Opacity clamping: -100, 0, 5, 50, 100, 500 all produce valid output
+  - `ResolveTokens` replaces `{user}`, `{userId}`, `{file}`, `{fileId}`,
+    `{time}` correctly; handles null user/file with `anonymous`/empty;
+    leaves unknown tokens (e.g. `{tenant}`) untouched so typos are visible
+    on the rendered output; uses InvariantCulture so non-Western thread
+    cultures don't render Buddhist years etc.
+  - `PdfSharpFontFixture` shared collection registers a system-font
+    resolver so PdfSharp can render text on Linux CI (it scans DejaVu /
+    Liberation / Helvetica / Arial paths and maps every requested family
+    to whichever it finds).
+- **`Drm.Viewer.Windows.ScreenCaptureProtection`** — wraps the Windows
+  `SetWindowDisplayAffinity` user32 API:
+  - `Enable(window)` applies `WDA_EXCLUDEFROMCAPTURE` (Win10 build 19041+);
+    falls back to `WDA_MONITOR` on older Windows. Defers via
+    `SourceInitialized` if the HWND isn't ready yet.
+  - `Disable(window)` removes the flag (unused in main viewer, available
+    for diagnostic surfaces).
+  - Silent best-effort: a failed API call writes to `Debug` and does NOT
+    throw — the user is already looking at the document; we won't crash
+    them because the capture-blocker couldn't load.
+- **PrintScreen + Win+Shift+S key intercept** in `MainWindow.PreviewKeyDown`:
+  clears the clipboard (in case Snipping Tool already wrote a clip),
+  updates the status text to "Screen capture blocked. This file is
+  protected.", and marks the key event handled so it doesn't propagate.
+- **CI runs `Drm.Watermark.Tests`** on every push (added to
+  `.github/workflows/ci.yml`).
+
+### What this blocks (Windows screen-capture pipeline)
+- ✓ Snipping Tool + Win+Shift+S screen snip — captures a black rectangle
+- ✓ Print Screen key — captures a black rectangle + intercepted by viewer
+- ✓ Windows + G screen recorder — viewer shows black
+- ✓ OBS Studio display capture (default capture method)
+- ✓ Microsoft Teams / Zoom / Google Meet screen-share streams
+- ✓ Most third-party recording tools that go through the standard Windows
+  graphics capture API
+
+### What this does NOT block (documented limits)
+- Physical camera pointed at the monitor
+- Hardware HDMI capture card on the GPU output
+- Kernel-level hooks or DRM-bypass utilities
+- Capture via "Game capture" mode on some recorders if user manually
+  overrides to that mode
+
+The mission, like FinalCode's, is to raise the bar against casual leakage,
+not promise mathematical impossibility. Per-frame watermark tiles on the
+WPF surface still apply for the physical-camera attack vector.
+
+### Refactor
+- `Drm.Viewer.Windows.csproj` removes direct `PdfSharp` package reference;
+  picks it up transitively through `Drm.Watermark`.
+- `Drm.Viewer.Windows/PrintWatermarkComposer.cs` deleted (moved).
+- `MainWindow.xaml.cs` adds `using Drm.Watermark;` — call sites unchanged.
+
+### Tests
+- `Drm.Watermark.Tests`: 24 new, all green
+- Domain: 16/16 (unchanged)
+- Server: 406/406 (unchanged)
+- Total now: 446 passing
+
 ## [1.5.0] — 2026-05-20
 
 **Brute-force auto-revoke for share links (FinalCode parity, item C2).**
