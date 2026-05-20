@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.6.1] — 2026-05-21
+
+**`/me/` topbar: hide `Admin →` link for non-admin users (CSS specificity fix).**
+The `Admin →` link in the `/me/` topbar carries the `hidden` HTML attribute
+until the loaded session reports an admin role. The author CSS rule
+`.topbar nav a { display: inline-block }` (specificity 0,2,1) outranked
+the user-agent `[hidden] { display: none }` rule (specificity 0,1,0), so
+the link rendered as a clickable element for every visitor — including
+recipients who only land on `/me/` to send a file.
+
+### Fixed
+- Added `.topbar nav a[hidden], .topbar nav .topbar-link[hidden] { display: none }`
+  rule to `/me/app.css`. Higher specificity than the layout rule, so the
+  `hidden` attribute now does what HTML spec says it does.
+- Verified `/admin/` and `/share/` do not have the same pattern (no
+  `[hidden]` element is rendered visible on either page).
+- Found via the inline UI audit on `https://drm.zcr.ai/me/`.
+
 ## [1.6.0] — 2026-05-21
 
 **Screen-capture protection + cross-platform watermark library (FinalCode parity, item C3 — Windows surface).**
