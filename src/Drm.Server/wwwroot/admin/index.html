@@ -5,7 +5,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>zcrDRM — Admin console</title>
-  <link rel="icon" href="data:,">
+  <meta name="description" content="zcrDRM admin console — self-hosted DRM running on drm.zcr.ai. Manage tenants, users, policies, files, and audit chains.">
+  <meta name="theme-color" content="#275d72">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="zcrDRM">
+  <meta property="og:title" content="zcrDRM — Admin console">
+  <meta property="og:description" content="Self-hosted DRM, ready in 5 minutes. AES-256 per file, tamper-proof audit, remote revoke.">
+  <meta property="og:url" content="https://drm.zcr.ai/admin/">
+  <meta property="og:image" content="https://drm.zcr.ai/static/favicon.svg">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="mask-icon" href="/static/favicon.svg" color="#275d72">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -294,8 +304,8 @@
           <button id="refreshOutlookConfig" type="button">Load</button>
         </div>
 
-        <p class="hint">Sideload the Office add-in manifest at <code id="outlookManifestUrl">/outlook-addin/manifest.xml</code> from <strong>Outlook → Get add-ins → My add-ins → Add a custom add-in → Add from file</strong> (replace <code>${SERVER_BASE_URL}</code> with your DRM server URL first).</p>
-        <p class="hint">Word ribbon button: sideload <code id="wordManifestUrl">/word-addin/manifest.xml</code> via <strong>Word → Insert → My Add-ins → Upload My Add-in</strong> to add a "🔒 DRM Protect" button to the Home ribbon.</p>
+        <p class="hint">Sideload the Office add-in manifest at <code id="outlookManifestUrl">https://drm.zcr.ai/outlook-addin/manifest.xml</code> from <strong>Outlook → Get add-ins → My add-ins → Add a custom add-in → Add from file</strong>. Replace <code>drm.zcr.ai</code> with your own server hostname if you self-host elsewhere.</p>
+        <p class="hint">Word ribbon button: sideload <code id="wordManifestUrl">https://drm.zcr.ai/word-addin/manifest.xml</code> via <strong>Word → Insert → My Add-ins → Upload My Add-in</strong> to add a "zcrDRM Protect" button to the Home ribbon.</p>
 
         <form class="create-row" id="outlookConfigForm">
           <label class="inline-check">
