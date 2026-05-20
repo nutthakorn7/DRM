@@ -120,6 +120,92 @@ public sealed class PolicyEvaluatorTests
     }
 
     [Fact]
+    public void Allows_when_max_opens_is_null_regardless_of_opens_used()
+    {
+        var policy = TestPolicy(Permission.View, expiresAtUtc: NowUtc.AddHours(1))
+            with { MaxOpens = null, OpensUsed = 9_999 };
+        var request = TestRequest(Permission.View);
+
+        var decision = PolicyEvaluator.Evaluate(policy, request);
+
+        decision.Allowed.Should().BeTrue();
+        decision.ReasonCode.Should().Be("allowed");
+        decision.OpensRemaining.Should().BeNull("unlimited policies should not report a remaining count");
+    }
+
+    [Fact]
+    public void Reports_opens_remaining_after_this_access_when_max_opens_is_set()
+    {
+        var policy = TestPolicy(Permission.View, expiresAtUtc: NowUtc.AddHours(1))
+            with { MaxOpens = 5, OpensUsed = 2 };
+        var request = TestRequest(Permission.View);
+
+        var decision = PolicyEvaluator.Evaluate(policy, request);
+
+        decision.Allowed.Should().BeTrue();
+        // 5 limit minus 2 already used minus 1 consumed by this access = 2.
+        decision.OpensRemaining.Should().Be(2);
+    }
+
+    [Fact]
+    public void Allows_the_final_open_when_remaining_equals_one()
+    {
+        var policy = TestPolicy(Permission.View, expiresAtUtc: NowUtc.AddHours(1))
+            with { MaxOpens = 3, OpensUsed = 2 };
+        var request = TestRequest(Permission.View);
+
+        var decision = PolicyEvaluator.Evaluate(policy, request);
+
+        decision.Allowed.Should().BeTrue();
+        decision.OpensRemaining.Should().Be(0);
+    }
+
+    [Fact]
+    public void Denies_with_opens_exhausted_when_user_has_consumed_all_opens()
+    {
+        var policy = TestPolicy(Permission.View, expiresAtUtc: NowUtc.AddHours(1))
+            with { MaxOpens = 3, OpensUsed = 3 };
+        var request = TestRequest(Permission.View);
+
+        var decision = PolicyEvaluator.Evaluate(policy, request);
+
+        decision.Allowed.Should().BeFalse();
+        decision.ReasonCode.Should().Be("opens_exhausted");
+        decision.OpensRemaining.Should().Be(0);
+    }
+
+    [Fact]
+    public void Denies_with_opens_exhausted_even_when_opens_used_exceeds_max()
+    {
+        // Defensive: if MaxOpens was lowered after the fact and the user is
+        // now past the limit, still deny rather than report a negative count.
+        var policy = TestPolicy(Permission.View, expiresAtUtc: NowUtc.AddHours(1))
+            with { MaxOpens = 2, OpensUsed = 5 };
+        var request = TestRequest(Permission.View);
+
+        var decision = PolicyEvaluator.Evaluate(policy, request);
+
+        decision.Allowed.Should().BeFalse();
+        decision.ReasonCode.Should().Be("opens_exhausted");
+        decision.OpensRemaining.Should().Be(0);
+    }
+
+    [Fact]
+    public void Opens_check_runs_after_permission_check_not_before()
+    {
+        // Permission denial must take precedence over opens_exhausted so that
+        // a user without the right grant never burns an open from their tally.
+        var policy = TestPolicy(Permission.View, expiresAtUtc: NowUtc.AddHours(1))
+            with { MaxOpens = 0, OpensUsed = 0 };
+        var request = TestRequest(Permission.Print);
+
+        var decision = PolicyEvaluator.Evaluate(policy, request);
+
+        decision.Allowed.Should().BeFalse();
+        decision.ReasonCode.Should().Be("permission_not_granted");
+    }
+
+    [Fact]
     public void Grants_are_not_changed_by_mutating_source_collection_after_policy_construction()
     {
         var grants = new List<FileGrant> { new(TestIds.User, Permission.View) };

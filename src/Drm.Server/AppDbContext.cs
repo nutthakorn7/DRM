@@ -14,6 +14,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<ProtectedFileEntity> ProtectedFiles => Set<ProtectedFileEntity>();
 
+    public DbSet<FileAccessCountEntity> FileAccessCounts => Set<FileAccessCountEntity>();
+
     public DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
 
     public DbSet<TenantUserEntity> TenantUsers => Set<TenantUserEntity>();
@@ -146,6 +148,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(file => file.ContentType).HasMaxLength(256);
             entity.Property(file => file.WatermarkTemplate).HasMaxLength(1024);
             entity.Property(file => file.Permissions).HasConversion<int>();
+        });
+
+        modelBuilder.Entity<FileAccessCountEntity>(entity =>
+        {
+            entity.HasKey(row => new { row.TenantId, row.FileId, row.UserId });
+            entity.HasIndex(row => new { row.TenantId, row.FileId });
         });
 
         modelBuilder.Entity<AuditEventEntity>(entity =>

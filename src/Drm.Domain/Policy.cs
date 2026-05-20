@@ -10,7 +10,9 @@ public sealed record FilePolicy
         DateTimeOffset ExpiresAtUtc,
         bool Revoked,
         IEnumerable<FileGrant> Grants,
-        string WatermarkTemplate)
+        string WatermarkTemplate,
+        int? MaxOpens = null,
+        int OpensUsed = 0)
     {
         this.TenantId = TenantId;
         this.FileId = FileId;
@@ -18,6 +20,8 @@ public sealed record FilePolicy
         this.Revoked = Revoked;
         this.Grants = Grants.ToImmutableArray();
         this.WatermarkTemplate = WatermarkTemplate;
+        this.MaxOpens = MaxOpens;
+        this.OpensUsed = OpensUsed;
     }
 
     public TenantId TenantId { get; init; }
@@ -31,6 +35,19 @@ public sealed record FilePolicy
     public ImmutableArray<FileGrant> Grants { get; init; }
 
     public string WatermarkTemplate { get; init; }
+
+    /// <summary>
+    /// Maximum number of times this file may be opened by any single user.
+    /// <c>null</c> means unlimited. When the per-user open count reaches this
+    /// value, further access is denied with <c>opens_exhausted</c>.
+    /// </summary>
+    public int? MaxOpens { get; init; }
+
+    /// <summary>
+    /// Opens already consumed by the requesting user. Compared against
+    /// <see cref="MaxOpens"/> to determine whether another open is allowed.
+    /// </summary>
+    public int OpensUsed { get; init; }
 }
 
 public sealed record FileGrant(

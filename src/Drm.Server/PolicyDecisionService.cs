@@ -10,7 +10,9 @@ public sealed record ServerPolicyDecision(
     string? WatermarkTemplate,
     DateTimeOffset? OfflineLeaseExpiresAtUtc,
     bool FileFound,
-    bool InvalidPermission);
+    bool InvalidPermission,
+    int? MaxOpens = null,
+    int? OpensRemaining = null);
 
 public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotificationService notificationService)
 {
@@ -253,13 +255,23 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
             grants.Add(new FileGrant(new UserId(userId), effectivePermissions));
         }
 
+        // Load the per-user access tally. If no row exists this is the user's
+        // first attempt; treat as 0 opens used.
+        var accessCount = await dbContext.FileAccessCounts
+            .FirstOrDefaultAsync(
+                row => row.TenantId == tenantId && row.FileId == fileId && row.UserId == userId,
+                cancellationToken);
+        var opensUsed = accessCount?.OpensUsed ?? 0;
+
         var policy = new FilePolicy(
             new TenantId(file.TenantId),
             new ProtectedFileId(file.Id),
             file.ExpiresAtUtc,
             file.Revoked,
             grants,
-            file.WatermarkTemplate);
+            file.WatermarkTemplate,
+            MaxOpens: file.MaxOpens,
+            OpensUsed: opensUsed);
 
         var decision = PolicyEvaluator.Evaluate(policy, new PolicyRequest(
             new TenantId(tenantId),
@@ -280,6 +292,31 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
                 ReasonCode = decision.ReasonCode,
                 CreatedAtUtc = decisionTime
             });
+
+            // Consume one open against MaxOpens on every successful access.
+            // Simulation (writeAudit=false) MUST NOT mutate the counter,
+            // otherwise the policy simulator silently exhausts real opens.
+            if (decision.Allowed && file.MaxOpens.HasValue)
+            {
+                if (accessCount is null)
+                {
+                    dbContext.FileAccessCounts.Add(new FileAccessCountEntity
+                    {
+                        TenantId = tenantId,
+                        FileId = fileId,
+                        UserId = userId,
+                        OpensUsed = 1,
+                        FirstOpenedAtUtc = decisionTime,
+                        LastOpenedAtUtc = decisionTime
+                    });
+                }
+                else
+                {
+                    accessCount.OpensUsed += 1;
+                    accessCount.LastOpenedAtUtc = decisionTime;
+                }
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (!decision.Allowed)
             {
@@ -307,6 +344,8 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
             decision.WatermarkTemplate,
             offlineLeaseExpiresAtUtc,
             FileFound: true,
-            InvalidPermission: false);
+            InvalidPermission: false,
+            MaxOpens: file.MaxOpens,
+            OpensRemaining: decision.OpensRemaining);
     }
 }

@@ -110,7 +110,12 @@ public static class FileKeyEndpoints
 
         if (!decision.Allowed)
         {
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
+            // Surface the reason code in the body so clients can tell
+            // "your X opens are used up" apart from "this file was revoked"
+            // and show a useful message. The status code stays 403.
+            return Results.Json(
+                new ErrorResponse(decision.ReasonCode),
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         var stored = await dbContext.FileKeys
@@ -135,7 +140,9 @@ public static class FileKeyEndpoints
             Convert.ToBase64String(fileKey),
             decision.AllowedPermissions.ToString(),
             decision.WatermarkTemplate,
-            decision.OfflineLeaseExpiresAtUtc));
+            decision.OfflineLeaseExpiresAtUtc,
+            decision.MaxOpens,
+            decision.OpensRemaining));
     }
 
     private sealed record WrapFileKeyRequest(Guid TenantId, string FileKeyBase64);
@@ -154,7 +161,9 @@ public static class FileKeyEndpoints
         string FileKeyBase64,
         string AllowedPermissions,
         string? WatermarkTemplate,
-        DateTimeOffset? OfflineLeaseExpiresAtUtc);
+        DateTimeOffset? OfflineLeaseExpiresAtUtc,
+        int? MaxOpens,
+        int? OpensRemaining);
 
     private sealed record ErrorResponse(string ReasonCode);
 }

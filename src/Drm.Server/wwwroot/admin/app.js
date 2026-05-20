@@ -765,6 +765,7 @@ document.querySelector("#createPolicyTemplateForm").addEventListener("submit", a
   const combinedPerms = extras.length
     ? (basePerms ? `${basePerms}, ${extras.join(", ")}` : extras.join(", "))
     : basePerms;
+  const maxOpensValue = document.querySelector("#templateMaxOpens").value.trim();
   const body = {
     tenantId: requireTenantId(),
     templateId: document.querySelector("#templateId").value.trim(),
@@ -772,7 +773,8 @@ document.querySelector("#createPolicyTemplateForm").addEventListener("submit", a
     permissions: combinedPerms,
     watermarkTemplate: document.querySelector("#templateWatermark").value.trim(),
     offlineLeaseMinutes: offlineLeaseValue ? Number(offlineLeaseValue) : 0,
-    allowPrint: document.querySelector("#templateAllowPrint").checked
+    allowPrint: document.querySelector("#templateAllowPrint").checked,
+    maxOpens: maxOpensValue ? Number(maxOpensValue) : null
   };
 
   await apiFetch("/api/admin/policy-templates", {
@@ -1880,10 +1882,10 @@ function renderDeviceHealth(health) {
 
 function renderPolicyTemplates(templates) {
   if (!templates.length) {
-    policyTemplatesBody.innerHTML = emptyStateRow(6, {
+    policyTemplatesBody.innerHTML = emptyStateRow(7, {
       icon: "📋",
       title: "No policy templates yet",
-      hint: "Templates bundle permissions, watermark, and offline-lease into a reusable preset. Create one above so users can apply it when protecting files.",
+      hint: "Templates bundle permissions, watermark, offline-lease, and a per-user open limit into a reusable preset. Create one above so users can apply it when protecting files.",
     });
     return;
   }
@@ -1895,6 +1897,7 @@ function renderPolicyTemplates(templates) {
       <td>${escapeHtml(template.permissions)}</td>
       <td>${escapeHtml(template.watermarkTemplate)}</td>
       <td>${escapeHtml(`${template.offlineLeaseMinutes} min`)}</td>
+      <td>${template.maxOpens ? escapeHtml(`${template.maxOpens} / user`) : '<span class="muted">Unlimited</span>'}</td>
       <td>${template.allowPrint ? "Yes" : "No"}</td>
     </tr>
   `).join("");

@@ -109,6 +109,141 @@ public sealed class FileKeyApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Max_opens_template_caps_per_user_access_and_returns_403_after_limit()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+
+        // Template with MaxOpens=3 — the owner gets exactly three opens.
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "Three-open cap",
+            permissions = "View",
+            watermarkTemplate = "user:{userId}",
+            offlineLeaseMinutes = 15,
+            allowPrint = false,
+            maxOpens = 3
+        });
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = templateId
+        });
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        await WrapKeyAsync(client, tenantId, fileId, fileKey);
+
+        // Open #1 — allowed, 2 remaining after consumption.
+        var first = await UnwrapAsync(client, tenantId, fileId, ownerUserId);
+        first.statusCode.Should().Be(HttpStatusCode.OK);
+        first.body!.MaxOpens.Should().Be(3);
+        first.body.OpensRemaining.Should().Be(2);
+
+        // Open #2 — allowed, 1 remaining.
+        var second = await UnwrapAsync(client, tenantId, fileId, ownerUserId);
+        second.statusCode.Should().Be(HttpStatusCode.OK);
+        second.body!.OpensRemaining.Should().Be(1);
+
+        // Open #3 — allowed, 0 remaining (last open consumed).
+        var third = await UnwrapAsync(client, tenantId, fileId, ownerUserId);
+        third.statusCode.Should().Be(HttpStatusCode.OK);
+        third.body!.OpensRemaining.Should().Be(0);
+
+        // Open #4 — denied with opens_exhausted. The endpoint returns 403
+        // for any policy denial; the reason code lives in the error body.
+        using var fourth = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId = ownerUserId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "View"
+        });
+        fourth.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await fourth.Content.ReadFromJsonAsync<ErrorBody>();
+        error!.ReasonCode.Should().Be("opens_exhausted");
+    }
+
+    [Fact]
+    public async Task Max_opens_is_tracked_independently_per_user()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+        var fileKey = EnvelopeCrypto.GenerateKey();
+
+        using var createTemplate = await client.PostAsJsonAsync("/api/admin/policy-templates", new
+        {
+            tenantId,
+            templateId,
+            name = "One-open cap",
+            permissions = "View",
+            watermarkTemplate = "user:{userId}",
+            offlineLeaseMinutes = 15,
+            allowPrint = false,
+            maxOpens = 1
+        });
+        createTemplate.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/files", new
+        {
+            tenantId,
+            fileId,
+            ownerUserId,
+            contentType = "application/pdf",
+            expiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+            permissions = "View",
+            policyTemplateId = templateId
+        });
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        await WrapKeyAsync(client, tenantId, fileId, fileKey);
+
+        // Grant the second user too so the test isn't conflated with no_grant.
+        using var grantResponse = await client.PostAsJsonAsync($"/api/admin/files/{fileId}/grants", new
+        {
+            tenantId,
+            adminUserId = Guid.NewGuid(),
+            subjectType = "User",
+            subjectId = secondUserId,
+            permissions = "View"
+        });
+        grantResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Created);
+
+        // Owner burns their single open.
+        var ownerOpen = await UnwrapAsync(client, tenantId, fileId, ownerUserId);
+        ownerOpen.statusCode.Should().Be(HttpStatusCode.OK);
+
+        // Owner attempt #2 is denied — they have no opens left.
+        using var ownerSecondAttempt = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId = ownerUserId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "View"
+        });
+        ownerSecondAttempt.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // Second user has their OWN counter and can still open the file.
+        var secondUserOpen = await UnwrapAsync(client, tenantId, fileId, secondUserId);
+        secondUserOpen.statusCode.Should().Be(HttpStatusCode.OK);
+        secondUserOpen.body!.OpensRemaining.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Unwrap_denies_user_without_policy_grant()
     {
         using var client = factory.CreateClient();
@@ -205,6 +340,24 @@ public sealed class FileKeyApiTests : IDisposable
         DeleteDatabaseFiles(databasePath);
     }
 
+    private static async Task<(HttpStatusCode statusCode, UnwrapFileKeyResponse? body)> UnwrapAsync(
+        HttpClient client, Guid tenantId, Guid fileId, Guid userId)
+    {
+        using var response = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId,
+            deviceId = Guid.NewGuid(),
+            requestedPermission = "View"
+        });
+        var body = response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<UnwrapFileKeyResponse>()
+            : null;
+        return (response.StatusCode, body);
+    }
+
+    private sealed record ErrorBody(string ReasonCode);
+
     private static async Task RegisterFileAsync(HttpClient client, Guid tenantId, Guid ownerUserId, Guid fileId)
     {
         using var response = await client.PostAsJsonAsync("/api/files", new
@@ -276,5 +429,7 @@ public sealed class FileKeyApiTests : IDisposable
         string FileKeyBase64,
         string AllowedPermissions,
         string? WatermarkTemplate,
-        DateTimeOffset? OfflineLeaseExpiresAtUtc);
+        DateTimeOffset? OfflineLeaseExpiresAtUtc,
+        int? MaxOpens,
+        int? OpensRemaining);
 }

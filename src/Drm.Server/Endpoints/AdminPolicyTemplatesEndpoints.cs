@@ -47,6 +47,7 @@ public static class AdminPolicyTemplatesEndpoints
             WatermarkTemplate = request.WatermarkTemplate,
             OfflineLeaseMinutes = request.OfflineLeaseMinutes,
             AllowPrint = request.AllowPrint,
+            MaxOpens = request.MaxOpens is > 0 ? request.MaxOpens : null,
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
 
@@ -152,7 +153,8 @@ public static class AdminPolicyTemplatesEndpoints
         string Permissions,
         string WatermarkTemplate,
         int OfflineLeaseMinutes,
-        bool AllowPrint);
+        bool AllowPrint,
+        int? MaxOpens = null);
 
     private sealed record PolicyTemplateResponse(
         Guid TenantId,
@@ -161,7 +163,8 @@ public static class AdminPolicyTemplatesEndpoints
         string Permissions,
         string WatermarkTemplate,
         int OfflineLeaseMinutes,
-        bool AllowPrint)
+        bool AllowPrint,
+        int? MaxOpens)
     {
         public static PolicyTemplateResponse From(PolicyTemplateEntity template)
             => new(
@@ -171,7 +174,8 @@ public static class AdminPolicyTemplatesEndpoints
                 template.Permissions,
                 template.WatermarkTemplate,
                 template.OfflineLeaseMinutes,
-                template.AllowPrint);
+                template.AllowPrint,
+                template.MaxOpens);
     }
 
     private sealed record ErrorResponse(string ReasonCode);
