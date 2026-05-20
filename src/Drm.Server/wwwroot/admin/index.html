@@ -4,7 +4,7 @@
 <!-- design-audit-20260519: fixes applied (aria-hidden icons, skip-nav, danger class, step count, Forget placement) -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DRM Management</title>
+  <title>zcrDRM — Admin console</title>
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,10 +64,16 @@
   <a href="#adminMain" class="skip-link">Skip to main content</a>
   <div class="welcome-screen" id="welcomeScreen" hidden role="dialog" aria-labelledby="welcomeTitle">
     <div class="welcome-card">
-      <div class="welcome-logo" aria-hidden="true">🔒</div>
+      <div class="welcome-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="11" width="16" height="10" rx="2"/>
+          <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+          <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+        </svg>
+      </div>
       <p class="eyebrow">First time here</p>
-      <h1 id="welcomeTitle">Welcome to DRM Management</h1>
-      <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, admin credential, and Admin user ID for you — you can replace them with real credentials anytime.</p>
+      <h1 id="welcomeTitle"><span class="brand-zcr">zcr</span><span class="brand-drm">DRM</span> — self-hosted DRM, ready in 5 minutes</h1>
+      <p class="welcome-lede">Generate a test tenant in one click. We'll wire up a Tenant ID, admin credential, and Admin user ID so you can protect a file before your coffee is cold.</p>
 
       <ul class="welcome-steps">
         <li><span class="step-num">1</span> Enter or generate a Tenant ID</li>
@@ -110,10 +116,16 @@
     <main class="surface" id="adminMain">
       <header class="page-header">
         <div class="brand">
-          <div class="brand-logo" aria-hidden="true">🔒</div>
+          <div class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2"/>
+              <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+              <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+            </svg>
+          </div>
           <div class="brand-text">
-            <h1>DRM Management</h1>
-            <p class="hint" id="railPersonaHint">Admin console</p>
+            <h1 class="brand-wordmark"><span class="brand-zcr">zcr</span><span class="brand-drm">DRM</span></h1>
+            <p class="hint" id="railPersonaHint">Self-hosted DRM, ready in 5 minutes</p>
           </div>
         </div>
         <div class="page-header-right">
@@ -179,6 +191,54 @@
       </nav>
 
       <nav class="subtab-nav" id="subTabNav" aria-label="Section sub-tabs" role="tablist"></nav>
+
+      <aside class="brand-hero" id="brandHeroBand" aria-label="zcrDRM product pillars">
+        <div class="hero-pillars">
+          <article class="pillar">
+            <span class="pillar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <p class="pillar-eyebrow">Encrypt</p>
+            <p class="pillar-title">AES-256 per file</p>
+            <p class="pillar-body">RSA-2048 key wrap. Watermark, expiry, and offline lease enforced at the viewer.</p>
+          </article>
+          <article class="pillar">
+            <span class="pillar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <polyline points="12 7 12 12 15 14"/>
+              </svg>
+            </span>
+            <p class="pillar-eyebrow">Audit</p>
+            <p class="pillar-title">Every open, every device</p>
+            <p class="pillar-body">Tamper-proof chain. SIEM webhook stream. CSV export ready for PDPA / ISO 27001 / SOC 2.</p>
+          </article>
+          <article class="pillar">
+            <span class="pillar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1.5 14a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8L5 6"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </span>
+            <p class="pillar-eyebrow">Revoke</p>
+            <p class="pillar-title">Kill files from anywhere</p>
+            <p class="pillar-body">Instant policy change propagates to every viewer. Remote delete protected copies on disconnect.</p>
+          </article>
+        </div>
+        <ul class="trust-badges" aria-label="Technical credentials">
+          <li>AES-256</li>
+          <li>RSA-2048</li>
+          <li>FIPS 140-2 ready</li>
+          <li>PostgreSQL</li>
+          <li>Docker deploy</li>
+          <li>On-prem first</li>
+        </ul>
+      </aside>
 
       <section class="panel" id="notifications" data-tab="integrations">
         <div class="section-head">
@@ -987,7 +1047,7 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">Welcome</p>
-            <h3>Getting started — set up DRM in 5 steps</h3>
+            <h3>Getting started — set up zcrDRM in 5 steps</h3>
           </div>
           <button id="dismissGettingStarted" type="button" class="ghost">Hide</button>
         </div>

@@ -1,12 +1,49 @@
-# DRM Design System
+# zcrDRM Design System
 
-Source of truth for visual decisions across the DRM web surfaces. Tokens live in
+Source of truth for visual decisions across the zcrDRM web surfaces. Tokens live in
 [`src/Drm.Server/wwwroot/static/tokens.css`](src/Drm.Server/wwwroot/static/tokens.css) —
 this document explains the **why** behind those tokens so future changes can be
 calibrated against intent.
 
-Decided: 2026-05-17. Latest audit: see
-`~/.gstack/projects/DRM/designs/design-audit-20260517/design-audit-drm-admin.md`.
+Decided: 2026-05-17. Brand layer added 2026-05-20 (v1.3.0).
+Latest audit: see `~/.gstack/projects/quirky-visvesvaraya-d75114/designs/design-audit-20260519/`.
+
+---
+
+## Product name & positioning
+
+**Name:** `zcrDRM` — lowercase `zcr` (brand prefix, CyberDefense house mark) +
+uppercase `DRM` (category descriptor so outsiders categorize instantly).
+
+**Memorable thing:** "Self-hosted DRM, running in 5 minutes. No SaaS lock-in."
+
+**Positioning vs incumbents** (FinalCode / Vera / Seclore / Microsoft Purview):
+- Engineer-friendly, not enterprise-procurement-friendly
+- On-prem first, Docker-deployable, Postgres-native
+- Per-file AES-256, per-event audit chain, instant revoke from anywhere
+- No SaaS license dance, no vendor cloud dependency
+
+**Three product pillars** (used in hero band on Overview tab):
+1. **Encrypt** — AES-256 per file, RSA-2048 wrapping, FIPS 140-2 ready
+2. **Audit** — every open, every device, every share, tamper-proof chain
+3. **Revoke** — kill files from anywhere after they left the network
+
+---
+
+## Wordmark
+
+```
+zcrDRM
+```
+
+- Lowercase `zcr` rendered in `var(--accent)` (`#275d72`)
+- Uppercase `DRM` rendered in `var(--ink)` (default dark)
+- IBM Plex Sans, weight 700 (bold)
+- Letter-spacing: -0.01em (tight)
+- Paired with the brand-seal icon (24x24 SVG) on the left
+
+The wordmark replaces the previous `🔒 DRM Management` text. It carries the brand
+in every page-header, every favicon, every email footer.
 
 ---
 
