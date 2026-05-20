@@ -1,6 +1,8 @@
-# Contributing to DRM
+# Contributing to zcrDRM
 
-Thanks for working on the DRM (Digital Rights Management) project. This file is the short version of what we expect from a contribution.
+Thanks for working on `zcrDRM`, the Information Rights Management platform that
+ships from this repo. Production runs at <https://drm.zcr.ai>. This file is the
+short version of what we expect from a contribution.
 
 ## Repository layout
 
