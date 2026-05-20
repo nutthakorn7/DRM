@@ -298,6 +298,47 @@ public sealed class ExternalShareLinkEntity
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset? RevokedAtUtc { get; set; }
+
+    /// <summary>
+    /// Reason the share link was revoked, when set. Filled by the brute-force
+    /// auto-revoke worker (<c>"brute_force_threshold"</c>) or manual admin
+    /// revoke flows. Null on active links and on links revoked before this
+    /// field was added.
+    /// </summary>
+    public string? RevocationReason { get; set; }
+}
+
+/// <summary>
+/// Per-share-link log of failed access attempts. Insert one row on every
+/// wrong verification code, every expired verification, and every guest
+/// email that couldn't redeem the link. The brute-force worker reads this
+/// table windowed against <see cref="TenantBruteForcePolicyEntity"/> to
+/// decide when to auto-revoke a share.
+/// </summary>
+public sealed class ShareLinkFailedAttemptEntity
+{
+    public long Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid ShareLinkId { get; set; }
+    public string GuestEmail { get; set; } = string.Empty;
+    public string? IpAddress { get; set; }
+    public string ReasonCode { get; set; } = string.Empty;
+    public DateTimeOffset OccurredAtUtc { get; set; }
+}
+
+/// <summary>
+/// Per-tenant brute-force protection settings. When a share link receives
+/// <see cref="Threshold"/> failed attempts within <see cref="WindowMinutes"/>,
+/// the link is auto-revoked with reason <c>brute_force_threshold</c>.
+/// Defaults are conservative: 10 failures in 60 minutes.
+/// </summary>
+public sealed class TenantBruteForcePolicyEntity
+{
+    public Guid TenantId { get; set; }
+    public bool Enabled { get; set; } = true;
+    public int Threshold { get; set; } = 10;
+    public int WindowMinutes { get; set; } = 60;
+    public DateTimeOffset UpdatedAtUtc { get; set; }
 }
 
 public sealed class ExternalShareVerificationEntity

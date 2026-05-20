@@ -868,7 +868,8 @@ public static class AdminFilesEndpoints
         int UsedCount,
         bool Revoked,
         DateTimeOffset CreatedAtUtc,
-        DateTimeOffset? RevokedAtUtc)
+        DateTimeOffset? RevokedAtUtc,
+        string? RevocationReason)
     {
         public static ExternalShareLinkResponse From(ExternalShareLinkEntity link)
             => new(
@@ -881,7 +882,8 @@ public static class AdminFilesEndpoints
                 link.UsedCount,
                 link.Revoked,
                 link.CreatedAtUtc,
-                link.RevokedAtUtc);
+                link.RevokedAtUtc,
+                link.RevocationReason);
     }
 
     private sealed record AgentCommandResponse(

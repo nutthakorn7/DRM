@@ -388,6 +388,120 @@ public sealed class ExternalShareApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Brute_force_threshold_auto_revokes_share_link_after_repeated_failures()
+    {
+        // Set the tenant's brute-force threshold to 3 so we hit it within
+        // a single verification's MaxAttempts (5). With the default 10 we
+        // would need 2 verifications and a way to start the second.
+        var ctx = await CreateStartedVerificationAsync();
+        using var setPolicy = await ctx.SetupClient.PutAsJsonAsync(
+            "/api/admin/brute-force-policy",
+            new
+            {
+                tenantId = ctx.TenantId,
+                enabled = true,
+                threshold = 3,
+                windowMinutes = 60
+            });
+        setPolicy.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // First 2 wrong codes — not at threshold yet, normal invalid_code error.
+        for (var i = 0; i < 2; i += 1)
+        {
+            using var attempt = await ConfirmVerificationAsync(
+                ctx.GuestClient, ctx.TenantId, ctx.VerificationId, DifferentCode(ctx.Code));
+            attempt.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await attempt.Content.ReadFromJsonAsync<ErrorResponse>())!
+                .ReasonCode.Should().Be("invalid_verification_code");
+        }
+
+        // 3rd wrong code — hits threshold, share link is auto-revoked.
+        // The error code on this final attempt is share_link_auto_revoked so
+        // a legitimate user with a typo storm knows the link is dead and
+        // stops retrying. Attackers see the same code and learn nothing more.
+        using var threshold = await ConfirmVerificationAsync(
+            ctx.GuestClient, ctx.TenantId, ctx.VerificationId, DifferentCode(ctx.Code));
+        threshold.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await threshold.Content.ReadFromJsonAsync<ErrorResponse>())!
+            .ReasonCode.Should().Be("share_link_auto_revoked");
+
+        // Verify the share link state via the admin API — Revoked=true and
+        // RevocationReason carries the auto-revoke marker.
+        using var detailsResponse = await ctx.SetupClient.GetAsync(
+            $"/api/admin/files/{ctx.FileId}/share-links?tenantId={ctx.TenantId}");
+        detailsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var detailsBody = await detailsResponse.Content.ReadAsStringAsync();
+        detailsBody.Should().Contain("brute_force_threshold");
+
+        // Even with the correct code, the link refuses — it's revoked.
+        using var afterRevoke = await ConfirmVerificationAsync(
+            ctx.GuestClient, ctx.TenantId, ctx.VerificationId, ctx.Code);
+        afterRevoke.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Brute_force_protection_can_be_disabled_per_tenant()
+    {
+        var ctx = await CreateStartedVerificationAsync();
+
+        // Disable brute-force protection — even a flood of wrong codes
+        // should NOT auto-revoke the link. The single-verification cap
+        // (MaxAttempts=5) still applies.
+        using var setPolicy = await ctx.SetupClient.PutAsJsonAsync(
+            "/api/admin/brute-force-policy",
+            new
+            {
+                tenantId = ctx.TenantId,
+                enabled = false,
+                threshold = 1,
+                windowMinutes = 60
+            });
+        setPolicy.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Even at the trivially-low threshold of 1, no auto-revoke fires
+        // because the policy is disabled. We expect the regular invalid_code
+        // error all the way up to MaxAttempts.
+        for (var i = 0; i < 3; i += 1)
+        {
+            using var attempt = await ConfirmVerificationAsync(
+                ctx.GuestClient, ctx.TenantId, ctx.VerificationId, DifferentCode(ctx.Code));
+            attempt.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await attempt.Content.ReadFromJsonAsync<ErrorResponse>())!
+                .ReasonCode.Should().Be("invalid_verification_code");
+        }
+    }
+
+    [Fact]
+    public async Task Brute_force_policy_get_returns_defaults_when_no_row()
+    {
+        var ctx = await CreateStartedVerificationAsync();
+        using var response = await ctx.SetupClient.GetAsync(
+            $"/api/admin/brute-force-policy?tenantId={ctx.TenantId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("\"usingDefaults\":true");
+        body.Should().Contain("\"threshold\":10");
+        body.Should().Contain("\"windowMinutes\":60");
+        body.Should().Contain("\"enabled\":true");
+    }
+
+    [Fact]
+    public async Task Brute_force_policy_rejects_invalid_threshold_and_window()
+    {
+        var ctx = await CreateStartedVerificationAsync();
+
+        using var zeroThreshold = await ctx.SetupClient.PutAsJsonAsync(
+            "/api/admin/brute-force-policy",
+            new { tenantId = ctx.TenantId, enabled = true, threshold = 0, windowMinutes = 60 });
+        zeroThreshold.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var hugeWindow = await ctx.SetupClient.PutAsJsonAsync(
+            "/api/admin/brute-force-policy",
+            new { tenantId = ctx.TenantId, enabled = true, threshold = 5, windowMinutes = 999_999 });
+        hugeWindow.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Guest_verification_confirm_rechecks_share_and_file_state()
     {
         var revokedLink = await CreateStartedVerificationAsync();
