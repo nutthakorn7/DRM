@@ -2,6 +2,52 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.4.0] — 2026-05-20
+
+**Access count limit per user (FinalCode parity, item C1).**
+Files can now cap how many times each user opens them. Once a user consumes
+their allowed opens, further attempts are denied with `opens_exhausted`. The
+counter is per-user, so handing the same file to five recipients with a
+"3 opens each" cap gives 15 total opens, not 3 shared.
+
+### Added
+- **`FilePolicy.MaxOpens` (int?) + `OpensUsed` (int)** in `Drm.Domain`.
+  Null means unlimited; the historical behaviour. `PolicyEvaluator.Evaluate`
+  now returns `Deny("opens_exhausted")` once a user's count meets the cap,
+  and reports `OpensRemaining` on the allow path so clients can show "3 opens
+  left" in the viewer UI.
+- **`FileAccessCountEntity`** — new table with composite key
+  `(TenantId, FileId, UserId)` recording `OpensUsed`, `FirstOpenedAtUtc`, and
+  `LastOpenedAtUtc`. Created lazily on the user's first access. Incremented
+  only on real access (the policy simulator does NOT burn opens).
+- **`PolicyTemplateEntity.MaxOpens`** so an admin can bake "3 opens per user"
+  into a reusable template. Applying the template (`POST /api/admin/files/{id}/apply-policy-template`)
+  copies `MaxOpens` onto the file. Templates without a cap stay unlimited.
+- **Admin console** — Policy template form has a new "Max opens per user"
+  input. Templates table shows the value or `Unlimited` per row.
+- **`UnwrapFileKeyResponse.MaxOpens`** and **`OpensRemaining`** so the viewer
+  can render the remaining count next to the file name.
+- **403 unwrap responses now include a JSON body** with `{ "reasonCode": "..." }`
+  instead of empty 403, so the client can distinguish `opens_exhausted` from
+  `revoked` / `expired` / `device_disabled` / `permission_not_granted`.
+
+### Behaviour
+- `MaxOpens` precedence at register-time: explicit `RegisterFileRequest.MaxOpens`
+  wins, then the applied template's `MaxOpens`, then null (unlimited).
+- Lowering `MaxOpens` after the fact on a file where a user already exceeded
+  it: defensive — they're denied immediately, `OpensRemaining` reports `0`.
+- Permission check still runs before the opens check, so a user who lacks
+  the requested permission never burns one of their opens.
+
+### Tests
+- 6 new domain tests in `PolicyEvaluatorTests` covering null cap, opens
+  remaining math, the final-open boundary, exhaustion, defensive over-use,
+  and precedence over permission denial.
+- 2 new integration tests in `FileKeyApiTests` covering the full template →
+  register → 3 opens allowed → 4th gets 403 `opens_exhausted` flow, plus
+  per-user isolation (User A exhausts their cap, User B still has theirs).
+- Total: 402/402 (was 400) green.
+
 ## [1.3.1] — 2026-05-20
 
 **Docs + social card.**

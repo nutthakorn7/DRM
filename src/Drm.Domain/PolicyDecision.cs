@@ -4,11 +4,12 @@ public sealed record PolicyDecision(
     bool Allowed,
     Permission AllowedPermissions,
     string ReasonCode,
-    string? WatermarkTemplate)
+    string? WatermarkTemplate,
+    int? OpensRemaining = null)
 {
-    public static PolicyDecision Allow(Permission allowedPermissions, string watermarkTemplate)
-        => new(true, allowedPermissions, "allowed", watermarkTemplate);
+    public static PolicyDecision Allow(Permission allowedPermissions, string watermarkTemplate, int? opensRemaining = null)
+        => new(true, allowedPermissions, "allowed", watermarkTemplate, opensRemaining);
 
-    public static PolicyDecision Deny(string reasonCode)
-        => new(false, Permission.None, reasonCode, WatermarkTemplate: null);
+    public static PolicyDecision Deny(string reasonCode, int? opensRemaining = null)
+        => new(false, Permission.None, reasonCode, WatermarkTemplate: null, OpensRemaining: opensRemaining);
 }

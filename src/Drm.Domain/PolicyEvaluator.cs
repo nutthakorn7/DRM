@@ -35,6 +35,23 @@ public static class PolicyEvaluator
             return PolicyDecision.Deny("permission_not_granted");
         }
 
-        return PolicyDecision.Allow(grant.Permissions, policy.WatermarkTemplate);
+        // Access count enforcement. MaxOpens null means unlimited. If the user
+        // has already consumed the allowed number of opens, deny. The caller
+        // is responsible for incrementing OpensUsed on a successful access.
+        int? opensRemaining = null;
+        if (policy.MaxOpens.HasValue)
+        {
+            var remaining = policy.MaxOpens.Value - policy.OpensUsed;
+            if (remaining <= 0)
+            {
+                return PolicyDecision.Deny("opens_exhausted", opensRemaining: 0);
+            }
+
+            // Report what will be left AFTER this access is consumed by the
+            // caller. This is the value most clients display ("3 opens left").
+            opensRemaining = remaining - 1;
+        }
+
+        return PolicyDecision.Allow(grant.Permissions, policy.WatermarkTemplate, opensRemaining);
     }
 }

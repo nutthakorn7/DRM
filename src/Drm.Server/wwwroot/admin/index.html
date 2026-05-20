@@ -643,6 +643,7 @@
           <input id="templatePermissions" autocomplete="off" placeholder="Permissions, e.g. View, Print">
           <input id="templateWatermark" autocomplete="off" placeholder="Watermark template">
           <input id="templateOfflineLease" type="number" min="0" max="527040" autocomplete="off" placeholder="Offline lease minutes">
+          <input id="templateMaxOpens" type="number" min="1" max="100000" autocomplete="off" placeholder="Max opens per user (blank = unlimited)">
           <label class="check-row">
             <input id="templateAllowPrint" type="checkbox">
             <span>Allow print</span>
@@ -667,12 +668,13 @@
                 <th>Permissions</th>
                 <th>Watermark template</th>
                 <th>Offline lease</th>
+                <th>Max opens</th>
                 <th>Allow print</th>
               </tr>
             </thead>
             <tbody id="policyTemplatesBody">
               <tr>
-                <td colspan="6">
+                <td colspan="7">
                   <div class="empty-state">
                     <span class="empty-icon" aria-hidden="true"><svg><use href="#icon-file-text"></use></svg></span>
                     <span class="empty-title">No templates yet</span>

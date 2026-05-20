@@ -107,6 +107,28 @@ public sealed class ProtectedFileEntity
     public string WatermarkTemplate { get; set; } = string.Empty;
 
     public int OfflineLeaseMinutes { get; set; } = 15;
+
+    /// <summary>
+    /// Maximum number of times each user may open this file. Null means
+    /// unlimited (the historical behaviour for files created before v1.4.0).
+    /// </summary>
+    public int? MaxOpens { get; set; }
+}
+
+/// <summary>
+/// Per-(file, user) tally of how many times that user has consumed an open
+/// against <see cref="ProtectedFileEntity.MaxOpens"/>. One row per pair, created
+/// lazily on the user's first access. Increment happens after a successful
+/// policy decision, before the response is returned to the viewer.
+/// </summary>
+public sealed class FileAccessCountEntity
+{
+    public Guid TenantId { get; set; }
+    public Guid FileId { get; set; }
+    public Guid UserId { get; set; }
+    public int OpensUsed { get; set; }
+    public DateTimeOffset FirstOpenedAtUtc { get; set; }
+    public DateTimeOffset LastOpenedAtUtc { get; set; }
 }
 
 public sealed class AuditEventEntity
@@ -184,6 +206,13 @@ public sealed class PolicyTemplateEntity
     public int OfflineLeaseMinutes { get; set; }
 
     public bool AllowPrint { get; set; }
+
+    /// <summary>
+    /// Per-user open limit baked into the template. When this template is
+    /// applied to a file, the value is copied onto
+    /// <see cref="ProtectedFileEntity.MaxOpens"/>. Null means unlimited.
+    /// </summary>
+    public int? MaxOpens { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 }

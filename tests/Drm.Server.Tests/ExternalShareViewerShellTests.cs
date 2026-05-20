@@ -60,7 +60,8 @@ public sealed class ExternalShareViewerShellTests : IDisposable
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
-        html.Should().Contain("External Share Viewer");
+        html.Should().Contain("Open shared file");
+        html.Should().Contain("External viewer");
         html.Should().Contain("verificationStartForm");
         html.Should().Contain("verificationConfirmForm");
         html.Should().Contain("viewerStatus");

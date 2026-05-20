@@ -76,6 +76,13 @@ public static class FilesEndpoints
             return TypedResults.BadRequest(new ErrorResponse(reasonCode));
         }
 
+        // MaxOpens precedence: explicit request value wins, then template,
+        // then unlimited (null). Negative request values are clamped — a
+        // client mistake should not persist a nonsensical cap.
+        int? maxOpens = request.MaxOpens is > 0
+            ? request.MaxOpens
+            : effectivePolicy.MaxOpens is > 0 ? effectivePolicy.MaxOpens : null;
+
         var file = new ProtectedFileEntity
         {
             Id = request.FileId,
@@ -86,7 +93,8 @@ public static class FilesEndpoints
             Revoked = false,
             Permissions = permissions,
             WatermarkTemplate = watermarkTemplate,
-            OfflineLeaseMinutes = effectivePolicy.OfflineLeaseMinutes
+            OfflineLeaseMinutes = effectivePolicy.OfflineLeaseMinutes,
+            MaxOpens = maxOpens
         };
 
         dbContext.ProtectedFiles.Add(file);
@@ -139,7 +147,8 @@ public static class FilesEndpoints
             return new EffectiveRegistrationPolicy(
                 fallbackPermissions,
                 request.WatermarkTemplate ?? DefaultWatermarkTemplate,
-                DefaultOfflineLeaseMinutes);
+                DefaultOfflineLeaseMinutes,
+                MaxOpens: null);
         }
 
         var template = await dbContext.PolicyTemplates
@@ -158,7 +167,11 @@ public static class FilesEndpoints
             return null;
         }
 
-        return new EffectiveRegistrationPolicy(templatePermissions, template.WatermarkTemplate, template.OfflineLeaseMinutes);
+        return new EffectiveRegistrationPolicy(
+            templatePermissions,
+            template.WatermarkTemplate,
+            template.OfflineLeaseMinutes,
+            MaxOpens: template.MaxOpens);
     }
 
     private static async Task<RecipientBuildError?> BuildFileGrantsAsync(
@@ -307,14 +320,16 @@ public static class FilesEndpoints
         string Permissions,
         string? WatermarkTemplate,
         Guid? PolicyTemplateId = null,
-        IReadOnlyList<RegisterFileRecipientRequest?>? Recipients = null);
+        IReadOnlyList<RegisterFileRecipientRequest?>? Recipients = null,
+        int? MaxOpens = null);
 
     private sealed record RegisterFileRecipientRequest(string SubjectType, Guid SubjectId);
 
     private sealed record EffectiveRegistrationPolicy(
         Permission Permissions,
         string WatermarkTemplate,
-        int OfflineLeaseMinutes);
+        int OfflineLeaseMinutes,
+        int? MaxOpens = null);
 
     private sealed record RegisterFileResponse(
         Guid FileId,
