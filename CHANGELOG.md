@@ -2,6 +2,42 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.3.0] — 2026-05-20
+
+**Brand identity — zcrDRM.**
+First brand layer on top of the teal-on-slate design system. Replaces the generic
+"DRM Management" label with the `zcrDRM` wordmark, adds a product hero band to
+the Overview tab, and shifts the marketing voice from engineer-internal to
+customer-facing.
+
+### Added
+- **Product wordmark `zcrDRM`.** Lowercase `zcr` (`var(--accent)` teal) +
+  uppercase `DRM` (`var(--ink)` dark). IBM Plex Sans bold, tight letter-spacing.
+  Paired with a custom inline-SVG padlock-seal icon (replaces 🔒 emoji).
+- **Hero pillars band on Overview tab.** Three pillars — **Encrypt** (AES-256
+  per file + RSA-2048 wrap), **Audit** (every open / every device / tamper-proof
+  chain), **Revoke** (kill files from anywhere). Lucide-style SVG icons in
+  teal-tinted squares. Only visible when `body[data-active-tab="overview"]`.
+- **Trust badges row.** Pill chips below pillars: `AES-256` `RSA-2048`
+  `FIPS 140-2 ready` `PostgreSQL` `Docker deploy` `On-prem first`. Engineer-
+  legible credentials at first glance.
+
+### Changed
+- **Welcome modal copy.** "Welcome to DRM Management" → "zcrDRM — self-hosted DRM,
+  ready in 5 minutes". Lede shortened to emphasize speed. Logo swapped to the
+  same SVG padlock-seal used by the brand mark.
+- **Page title.** `<title>` updated to `zcrDRM — Admin console`.
+- **Getting started heading.** "set up DRM in 5 steps" → "set up zcrDRM in 5 steps".
+- **Brand-logo CSS.** Now accepts an inline SVG child sized to 22×22 inside the
+  40×40 teal tile (replaces the emoji approach).
+
+### Design system
+- `DESIGN.md` updated with **Product name & positioning** and **Wordmark**
+  sections. Brand layer recorded; teal-on-slate tokens unchanged.
+
+### Tests
+- `ManagementConsoleTests` updated to assert `zcrDRM` (was `DRM Management`).
+
 ## [1.2.2] — 2026-05-19
 
 **Admin console A+ polish — SVG icons, Tenants tab fix, design tokens.**

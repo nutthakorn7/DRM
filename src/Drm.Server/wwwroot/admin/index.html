@@ -4,8 +4,18 @@
 <!-- design-audit-20260519: fixes applied (aria-hidden icons, skip-nav, danger class, step count, Forget placement) -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DRM Management</title>
-  <link rel="icon" href="data:,">
+  <title>zcrDRM — Admin console</title>
+  <meta name="description" content="zcrDRM admin console — self-hosted DRM running on drm.zcr.ai. Manage tenants, users, policies, files, and audit chains.">
+  <meta name="theme-color" content="#275d72">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="zcrDRM">
+  <meta property="og:title" content="zcrDRM — Admin console">
+  <meta property="og:description" content="Self-hosted DRM, ready in 5 minutes. AES-256 per file, tamper-proof audit, remote revoke.">
+  <meta property="og:url" content="https://drm.zcr.ai/admin/">
+  <meta property="og:image" content="https://drm.zcr.ai/static/favicon.svg">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="mask-icon" href="/static/favicon.svg" color="#275d72">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -64,10 +74,16 @@
   <a href="#adminMain" class="skip-link">Skip to main content</a>
   <div class="welcome-screen" id="welcomeScreen" hidden role="dialog" aria-labelledby="welcomeTitle">
     <div class="welcome-card">
-      <div class="welcome-logo" aria-hidden="true">🔒</div>
+      <div class="welcome-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="11" width="16" height="10" rx="2"/>
+          <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+          <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+        </svg>
+      </div>
       <p class="eyebrow">First time here</p>
-      <h1 id="welcomeTitle">Welcome to DRM Management</h1>
-      <p class="welcome-lede">Set up a test tenant in one click. We'll generate a Tenant ID, admin credential, and Admin user ID for you — you can replace them with real credentials anytime.</p>
+      <h1 id="welcomeTitle"><span class="brand-zcr">zcr</span><span class="brand-drm">DRM</span> — self-hosted DRM, ready in 5 minutes</h1>
+      <p class="welcome-lede">You're on <code class="brand-domain">drm.zcr.ai</code>. Generate a test tenant in one click — we'll wire up a Tenant ID, admin credential, and Admin user ID so you can protect a file before your coffee is cold.</p>
 
       <ul class="welcome-steps">
         <li><span class="step-num">1</span> Enter or generate a Tenant ID</li>
@@ -110,10 +126,16 @@
     <main class="surface" id="adminMain">
       <header class="page-header">
         <div class="brand">
-          <div class="brand-logo" aria-hidden="true">🔒</div>
+          <div class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2"/>
+              <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+              <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+            </svg>
+          </div>
           <div class="brand-text">
-            <h1>DRM Management</h1>
-            <p class="hint" id="railPersonaHint">Admin console</p>
+            <h1 class="brand-wordmark"><span class="brand-zcr">zcr</span><span class="brand-drm">DRM</span></h1>
+            <p class="hint" id="railPersonaHint"><code class="brand-domain">drm.zcr.ai</code> · Admin console</p>
           </div>
         </div>
         <div class="page-header-right">
@@ -180,6 +202,54 @@
 
       <nav class="subtab-nav" id="subTabNav" aria-label="Section sub-tabs" role="tablist"></nav>
 
+      <aside class="brand-hero" id="brandHeroBand" aria-label="zcrDRM product pillars">
+        <div class="hero-pillars">
+          <article class="pillar">
+            <span class="pillar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            <p class="pillar-eyebrow">Encrypt</p>
+            <p class="pillar-title">AES-256 per file</p>
+            <p class="pillar-body">RSA-2048 key wrap. Watermark, expiry, and offline lease enforced at the viewer.</p>
+          </article>
+          <article class="pillar">
+            <span class="pillar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <polyline points="12 7 12 12 15 14"/>
+              </svg>
+            </span>
+            <p class="pillar-eyebrow">Audit</p>
+            <p class="pillar-title">Every open, every device</p>
+            <p class="pillar-body">Tamper-proof chain. SIEM webhook stream. CSV export ready for PDPA / ISO 27001 / SOC 2.</p>
+          </article>
+          <article class="pillar">
+            <span class="pillar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1.5 14a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8L5 6"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </span>
+            <p class="pillar-eyebrow">Revoke</p>
+            <p class="pillar-title">Kill files from anywhere</p>
+            <p class="pillar-body">Instant policy change propagates to every viewer. Remote delete protected copies on disconnect.</p>
+          </article>
+        </div>
+        <ul class="trust-badges" aria-label="Technical credentials">
+          <li>AES-256</li>
+          <li>RSA-2048</li>
+          <li>FIPS 140-2 ready</li>
+          <li>PostgreSQL</li>
+          <li>Docker deploy</li>
+          <li>On-prem first</li>
+        </ul>
+      </aside>
+
       <section class="panel" id="notifications" data-tab="integrations">
         <div class="section-head">
           <div>
@@ -234,8 +304,8 @@
           <button id="refreshOutlookConfig" type="button">Load</button>
         </div>
 
-        <p class="hint">Sideload the Office add-in manifest at <code id="outlookManifestUrl">/outlook-addin/manifest.xml</code> from <strong>Outlook → Get add-ins → My add-ins → Add a custom add-in → Add from file</strong> (replace <code>${SERVER_BASE_URL}</code> with your DRM server URL first).</p>
-        <p class="hint">Word ribbon button: sideload <code id="wordManifestUrl">/word-addin/manifest.xml</code> via <strong>Word → Insert → My Add-ins → Upload My Add-in</strong> to add a "🔒 DRM Protect" button to the Home ribbon.</p>
+        <p class="hint">Sideload the Office add-in manifest at <code id="outlookManifestUrl">https://drm.zcr.ai/outlook-addin/manifest.xml</code> from <strong>Outlook → Get add-ins → My add-ins → Add a custom add-in → Add from file</strong>. Replace <code>drm.zcr.ai</code> with your own server hostname if you self-host elsewhere.</p>
+        <p class="hint">Word ribbon button: sideload <code id="wordManifestUrl">https://drm.zcr.ai/word-addin/manifest.xml</code> via <strong>Word → Insert → My Add-ins → Upload My Add-in</strong> to add a "zcrDRM Protect" button to the Home ribbon.</p>
 
         <form class="create-row" id="outlookConfigForm">
           <label class="inline-check">
@@ -987,7 +1057,7 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">Welcome</p>
-            <h3>Getting started — set up DRM in 5 steps</h3>
+            <h3>Getting started — set up zcrDRM in 5 steps</h3>
           </div>
           <button id="dismissGettingStarted" type="button" class="ghost">Hide</button>
         </div>
