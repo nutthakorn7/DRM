@@ -40,6 +40,7 @@ jobs:
           dotnet restore tests/Drm.Agent.Core.Tests/Drm.Agent.Core.Tests.csproj
           dotnet restore tests/Drm.Cli.Tests/Drm.Cli.Tests.csproj
           dotnet restore tests/Drm.Server.Tests/Drm.Server.Tests.csproj
+          dotnet restore tests/Drm.Watermark.Tests/Drm.Watermark.Tests.csproj
 
       - name: Build
         run: |
@@ -64,6 +65,9 @@ jobs:
 
       - name: Test — Server (main suite)
         run: dotnet test tests/Drm.Server.Tests/Drm.Server.Tests.csproj --no-restore -c Release --logger "console;verbosity=normal"
+
+      - name: Test — Watermark
+        run: dotnet test tests/Drm.Watermark.Tests/Drm.Watermark.Tests.csproj --no-restore -c Release --logger "console;verbosity=normal"
 
       - name: Test — Integration
         run: dotnet test tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj -c Release --logger "console;verbosity=normal"

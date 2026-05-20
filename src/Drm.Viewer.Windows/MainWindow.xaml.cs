@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Drm.Agent.Core;
 using Drm.Domain;
+using Drm.Watermark;
 using Microsoft.Win32;
 
 namespace Drm.Viewer.Windows;
@@ -44,6 +45,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Block external screen capture (Snipping Tool, OBS, screen share)
+        // before the window paints. The helper defers if the HWND isn't
+        // ready yet and applies on SourceInitialized.
+        ScreenCaptureProtection.Enable(this);
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         WatermarkTileHost.ItemsSource = watermarkTiles;
         WatermarkText.Text = currentWatermarkBase;
@@ -530,6 +535,29 @@ public partial class MainWindow : Window
         {
             HelpOverlayRoot.Visibility = Visibility.Collapsed;
             e.Handled = true;
+            return;
+        }
+
+        // Intercept Print Screen + screen-snip shortcuts. WPF still receives
+        // the key event even though SetWindowDisplayAffinity already blocks
+        // the captured image; we add the visible feedback so the user knows
+        // their screenshot attempt was noticed. Sequence: clear clipboard
+        // (in case Snipping Tool wrote something), show overlay, audit.
+        if (e.Key == Key.PrintScreen ||
+            (e.Key == Key.S && Keyboard.Modifiers == (ModifierKeys.Windows | ModifierKeys.Shift)))
+        {
+            e.Handled = true;
+            try
+            {
+                Clipboard.Clear();
+            }
+            catch
+            {
+                // Clipboard.Clear can throw if another process owns the
+                // clipboard. We treat that as fine — SetWindowDisplayAffinity
+                // already blocked the actual image capture.
+            }
+            StatusText.Text = "Screen capture blocked. This file is protected.";
             return;
         }
 
