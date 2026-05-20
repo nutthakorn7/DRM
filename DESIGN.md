@@ -15,6 +15,10 @@ Latest audit: see `~/.gstack/projects/quirky-visvesvaraya-d75114/designs/design-
 **Name:** `zcrDRM` — lowercase `zcr` (brand prefix, CyberDefense house mark) +
 uppercase `DRM` (category descriptor so outsiders categorize instantly).
 
+**Canonical URL:** `drm.zcr.ai` — production admin console. The `zcr.ai`
+parent domain belongs to CyberDefense; the `drm` subdomain isolates this
+product. The `.ai` TLD reinforces the modern/technical positioning.
+
 **Memorable thing:** "Self-hosted DRM, running in 5 minutes. No SaaS lock-in."
 
 **Positioning vs incumbents** (FinalCode / Vera / Seclore / Microsoft Purview):

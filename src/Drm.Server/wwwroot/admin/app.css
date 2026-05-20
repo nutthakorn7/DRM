@@ -94,6 +94,18 @@ select {
 .welcome-card h1 .brand-zcr { color: var(--accent); }
 .welcome-card h1 .brand-drm { color: var(--ink); }
 
+/* Canonical product URL — IBM Plex Mono chip used in brand-text and welcome lede */
+.brand-domain {
+  font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.95em;
+  font-weight: 500;
+  color: var(--accent-dark, var(--accent));
+  background: var(--accent-tint-06, rgba(39, 93, 114, 0.06));
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: -0.01em;
+}
+
 .welcome-card h1 {
   font-size: 24px;
   margin: 4px 0 10px;
