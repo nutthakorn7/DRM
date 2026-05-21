@@ -1297,6 +1297,31 @@
             <span class="detail">—</span>
           </article>
         </div>
+
+        <!--
+            Stage 11 A1 — Activity feed. Surfaces the latest 20 audit
+            events on the landing page so the admin lands in a useful
+            state instead of looking at a wall of subsystem tiles. Each
+            row pulls from /api/admin/audit (existing endpoint) and shows
+            event-type + reason chips, the related file id (if any) and
+            relative timestamp. Click an event to jump to the Audit
+            panel filtered to that file.
+        -->
+        <div class="activity-feed-wrap">
+          <div class="section-head" style="margin-top: 20px;">
+            <div>
+              <p class="eyebrow">Live</p>
+              <h3 id="activityFeedTitle">Recent activity</h3>
+            </div>
+            <button id="refreshActivityFeed" type="button">Refresh</button>
+          </div>
+          <p class="hint">Last 20 events across this tenant. Useful as a quick "did anything important just happen?" pulse — click a row to dig into the file.</p>
+          <ul class="activity-feed" id="activityFeed">
+            <li class="activity-feed-empty" id="activityFeedEmpty">
+              Loading recent events…
+            </li>
+          </ul>
+        </div>
       </section>
 
       <section class="panel" id="transparent" data-tab="files">

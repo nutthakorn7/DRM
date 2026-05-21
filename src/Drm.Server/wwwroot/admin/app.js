@@ -579,6 +579,72 @@ document.querySelector("#checkHealth").addEventListener("click", async () => {
 // Unified status dashboard — one card, 8 traffic-light tiles.
 document.querySelector("#refreshDashboard")?.addEventListener("click", refreshStatusDashboard);
 
+// Stage 11 A1 — Activity feed (latest 20 events) on the landing panel.
+// Re-uses /api/admin/audit and renders cards instead of the existing
+// dense table so an admin lands on the page with a useful overview
+// instead of a wall of status dots.
+async function refreshActivityFeed() {
+  const tenantId = (document.querySelector("#tenantId")?.value || "").trim();
+  const feedEl = document.querySelector("#activityFeed");
+  const emptyEl = document.querySelector("#activityFeedEmpty");
+  if (!feedEl) return;
+  if (!tenantId) {
+    feedEl.innerHTML = '<li class="activity-feed-empty">Set Tenant ID + Admin API key to see activity.</li>';
+    return;
+  }
+  try {
+    const events = await apiFetch(`/api/admin/audit?tenantId=${encodeURIComponent(tenantId)}&limit=20`);
+    if (!events.length) {
+      feedEl.innerHTML = '<li class="activity-feed-empty">No activity yet — share a file from the agent and it will appear here.</li>';
+      return;
+    }
+    feedEl.innerHTML = events.map(renderActivityRow).join("");
+  } catch (err) {
+    feedEl.innerHTML = `<li class="activity-feed-empty">Couldn't load activity (${escapeHtml(err.message || "unknown")}). Try Refresh.</li>`;
+  }
+}
+
+function renderActivityRow(ev) {
+  // Friendly event-type chips. Stays a chip even for unknown event-types
+  // (forwards-compat) — falls back to the raw eventType + reasonCode.
+  const friendly = ({
+    "system_changed":           { label: "System change",     tone: "info"   },
+    "file_registered":          { label: "Protected",         tone: "good"   },
+    "file_revoked":             { label: "Revoked",           tone: "danger" },
+    "external_share_accessed":  { label: "Recipient verified", tone: "info"  },
+    "external_share_viewer":    { label: "Viewer opened",     tone: "good"   },
+    "system_revoked":           { label: "Auto-revoked",      tone: "danger" },
+  })[ev.eventType] || { label: ev.eventType || "Event", tone: "info" };
+
+  const reason = ev.reasonCode || "";
+  const fileShort = ev.fileId ? String(ev.fileId).slice(0, 8) + "…" : "—";
+  const when = formatRelativeAge(ev.createdAtUtc);
+  return `
+    <li class="activity-row" data-event-type="${escapeHtml(ev.eventType || "")}">
+      <span class="activity-chip activity-tone-${friendly.tone}">${escapeHtml(friendly.label)}</span>
+      <span class="activity-reason">${escapeHtml(reason)}</span>
+      <span class="activity-file"><code>${escapeHtml(fileShort)}</code></span>
+      <span class="activity-when" title="${escapeHtml(formatDate(ev.createdAtUtc))}">${escapeHtml(when)}</span>
+    </li>`;
+}
+
+function formatRelativeAge(isoString) {
+  if (!isoString) return "—";
+  const then = new Date(isoString).getTime();
+  if (isNaN(then)) return "—";
+  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (seconds < 60)      return `${seconds}s ago`;
+  if (seconds < 3600)    return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400)   return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+document.querySelector("#refreshActivityFeed")?.addEventListener("click", refreshActivityFeed);
+// Best-effort refresh when the admin key + tenant are already cached
+// from localStorage. Silent on failure — the empty-state copy will
+// prompt the admin to set credentials.
+window.addEventListener("load", () => { refreshActivityFeed().catch(() => {}); });
+
 document.querySelectorAll(".status-tile").forEach((tile) => {
   tile.addEventListener("click", () => {
     const jump = tile.getAttribute("data-jump");

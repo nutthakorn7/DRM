@@ -1884,3 +1884,86 @@ dialog::backdrop {
     flex: 1;
   }
 }
+
+/* Stage 11 A1 — Activity feed (admin landing page).
+   Renders as compact rows with colored chips so an admin can scan
+   "what happened recently" without clicking into the audit table. */
+.activity-feed-wrap {
+  margin-top: 8px;
+}
+
+.activity-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 120px 90px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line, #f3f4f6);
+  font-size: 13px;
+}
+
+.activity-row:first-child {
+  border-top: 0;
+}
+
+.activity-feed-empty {
+  padding: 18px;
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+}
+
+.activity-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.activity-tone-good   { background: #d1fae5; color: #065f46; }
+.activity-tone-info   { background: #e0e7ff; color: #3730a3; }
+.activity-tone-danger { background: #fee2e2; color: #991b1b; }
+
+.activity-reason {
+  color: #374151;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-file code {
+  font-size: 11.5px;
+  color: #6b7280;
+}
+
+.activity-when {
+  color: #6b7280;
+  font-size: 11.5px;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .activity-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    text-align: left;
+  }
+  .activity-when {
+    text-align: left;
+  }
+}

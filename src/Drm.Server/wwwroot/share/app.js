@@ -130,11 +130,25 @@
     document.getElementById("watermarkValue").textContent = payload.watermarkTemplate || "-";
     document.getElementById("previewWatermark").textContent = payload.watermarkTemplate || "Watermark active";
 
-    // Stage 10 — sender hint stays as the default copy ("they") because
-    // the verifier intentionally doesn't return the sender email to the
+    // Stage 10 — sender hint stays as the default copy because the
+    // verifier intentionally doesn't return the sender email to the
     // recipient session (leaking sender metadata would be a privacy
-    // regression). If a future endpoint surfaces sender-display-name
-    // without leaking PII, populate the span here.
+    // regression).
+
+    // Stage 11 R1 — render permission badges from the bitfield-string.
+    // The server emits Permissions as the C# flagged-enum ToString
+    // output ("View, Print" or "View, Print, ExportOriginal"). Split
+    // on comma+optional-whitespace and flip data-state="allowed" on
+    // each matching badge. Badges not in the granted list stay at
+    // their default data-state="denied".
+    const grantedRaw = (payload.permissions || "").trim();
+    const granted = new Set(
+      grantedRaw ? grantedRaw.split(/\s*,\s*/).filter(Boolean) : []
+    );
+    document.querySelectorAll(".perm-badge").forEach(badge => {
+      const perm = badge.getAttribute("data-perm");
+      badge.setAttribute("data-state", granted.has(perm) ? "allowed" : "denied");
+    });
   }
 
   function valueOf(id) {
