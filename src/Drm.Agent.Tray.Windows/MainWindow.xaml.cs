@@ -775,17 +775,26 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string BuildFileShareEmailBody(string shareUrl, string fileName) =>
-        $"Hi,\n\n" +
-        $"I'm sharing a DRM-protected file ({fileName}) with you through zcrDRM.\n\n" +
-        $"BEFORE SENDING THIS EMAIL: attach the .drmx file from your sent folder " +
-        $"(your zcrDRM agent prepared it).\n\n" +
-        $"To open the file:\n" +
-        $"1. Click this link to verify your email: {shareUrl}\n" +
-        $"2. Save the .drmx attachment from this email\n" +
-        $"3. Double-click to open in the zcrDRM viewer\n" +
-        $"   (no viewer yet? the /share/ link has a download button)\n\n" +
-        $"Thanks,";
+    private static string BuildFileShareEmailBody(string shareUrl, string fileName, string? localPath = null)
+    {
+        // Stage 13: when ProtectAsync wrote the .drmx, we know the exact
+        // path on disk and bake it into the body so the sender can drag
+        // it straight in from Explorer rather than hunting in Sent.
+        var attachLine = string.IsNullOrEmpty(localPath)
+            ? $"BEFORE SENDING THIS EMAIL: attach the .drmx file from your sent folder " +
+              $"(your zcrDRM agent prepared it)."
+            : $"BEFORE SENDING THIS EMAIL: attach the file at:\n  {localPath}";
+        return
+            $"Hi,\n\n" +
+            $"I'm sharing a DRM-protected file ({fileName}) with you through zcrDRM.\n\n" +
+            $"{attachLine}\n\n" +
+            $"To open the file:\n" +
+            $"1. Click this link to verify your email: {shareUrl}\n" +
+            $"2. Save the .drmx attachment from this email\n" +
+            $"3. Double-click to open in the zcrDRM viewer\n" +
+            $"   (no viewer yet? the /share/ link has a download button)\n\n" +
+            $"Thanks,";
+    }
 
     private static string BuildContainerShareEmailBody(string shareUrl, string containerFileName) =>
         $"Hi,\n\n" +
@@ -870,68 +879,90 @@ public partial class MainWindow : Window
         }
 
         QuickSendButton.IsEnabled = false;
-        QuickResultText.Text = "Sending…";
+        QuickResultText.Text = "Protecting…";
         try
         {
             var serverUrl = ParseServerUrl();
             var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
             var userId = ParseRequiredGuid(UserIdBox.Text, "User ID");
+            var adminKey = ClientApiKeyBox.Password.Trim();
+
+            // Stage 13: build Permission bitfield from the picker. View
+            // is always granted (recipient cannot open an encrypted file
+            // without it); the optional checkboxes layer Print/Copy/Edit/
+            // ExportOriginal on top.
+            var permissions = Permission.View;
+            if (QuickAllowPrintBox?.IsChecked == true)          permissions |= Permission.Print;
+            if (QuickAllowCopyBox?.IsChecked == true)           permissions |= Permission.Copy;
+            if (QuickAllowEditBox?.IsChecked == true)           permissions |= Permission.Edit;
+            if (QuickAllowExportOriginalBox?.IsChecked == true) permissions |= Permission.ExportOriginal;
+
+            var expiresInHours = ParseQuickExpiryHours();
+            var expiresAtUtc = DateTimeOffset.UtcNow.AddHours(expiresInHours);
+
+            // Stage 13: encrypt locally and register the file via the same
+            // workflow ProtectButton uses. This writes <source>.drmx next
+            // to the source file, registers fileId on the server, and
+            // wraps the per-file key. Then we mint an external share-link
+            // for `recipient` against that fileId — same path as the
+            // admin console's per-file share button.
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
-                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+            var serverClient = new DrmServerClient(httpClient, adminKey);
+            var inventory = new JsonProtectedFileInventory(ResolveDataPath("protected-inventory.json"));
+            var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
+            var workflow = new ProtectFileWorkflow(serverClient, inventory, keyStore);
 
-            var bytes = await File.ReadAllBytesAsync(quickPickedFile);
+            var protectResult = await workflow.ProtectAsync(
+                new TenantId(tenantId),
+                new UserId(userId),
+                quickPickedFile,
+                EnvelopeCrypto.GenerateKey(),
+                new ProtectFilePolicyOptions(permissions, PolicyTemplateId: null, Recipients: []),
+                deleteOriginalAfterProtection: false,
+                CancellationToken.None,
+                fileExpiresAtUtc: expiresAtUtc);
 
-            // Per-share permission picker (Stage 7). When the
-            // "Customize permissions" expander is collapsed or every
-            // box is unchecked, the wire payload is byte-identical to
-            // pre-Stage-7 (View only, 7 days) — the new fields default
-            // to false on the server. Power users flip checkboxes +
-            // pick a longer expiry on a per-recipient basis.
-            var allowPrint          = QuickAllowPrintBox?.IsChecked == true;
-            var allowCopy           = QuickAllowCopyBox?.IsChecked == true;
-            var allowEdit           = QuickAllowEditBox?.IsChecked == true;
-            var allowExportOriginal = QuickAllowExportOriginalBox?.IsChecked == true;
-            var expiresInHours      = ParseQuickExpiryHours();
+            QuickResultText.Text = "Creating share link…";
 
-            var body = new
+            using var adminHttpClient = new HttpClient { BaseAddress = serverUrl };
+            adminHttpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", adminKey);
+            var shareLinkBody = new
             {
                 tenantId,
-                userId,
-                recipientEmail = recipient,
-                fileName = Path.GetFileName(quickPickedFile),
-                contentType = "application/octet-stream",
-                fileBytesBase64 = Convert.ToBase64String(bytes),
-                expiresInHours,
-                allowPrint,
-                allowCopy,
-                allowEdit,
-                allowExportOriginal,
+                adminUserId = userId,
+                guestEmail = recipient,
+                expiresAtUtc,
+                maxUses = 1,
             };
-            using var content = new StringContent(
-                System.Text.Json.JsonSerializer.Serialize(body),
+            using var shareLinkContent = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(shareLinkBody),
                 System.Text.Encoding.UTF8, "application/json");
-            using var response = await httpClient.PostAsync("/api/me/share", content);
-            if (!response.IsSuccessStatusCode)
+            using var shareLinkResponse = await adminHttpClient.PostAsync(
+                $"/api/admin/files/{protectResult.FileId}/share-links", shareLinkContent);
+            if (!shareLinkResponse.IsSuccessStatusCode)
             {
-                QuickResultText.Text = $"Send failed: HTTP {(int)response.StatusCode}";
+                QuickResultText.Text =
+                    $"Share-link failed: HTTP {(int)shareLinkResponse.StatusCode}. " +
+                    $".drmx still written to {protectResult.DestinationPath}.";
                 return;
             }
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var shareLinkJson = await shareLinkResponse.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(shareLinkJson);
             var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? "";
-            var fileId = doc.RootElement.GetProperty("fileId").GetString() ?? "";
             System.Windows.Clipboard.SetText(shareUrl);
-            var fileName = Path.GetFileName(quickPickedFile);
-            // Stage 10: open the default mail client with subject + body
-            // pre-filled. Sender still has to drag the .drmx attachment in
-            // themselves (see helper comment).
+
+            var drmxPath = Path.GetFullPath(protectResult.DestinationPath);
+            var drmxName = Path.GetFileName(drmxPath);
+            // Stage 10/13: mailto with the real .drmx path baked in so the
+            // sender knows exactly which file to attach. Helper opens the
+            // default mail client; sender still drags the attachment in.
             OpenMailtoCompose(
                 recipient,
-                $"Encrypted file: {fileName}",
-                BuildFileShareEmailBody(shareUrl, fileName));
+                $"Encrypted file: {drmxName}",
+                BuildFileShareEmailBody(shareUrl, drmxName, drmxPath));
             QuickResultText.Text =
-                $"✅ Sent. Share URL copied + email composer opened — attach the .drmx and send. File {fileId.Substring(0, 8)}…";
+                $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.";
         }
         catch (Exception ex)
         {
