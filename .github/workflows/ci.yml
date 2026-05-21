@@ -99,6 +99,168 @@ jobs:
       - name: Build Viewer
         run: dotnet build src/Drm.Viewer.Windows/Drm.Viewer.Windows.csproj --no-restore -c Release
 
+  msi-build-and-verify:
+    name: MSI — build & verify on Windows
+    # Stage 2 of the easy-install agent. Produces zcrdrm-agent.msi via
+    # WiX 4 on a real Windows runner, then installs it silently and
+    # asserts the registry/files landed where the .wxs claims. Without
+    # this gate the Mac dev box has no way to know the MSI works.
+    runs-on: windows-latest
+    timeout-minutes: 25
+    needs: build-windows
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install WiX 4 toolset
+        # Pin to a specific WiX 4.x version so the CI behaviour is
+        # reproducible — a `wix` upstream change shouldn't silently
+        # break demo-prep day. 4.0.6 is the latest stable 4.x at time
+        # of writing and matches the v4 schema in Product.wxs. Bump
+        # when we want a newer version (5.x changed enough that
+        # Product.wxs would need updates).
+        run: dotnet tool install --global wix --version 4.0.6
+
+      - name: Build MSI
+        working-directory: deploy/windows-msi
+        shell: pwsh
+        run: .\build-msi.ps1
+
+      - name: Install MSI silently
+        shell: pwsh
+        run: |
+          $msi = Resolve-Path "deploy\windows-msi\zcrdrm-agent.msi"
+          Write-Host "Installing $msi"
+          $proc = Start-Process msiexec -ArgumentList "/i", "`"$msi`"", "/qn", "/l*v", "install.log" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "msiexec exit code $($proc.ExitCode)" -ForegroundColor Red
+            Get-Content install.log -Tail 200
+            throw "MSI install failed"
+          }
+          Write-Host "MSI installed."
+
+      - name: Verify file payload
+        shell: pwsh
+        run: |
+          $files = @(
+            "C:\Program Files\zcrDRM\Drm.Agent.Tray.Windows.exe",
+            "C:\Program Files\zcrDRM\Drm.Viewer.Windows.exe"
+          )
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) {
+              throw "Missing expected file after install: $f"
+            }
+            Write-Host "  OK $f"
+          }
+
+      - name: Verify registry — server URL baked in
+        shell: pwsh
+        run: |
+          $key = Get-ItemProperty -Path "HKLM:\SOFTWARE\zcrDRM" -ErrorAction Stop
+          if ($key.ServerUrl -ne "https://drm.zcr.ai") {
+            throw "Expected HKLM\SOFTWARE\zcrDRM\ServerUrl = https://drm.zcr.ai, got '$($key.ServerUrl)'"
+          }
+          Write-Host "  OK ServerUrl = $($key.ServerUrl)"
+          Write-Host "  OK Version   = $($key.Version)"
+
+      - name: Verify registry — .drmx file association
+        shell: pwsh
+        run: |
+          $drmxKey = Get-Item -Path "Registry::HKEY_CLASSES_ROOT\.drmx" -ErrorAction Stop
+          $progId = $drmxKey.GetValue("")
+          if ($progId -ne "zcrDRM.ProtectedFile.1") {
+            throw "Expected .drmx ProgID = zcrDRM.ProtectedFile.1, got '$progId'"
+          }
+          Write-Host "  OK .drmx -> $progId"
+          $openCmd = (Get-Item -Path "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectedFile.1\shell\open\command").GetValue("")
+          if ($openCmd -notlike "*Drm.Viewer.Windows.exe*") {
+            throw "Expected viewer in open command, got '$openCmd'"
+          }
+          Write-Host "  OK open command points at the viewer"
+
+      - name: Verify registry — Protect-with-zcrDRM shell menu
+        shell: pwsh
+        # `HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect` contains a literal
+        # `*` (the all-files registration key). PowerShell's -Path
+        # treats `*` as a wildcard, so we have to use -LiteralPath to
+        # match the actual `*` key. Same applies in the uninstall check.
+        run: |
+          $menuKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect" -ErrorAction Stop
+          $muiVerb = $menuKey.GetValue("MUIVerb")
+          if ($muiVerb -ne "Protect with zcrDRM") {
+            throw "Expected MUIVerb = 'Protect with zcrDRM', got '$muiVerb'"
+          }
+          Write-Host "  OK *\\shell\\zcrDRMProtect MUIVerb = $muiVerb"
+          foreach ($sub in @("01quicksend","02protect","03transparent")) {
+            $subKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectSubmenu\shell\$sub\command" -ErrorAction Stop
+            $cmd = $subKey.GetValue("")
+            if ($cmd -notlike "*Drm.Agent.Tray.Windows.exe*") {
+              throw "Sub-verb $sub command does not point at the tray exe: $cmd"
+            }
+            Write-Host "  OK submenu $sub -> tray exe"
+          }
+
+      # NOTE: tray auto-start (HKLM\...\Run\zcrDRM Agent) is intentionally
+      # NOT in Stage 2 — the tray exe has no --background flag yet (see
+      # comment block in Product.wxs). Stage 3 adds the flag + the
+      # component + the corresponding verify step.
+
+      - name: Uninstall MSI silently
+        shell: pwsh
+        run: |
+          $msi = Resolve-Path "deploy\windows-msi\zcrdrm-agent.msi"
+          $proc = Start-Process msiexec -ArgumentList "/x", "`"$msi`"", "/qn", "/l*v", "uninstall.log" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "msiexec exit code $($proc.ExitCode)" -ForegroundColor Red
+            Get-Content uninstall.log -Tail 200
+            throw "MSI uninstall failed"
+          }
+          Write-Host "MSI uninstalled."
+
+      - name: Verify uninstall — files gone
+        shell: pwsh
+        run: |
+          if (Test-Path "C:\Program Files\zcrDRM\Drm.Agent.Tray.Windows.exe") {
+            throw "Tray exe still present after uninstall — MSI is leaking files."
+          }
+          Write-Host "  OK install folder cleaned"
+
+      - name: Verify uninstall — registry gone
+        shell: pwsh
+        # -LiteralPath required for the HKCR \*\ key path (see comment
+        # on the install-time verify step).
+        run: |
+          $stillThere = @()
+          if (Test-Path -LiteralPath "HKLM:\SOFTWARE\zcrDRM")                                       { $stillThere += "HKLM\SOFTWARE\zcrDRM" }
+          if (Test-Path -LiteralPath "Registry::HKEY_CLASSES_ROOT\.drmx")                            { $stillThere += "HKCR\.drmx" }
+          if (Test-Path -LiteralPath "Registry::HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect")            { $stillThere += "HKCR\*\shell\zcrDRMProtect" }
+          if (Test-Path -LiteralPath "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectedFile.1")           { $stillThere += "HKCR\zcrDRM.ProtectedFile.1" }
+          if ($stillThere.Count -gt 0) {
+            throw "Registry leak after uninstall: $($stillThere -join ', ')"
+          }
+          Write-Host "  OK registry fully cleaned"
+
+      - name: Upload MSI as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zcrdrm-agent-msi
+          path: deploy/windows-msi/zcrdrm-agent.msi
+          retention-days: 30
+
+      - name: Upload install logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-install-logs
+          path: |
+            install.log
+            uninstall.log
+          retention-days: 7
+
   docker:
     name: Docker — build server image
     runs-on: ubuntu-latest

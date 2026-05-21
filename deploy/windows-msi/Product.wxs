@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    zcrDRM Agent MSI installer (WiX 4).
+
+    What this MSI does (the "easy to use ที่สุด" promise):
+      1. Drops the self-contained .NET 10 win-x64 publish output of
+         Drm.Agent.Tray.Windows + Drm.Viewer.Windows into
+         C:\Program Files\zcrDRM\.  No prerequisite runtime install
+         required on the end-user machine.
+      2. Bakes the production server URL (https://drm.zcr.ai) into
+         HKLM\SOFTWARE\zcrDRM\ServerUrl so the agent does not require
+         the end user to paste or even know the server URL.
+      3. Registers the .drmx file association so double-clicking a
+         protected file opens it in the zcrDRM viewer.
+      4. Registers a "Protect with zcrDRM" right-click context menu on
+         every file, with three sub-actions:
+             - Quick send (recommended)
+             - Protect (advanced)
+             - Transparent protect (preserve extension)
+      5. Adds the tray to the system-wide Windows startup so every user
+         on the machine gets the tray icon on login.
+      6. Adds a Start Menu shortcut.
+
+    On uninstall every registry key declared below comes out too — the
+    Windows Installer engine handles that automatically because each
+    `RegistryValue` is the KeyPath of its component.
+
+    Build it with `deploy\windows-msi\build-msi.ps1` on a Windows
+    machine that has the .NET 10 SDK plus the WiX 4 tool installed
+    via `dotnet tool install -g wix`. The script publishes the tray
+    and viewer self-contained for win-x64 into publish\agent\, then
+    invokes `wix build Product.wxs`.
+
+    The CI windows-latest job (.github/workflows/ci.yml) does all of
+    this and then runs msiexec /i and asserts the registry/files.
+-->
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <!--
+      UpgradeCode MUST remain stable across versions — it's how
+      Windows recognises future MSI builds as "the same product"
+      and triggers MajorUpgrade behaviour. Never regenerate this.
+  -->
+  <Package
+      Name="zcrDRM Agent"
+      Manufacturer="CyberDefense Co."
+      Version="1.6.1.0"
+      UpgradeCode="1DEDF094-CEFC-4BB7-988B-E4AB05C6CAFE"
+      InstallerVersion="500"
+      Scope="perMachine"
+      Compressed="yes">
+
+    <SummaryInformation
+        Description="zcrDRM Agent — encrypt, audit, revoke documents from Windows"
+        Manufacturer="CyberDefense Co." />
+
+    <!--
+        Side-by-side install of an older zcrDRM Agent is never useful.
+        Block downgrades; silently upgrade earlier versions.
+    -->
+    <MajorUpgrade
+        DowngradeErrorMessage="A newer version of zcrDRM Agent is already installed. Uninstall it before installing this older version."
+        Schedule="afterInstallInitialize" />
+
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!--
+        Install layout. ProgramFiles64Folder is the 64-bit
+        C:\Program Files\.  All of zcrDRM lands under
+        C:\Program Files\zcrDRM\ — including the viewer; the tray and
+        viewer ship side-by-side so right-click "Protect" can shell out
+        to the tray and double-click .drmx can shell out to the viewer
+        with no PATH manipulation.
+    -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="zcrDRM" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ZcrDrmProgramsFolder" Name="zcrDRM" />
+    </StandardDirectory>
+
+    <!--
+        File payload is auto-harvested by the AgentBinaries component
+        group defined in the Fragment below.  Splitting it out into a
+        Fragment is a WiX 4 requirement: `<ComponentGroup>` with a
+        `Source` attribute and bulk `<Files>` only works at Fragment
+        scope, not as a direct child of `<Package>`.
+    -->
+
+    <!--
+        Server URL baked in.  The tray app reads
+        HKLM\SOFTWARE\zcrDRM\ServerUrl at startup and pre-fills the
+        Server URL textbox.  Single source of truth — change the value
+        once here for OEM builds (e.g. a tenant whose private cloud
+        runs at https://drm.acme.example) without rebuilding the agent.
+    -->
+    <Component Id="ServerConfigRegistry" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\zcrDRM">
+        <RegistryValue Name="ServerUrl" Type="string" Value="https://drm.zcr.ai" KeyPath="yes" />
+        <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" />
+        <RegistryValue Name="Version" Type="string" Value="1.6.1.0" />
+      </RegistryKey>
+    </Component>
+
+    <!--
+        .drmx file association.  Writes to HKCR (which Windows maps to
+        HKLM\SOFTWARE\Classes for per-machine MSIs) so every user on
+        the box gets the association.
+
+        Quoting note: `&quot;` is the literal " character.  The final
+        command line that lands in the registry is, conceptually:
+            "[INSTALLFOLDER]Drm.Viewer.Windows.exe" [dash][dash]open "%1"
+        with %1 being the path Explorer hands us when the user
+        double-clicks a .drmx file. (XML comments can't contain a
+        double-hyphen, so the prose says "[dash][dash]open" where the
+        actual registry value uses two literal ASCII dashes.)
+    -->
+    <Component Id="DrmxFileAssociation" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key=".drmx">
+        <RegistryValue Type="string" Value="zcrDRM.ProtectedFile.1" KeyPath="yes" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectedFile.1">
+        <RegistryValue Type="string" Value="zcrDRM Protected File" />
+        <RegistryValue Name="FriendlyTypeName" Type="string" Value="zcrDRM Protected File" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectedFile.1\DefaultIcon">
+        <RegistryValue Type="string" Value="[INSTALLFOLDER]Drm.Viewer.Windows.exe,0" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectedFile.1\shell\open\command">
+        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Viewer.Windows.exe&quot; --open &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <!--
+        .drmcontainer association — same shape, separate ProgID so
+        Explorer shows a distinct icon/label if we ever ship one.
+    -->
+    <Component Id="DrmContainerFileAssociation" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key=".drmcontainer">
+        <RegistryValue Type="string" Value="zcrDRM.SecureContainer.1" KeyPath="yes" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.SecureContainer.1">
+        <RegistryValue Type="string" Value="zcrDRM Secure Container" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.SecureContainer.1\shell\open\command">
+        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Viewer.Windows.exe&quot; --open &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <!--
+        Right-click "Protect with zcrDRM" submenu on every file.
+
+        Implementation uses ExtendedSubCommandsKey (Windows 7+) so the
+        verb expands into a flyout with three sub-actions when the
+        user hovers it.  Sub-verbs live under
+        HKCR\zcrDRM.ProtectSubmenu\shell\<sortable-id> and are ordered
+        by the alphabetic sort of those IDs — hence the "01", "02",
+        "03" prefixes.
+
+        Icon imageres.dll,-78 is the Windows padlock glyph shipped
+        with Windows 10/11 — gives the entry visual identity without
+        bundling our own .ico into the MSI.
+    -->
+    <Component Id="ProtectShellMenu" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key="*\shell\zcrDRMProtect">
+        <RegistryValue Name="MUIVerb" Type="string" Value="Protect with zcrDRM" KeyPath="yes" />
+        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-78" />
+        <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="zcrDRM.ProtectSubmenu" />
+      </RegistryKey>
+    </Component>
+
+    <!-- Sub-verb 1: Quick send (recommended) -->
+    <Component Id="ProtectShellSubQuickSend" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\01quicksend">
+        <RegistryValue Type="string" Value="Quick send (recommended)" KeyPath="yes" />
+        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-1024" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\01quicksend\command">
+        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --quick-protect &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <!-- Sub-verb 2: Protect (advanced) -->
+    <Component Id="ProtectShellSubProtect" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\02protect">
+        <RegistryValue Type="string" Value="Protect (advanced)" KeyPath="yes" />
+        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-78" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\02protect\command">
+        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --protect &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <!-- Sub-verb 3: Transparent protect (preserve extension) -->
+    <Component Id="ProtectShellSubTransparent" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\03transparent">
+        <RegistryValue Type="string" Value="Transparent protect (preserve extension)" KeyPath="yes" />
+        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-5366" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\03transparent\command">
+        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --transparent-protect &quot;%1&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <!--
+        Tray auto-start at login is INTENTIONALLY NOT in Stage 2.
+
+        The tray today (Drm.Agent.Tray.Windows/MainWindow.xaml.cs) only
+        accepts the protect / quick-protect / transparent-protect
+        switches. It has no background-start switch, so wiring it
+        into HKLM\...\Run now would either crash on every login or
+        pop the main window in every user's face at every login.
+
+        Stage 3 is already editing this tray to add the first-run
+        email dialog. We add a background-start switch there at the
+        same time and add a TrayAutoStart component (HKLM Run key
+        with the tray exe path and the background switch) in the
+        same change.
+    -->
+
+    <!--
+        Start Menu shortcut.  The HKCU RegistryValue is required by
+        Windows Installer to be the component's KeyPath — Shortcut
+        elements don't qualify as a KeyPath, and per-user shortcuts
+        installed by a per-machine MSI need a per-user registry
+        breadcrumb for the engine to track them per-user.
+    -->
+    <Component Id="TrayStartMenuShortcut" Directory="ZcrDrmProgramsFolder" Guid="*">
+      <Shortcut Id="TrayShortcut"
+                Name="zcrDRM Agent"
+                Description="zcrDRM tray — protect, audit, revoke documents"
+                Target="[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <Shortcut Id="ViewerShortcut"
+                Name="zcrDRM Viewer"
+                Description="Open a zcrDRM-protected file"
+                Target="[INSTALLFOLDER]Drm.Viewer.Windows.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveZcrDrmProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\zcrDRM\Installed"
+                     Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!--
+        Single feature, no install-time picker.  The end user clicks
+        Next-Next-Finish and gets everything — Quick send, advanced
+        protect, transparent protect, .drmx viewer, auto-start, Start
+        Menu.  Power users can still uninstall via Add/Remove Programs.
+    -->
+    <Feature Id="Main" Title="zcrDRM Agent" Level="1">
+      <ComponentGroupRef Id="AgentBinaries" />
+      <ComponentRef Id="ServerConfigRegistry" />
+      <ComponentRef Id="DrmxFileAssociation" />
+      <ComponentRef Id="DrmContainerFileAssociation" />
+      <ComponentRef Id="ProtectShellMenu" />
+      <ComponentRef Id="ProtectShellSubQuickSend" />
+      <ComponentRef Id="ProtectShellSubProtect" />
+      <ComponentRef Id="ProtectShellSubTransparent" />
+      <!-- TrayAutoStart deferred to Stage 3 (needs background-start switch in the tray first). -->
+      <ComponentRef Id="TrayStartMenuShortcut" />
+    </Feature>
+
+  </Package>
+
+  <!--
+      Bulk-harvested file payload. Lives in a Fragment because
+      `<ComponentGroup Source="...">` + `<Files Include="...">` is
+      Fragment-scoped in WiX 4. The Feature inside <Package> above
+      references this via <ComponentGroupRef Id="AgentBinaries" />.
+
+      Source attribute is the base directory; `<Files Include="**\*">`
+      then matches every file in publish\agent\ and every subdirectory,
+      producing one Component per file with WiX-generated stable IDs.
+      Directory subtree (e.g. runtimes\win-x64\native\) is preserved
+      into INSTALLFOLDER, so WebView2 native deps land where the
+      viewer expects them.
+  -->
+  <Fragment>
+    <ComponentGroup Id="AgentBinaries" Directory="INSTALLFOLDER" Source="publish\agent">
+      <Files Include="**\*" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>
