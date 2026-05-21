@@ -1,5 +1,13 @@
 # Engineer Prep — 30-Minute Setup Before Demo
 
+> ⚠️ **อ่านอันนี้ก่อน:** Tenant + users + template + brute-force policy ของ demo ถูก seed ไว้บน prod แล้ว ตั้งแต่ 2026-05-21. ดู credentials ที่ [09-prod-seeded-credentials.md](09-prod-seeded-credentials.md) — ใช้ค่าจากนั้นได้เลย ไม่ต้องทำ Step 2 + Step 3 ของหน้านี้
+>
+> หน้า 01 นี้ยังอยู่เผื่อ seed หลุดหาย (run smoke ตามใน 09 → ถ้าไม่ 200 → กลับมาที่นี่) หรือต้องเซ็ตอัพ tenant อันใหม่หลัง demo
+>
+> ถ้า prod seed ยังครบ — ข้ามไป [08-engineer-windows-msi-setup.md](08-engineer-windows-msi-setup.md) เลย
+
+---
+
 > **เป้าหมาย:** ทำให้ทั้ง 3 ลิ้งก์ของ demo ทำงานได้ราบรื่นด้วยข้อมูล "เหมือนของจริง"
 > เมื่อเสร็จ คุณจะมี Tenant ID + ไฟล์ตัวอย่าง + share URL พร้อมส่งต่อ
 

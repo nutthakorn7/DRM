@@ -11,7 +11,7 @@ This package has **everything** needed to run a clean customer demo.
 | You are... | Read these in order |
 |------------|---------------------|
 | **Owner / Sales person** (จะพรีเซนต์ลูกค้า) | [03-demo-script.md](03-demo-script.md) → [04-customer-questions.md](04-customer-questions.md) |
-| **Engineer** (เตรียมระบบก่อน demo) | [01-engineer-prep.md](01-engineer-prep.md) → [02-the-3-links.md](02-the-3-links.md) → [08-engineer-windows-msi-setup.md](08-engineer-windows-msi-setup.md) (Windows agent on demo laptop) |
+| **Engineer** (เตรียมระบบก่อน demo) | [09-prod-seeded-credentials.md](09-prod-seeded-credentials.md) (start here — tenant already created) → [02-the-3-links.md](02-the-3-links.md) → [08-engineer-windows-msi-setup.md](08-engineer-windows-msi-setup.md) (Windows agent on demo laptop). The 30-min flow in [01-engineer-prep.md](01-engineer-prep.md) is still accurate if you ever need to seed from scratch. |
 | **Both** (15 นาทีก่อน demo) | [05-preflight-checklist.md](05-preflight-checklist.md) |
 | **Backup plan** (ถ้าเกิดปัญหาตอน demo) | [06-fallback-plan.md](06-fallback-plan.md) |
 
