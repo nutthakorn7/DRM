@@ -258,3 +258,54 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
   border-radius: 6px;
   font-size: 0.9rem;
 }
+
+/* Stage 18 — My Shares table. Matches the existing /me/ card aesthetic
+   so it reads as part of the same page rather than a bolted-on dashboard. */
+.my-shares {
+  margin-top: 32px;
+  padding: 18px 22px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+}
+.my-shares-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.my-shares h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1f2937;
+}
+.my-shares-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.my-shares-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #4B5563;
+  padding: 8px 6px;
+  border-bottom: 1px solid #E5E7EB;
+}
+.my-shares-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #F3F4F6;
+  color: #1f2937;
+  vertical-align: middle;
+}
+.my-shares-table .status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.my-shares-table .status-active   { background: #D1FAE5; color: #047857; }
+.my-shares-table .status-revoked  { background: #FEE2E2; color: #B91C1C; }
+.my-shares-table .status-expired  { background: #FEF3C7; color: #92400E; }
+.my-shares-table .status-used-up  { background: #E0E7FF; color: #3730A3; }

@@ -219,6 +219,9 @@ document.querySelector("#quickShareForm").addEventListener("submit", async (even
     result.scrollIntoView({ behavior: "smooth", block: "nearest" });
     // Mark the "protect" onboarding step done for the admin checklist.
     localStorage.setItem("drm:onboarded:protect", "1");
+    // Stage 18: refresh My Shares so the new row appears at the top
+    // without the user reloading the page.
+    refreshMyShares();
   } catch (err) {
     showError(err.message ?? String(err));
   } finally {
@@ -353,3 +356,100 @@ function maybeShowTour() {
   }
   render();
 }
+
+// =========================================================================
+// Stage 18 — My Shares: sender-side view of their own share history.
+// Pulls /api/me/shares whenever the session is configured (tenantId +
+// userId both present) and after every successful send. No revoke
+// button yet — that's a follow-up. For now the row reflects whatever
+// admin actions touched the share (audit-equivalent visibility).
+// =========================================================================
+const mySharesSection = document.getElementById("mySharesSection");
+const mySharesTable   = document.getElementById("mySharesTable");
+const mySharesBody    = document.getElementById("mySharesBody");
+const mySharesEmpty   = document.getElementById("mySharesEmpty");
+const mySharesRefresh = document.getElementById("mySharesRefresh");
+
+if (mySharesRefresh) {
+  mySharesRefresh.addEventListener("click", refreshMyShares);
+}
+
+async function refreshMyShares() {
+  if (!mySharesSection) return;
+  const tenant = (tenantIdInput?.value || "").trim();
+  const user   = (userIdInput?.value || "").trim();
+  // Session not yet configured — keep the section hidden so a fresh
+  // /me/ visitor doesn't see an empty table that looks broken.
+  if (!tenant || !user) { mySharesSection.hidden = true; return; }
+  mySharesSection.hidden = false;
+
+  try {
+    const resp = await fetch(
+      `/api/me/shares?tenantId=${encodeURIComponent(tenant)}&userId=${encodeURIComponent(user)}&limit=10`);
+    if (!resp.ok) {
+      // 4xx on a fresh tenant is fine — render empty state.
+      mySharesTable.hidden = true;
+      mySharesEmpty.hidden = false;
+      return;
+    }
+    const data = await resp.json();
+    renderMySharesTable(data.shares || []);
+  } catch {
+    // Network errors are not show-stoppers for this polish surface;
+    // the user can still send files normally.
+    mySharesTable.hidden = true;
+    mySharesEmpty.hidden = false;
+  }
+}
+
+function renderMySharesTable(shares) {
+  if (!shares.length) {
+    mySharesTable.hidden = true;
+    mySharesEmpty.hidden = false;
+    return;
+  }
+  mySharesEmpty.hidden = true;
+  mySharesTable.hidden = false;
+  mySharesBody.innerHTML = "";
+  for (const row of shares) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(row.guestEmail)}</td>
+      <td>${formatDate(row.createdAtUtc)}</td>
+      <td>${formatDate(row.expiresAtUtc)}</td>
+      <td>${row.usedCount}/${row.maxUses}</td>
+      <td>${escapeHtml(row.permissions)}</td>
+      <td>${renderShareStatus(row)}</td>`;
+    mySharesBody.appendChild(tr);
+  }
+}
+
+function renderShareStatus(row) {
+  if (row.shareRevoked) {
+    const reason = row.revocationReason ? ` (${escapeHtml(row.revocationReason)})` : "";
+    return `<span class="status status-revoked">Revoked${reason}</span>`;
+  }
+  if (row.fileRevoked) {
+    return `<span class="status status-revoked">File revoked</span>`;
+  }
+  if (row.usedCount >= row.maxUses && row.maxUses > 0) {
+    return `<span class="status status-used-up">Used up</span>`;
+  }
+  if (new Date(row.expiresAtUtc) < new Date()) {
+    return `<span class="status status-expired">Expired</span>`;
+  }
+  return `<span class="status status-active">Active</span>`;
+}
+
+function formatDate(iso) {
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+// Initial population on page load if the session is already configured
+// from localStorage. Wrap in setTimeout so this runs after the rest of
+// the IIFE setup that hydrates tenantIdInput / userIdInput.
+setTimeout(refreshMyShares, 0);

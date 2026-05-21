@@ -98,6 +98,32 @@
     </section>
 
     <p id="errorBox" class="error-box" hidden></p>
+
+    <!-- Stage 18: My Shares — the caller's recent share-link history.
+         Hidden until the session is configured (tenantId + userId).
+         Refreshes automatically after every successful send so a new
+         row shows up at the top without a page reload. -->
+    <section id="mySharesSection" class="my-shares" hidden>
+      <header class="my-shares-header">
+        <h2>My recent shares</h2>
+        <button type="button" id="mySharesRefresh" class="topbar-link" title="Pull the latest list from the server">↻ Refresh</button>
+      </header>
+      <p class="hint" id="mySharesEmpty" hidden>Nothing here yet — your first send will show up.</p>
+      <table id="mySharesTable" class="my-shares-table" hidden>
+        <thead>
+          <tr>
+            <th>Recipient</th>
+            <th>Sent</th>
+            <th>Expires</th>
+            <th>Opens</th>
+            <th>Permissions</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="mySharesBody"></tbody>
+      </table>
+      <p class="hint">Showing your most recent 10 shares. Open the admin console for the full audit trail.</p>
+    </section>
   </main>
 
   <script src="/me/app.js" defer></script>

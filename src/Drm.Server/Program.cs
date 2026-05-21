@@ -1166,6 +1166,7 @@ app.MapAdminFolderWatcherEndpoints();
 app.MapCompatibilityEndpoints();
 app.MapPersonaEndpoints();
 app.MapQuickShareEndpoints();
+app.MapMeSharesEndpoints();
 app.MapRecentRecipientsEndpoints();
 app.MapAdminNotificationConfigEndpoints();
 app.MapAdminAuditChainEndpoints();
