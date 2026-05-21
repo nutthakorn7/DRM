@@ -852,6 +852,61 @@ public partial class MainWindow : Window
     /// the sender to drag the .drmx in themselves. The body factory takes
     /// a bool that says which case we landed in so the body matches reality.
     /// </summary>
+    // Stage 19 — bulk-send helpers. Static so they're easy to unit-test
+    // via the source-presence pattern + their semantics are pure.
+
+    private sealed record BulkSendOutcome(
+        string Recipient,
+        bool Success,
+        bool ComposerOpened,
+        bool AttachmentInlined,
+        string? FailureReason);
+
+    private static string BuildBulkResultMessage(string drmxName, IReadOnlyList<BulkSendOutcome> outcomes)
+    {
+        var successes = outcomes.Where(o => o.Success).ToList();
+        var failures = outcomes.Where(o => !o.Success).ToList();
+        var inlinedCount = successes.Count(o => o.AttachmentInlined);
+        var composerOpenedCount = successes.Count(o => o.ComposerOpened);
+
+        if (outcomes.Count == 1)
+        {
+            var only = outcomes[0];
+            if (!only.Success) return $"Share-link failed: {only.FailureReason}. .drmx still written to {drmxName}.";
+            return only switch
+            {
+                { AttachmentInlined: true } =>
+                    $"✅ Wrote {drmxName} + Outlook opened with it attached. Just hit Send.",
+                { ComposerOpened: true } =>
+                    $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.",
+                _ =>
+                    $"✅ Wrote {drmxName} + share URL copied to clipboard. " +
+                    "Couldn't open an email composer — set a default mail client in " +
+                    "Settings → Apps → Default apps → Mail, then paste the URL into a new email."
+            };
+        }
+
+        // Bulk path — concise summary that names the file once + counts
+        // successes / failures so the sender knows what they need to
+        // follow up on manually.
+        var summary = $"✅ Wrote {drmxName} + created {successes.Count} share link(s)";
+        if (composerOpenedCount > 0)
+        {
+            summary += $", opened {composerOpenedCount} composer(s)";
+            if (inlinedCount > 0 && inlinedCount == composerOpenedCount)
+                summary += " with attachment already inlined";
+            else if (inlinedCount > 0)
+                summary += $" ({inlinedCount} with attachment inlined)";
+        }
+        summary += ".";
+        if (failures.Count > 0)
+        {
+            var failedList = string.Join(", ", failures.Select(f => $"{f.Recipient} [{f.FailureReason}]"));
+            summary += $" ⚠ {failures.Count} failed: {failedList}";
+        }
+        return summary;
+    }
+
     private static EmailComposeResult ComposeShareEmail(
         string recipient,
         string subject,
@@ -999,15 +1054,24 @@ public partial class MainWindow : Window
             QuickResultText.Text = "Drop a file or click Browse first.";
             return;
         }
-        var recipient = QuickRecipientBox.Text.Trim();
-        if (string.IsNullOrEmpty(recipient) || !recipient.Contains('@'))
+        // Stage 19: bulk send — accept comma/semicolon-separated recipients
+        // so the same encrypted file goes to N people in one click. Each
+        // recipient gets their own share-link with their own access token,
+        // their own verification flow, and shows up as its own audit row
+        // and its own row in /me/ My Shares. Crucially: each recipient
+        // never sees other recipients' tokens (we open N separate composers,
+        // not one composer with N URLs in the body).
+        var recipients = BulkRecipientParser.Parse(QuickRecipientBox.Text);
+        if (recipients.Count == 0)
         {
-            QuickResultText.Text = "Enter a recipient email.";
+            QuickResultText.Text = "Enter at least one recipient email.";
             return;
         }
 
         QuickSendButton.IsEnabled = false;
-        QuickResultText.Text = "Protecting…";
+        QuickResultText.Text = recipients.Count == 1
+            ? "Protecting…"
+            : $"Protecting {Path.GetFileName(quickPickedFile)} for {recipients.Count} recipients…";
         try
         {
             var serverUrl = ParseServerUrl();
@@ -1050,68 +1114,80 @@ public partial class MainWindow : Window
                 CancellationToken.None,
                 fileExpiresAtUtc: expiresAtUtc);
 
-            QuickResultText.Text = "Creating share link…";
-
             using var adminHttpClient = new HttpClient { BaseAddress = serverUrl };
             adminHttpClient.DefaultRequestHeaders.TryAddWithoutValidation(
                 "X-DRM-Admin-Key", adminKey);
-            var shareLinkBody = new
-            {
-                tenantId,
-                adminUserId = userId,
-                guestEmail = recipient,
-                expiresAtUtc,
-                maxUses = 1,
-            };
-            using var shareLinkContent = new StringContent(
-                System.Text.Json.JsonSerializer.Serialize(shareLinkBody),
-                System.Text.Encoding.UTF8, "application/json");
-            using var shareLinkResponse = await adminHttpClient.PostAsync(
-                $"/api/admin/files/{protectResult.FileId}/share-links", shareLinkContent);
-            if (!shareLinkResponse.IsSuccessStatusCode)
-            {
-                QuickResultText.Text =
-                    $"Share-link failed: HTTP {(int)shareLinkResponse.StatusCode}. " +
-                    $".drmx still written to {protectResult.DestinationPath}.";
-                return;
-            }
-            var shareLinkJson = await shareLinkResponse.Content.ReadAsStringAsync();
-            using var doc = System.Text.Json.JsonDocument.Parse(shareLinkJson);
-            var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? "";
-            System.Windows.Clipboard.SetText(shareUrl);
 
             var drmxPath = Path.GetFullPath(protectResult.DestinationPath);
             var drmxName = Path.GetFileName(drmxPath);
-            // Stage 10/13/14: open the sender's email client with subject
-            // + body pre-filled and (when Outlook is the default) the
-            // .drmx already attached. Sender clicks Send. Falls back to
-            // mailto: + drag-the-attachment when Outlook isn't available.
-            // Outlook cold-start can take 3-8s; surface that so the UI
-            // doesn't look frozen while the COM activation runs.
-            QuickResultText.Text = "Opening email composer…";
-            var composeResult = ComposeShareEmail(
-                recipient,
-                $"Encrypted file: {drmxName}",
-                bodyFor: inlined => BuildFileShareEmailBody(shareUrl, drmxName, drmxPath, inlined),
-                attachmentPath: drmxPath);
-            QuickResultText.Text = composeResult switch
+
+            // Stage 19: mint one share-link per recipient against the SAME
+            // fileId, then open one composer per recipient. The encryption
+            // happened once above; only the share-link + email steps
+            // multiply. Each per-recipient leg is independent so a single
+            // failed recipient doesn't abort the rest.
+            var sendResults = new List<BulkSendOutcome>(recipients.Count);
+            for (var index = 0; index < recipients.Count; index++)
             {
-                { AttachmentInlined: true } =>
-                    $"✅ Wrote {drmxName} + Outlook opened with it attached. Just hit Send.",
-                { ComposerOpened: true } =>
-                    $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.",
-                // Stage 16: no composer succeeded — surface the failure
-                // visibly instead of leaving a stale "Sending…" string.
-                // Share URL is still on the clipboard so the sender can
-                // paste into webmail by hand.
-                _ =>
-                    $"✅ Wrote {drmxName} + share URL copied to clipboard. " +
-                    "Couldn't open an email composer — set a default mail client in " +
-                    "Settings → Apps → Default apps → Mail, then paste the URL into a new email."
-            };
-            // Stage 15: persist after the share succeeded so a failed
-            // send doesn't pollute the dropdown with bad addresses.
-            await RememberRecipientAsync(recipient);
+                var bulkRecipient = recipients[index];
+                QuickResultText.Text = recipients.Count == 1
+                    ? "Creating share link…"
+                    : $"Creating share link {index + 1}/{recipients.Count} ({bulkRecipient})…";
+
+                var shareLinkBody = new
+                {
+                    tenantId,
+                    adminUserId = userId,
+                    guestEmail = bulkRecipient,
+                    expiresAtUtc,
+                    maxUses = 1,
+                };
+                using var shareLinkContent = new StringContent(
+                    System.Text.Json.JsonSerializer.Serialize(shareLinkBody),
+                    System.Text.Encoding.UTF8, "application/json");
+                using var shareLinkResponse = await adminHttpClient.PostAsync(
+                    $"/api/admin/files/{protectResult.FileId}/share-links", shareLinkContent);
+                if (!shareLinkResponse.IsSuccessStatusCode)
+                {
+                    sendResults.Add(new BulkSendOutcome(
+                        bulkRecipient,
+                        Success: false,
+                        ComposerOpened: false,
+                        AttachmentInlined: false,
+                        FailureReason: $"HTTP {(int)shareLinkResponse.StatusCode}"));
+                    continue;
+                }
+                var shareLinkJson = await shareLinkResponse.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(shareLinkJson);
+                var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? "";
+
+                // Each recipient gets ONLY their own share URL — never see
+                // anyone else's token. That's why we open a composer per
+                // recipient instead of one composer with N URLs in the body.
+                QuickResultText.Text = recipients.Count == 1
+                    ? "Opening email composer…"
+                    : $"Opening composer {index + 1}/{recipients.Count} for {bulkRecipient}…";
+                var composeResult = ComposeShareEmail(
+                    bulkRecipient,
+                    $"Encrypted file: {drmxName}",
+                    bodyFor: inlined => BuildFileShareEmailBody(shareUrl, drmxName, drmxPath, inlined),
+                    attachmentPath: drmxPath);
+
+                sendResults.Add(new BulkSendOutcome(
+                    bulkRecipient,
+                    Success: true,
+                    composeResult.ComposerOpened,
+                    composeResult.AttachmentInlined,
+                    FailureReason: null));
+
+                // Last-known share URL goes on the clipboard so a sender
+                // who needs to paste manually still has the most recent
+                // one to hand.
+                System.Windows.Clipboard.SetText(shareUrl);
+                await RememberRecipientAsync(bulkRecipient);
+            }
+
+            QuickResultText.Text = BuildBulkResultMessage(drmxName, sendResults);
             // Stage 16: clear the file picker so the sender can drop the
             // next file without first un-selecting. Recipient stays in
             // the box — same-recipient-different-file is the common

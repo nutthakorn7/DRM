@@ -167,6 +167,34 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
+    public void Bulk_send_parses_multi_recipient_input_and_loops_per_recipient()
+    {
+        // Stage 19 — typing "alice@a.com, bob@b.com" in the recipient
+        // ComboBox should encrypt the file once and create one share-link
+        // per recipient, each with its own access token. Verify the wiring
+        // exists in the source by greping for the canonical markers.
+        TrayMain.Should().Contain("BulkRecipientParser.Parse",
+            "QuickSendButton_Click must use the cross-platform parser, not inline string splitting");
+        TrayMain.Should().Contain("for (var index = 0; index < recipients.Count; index++)",
+            "the bulk send loop must iterate every parsed recipient");
+        TrayMain.Should().Contain("BulkSendOutcome",
+            "per-recipient outcome record must exist so the summary can report partial failures");
+
+        // Privacy guard: each recipient's composer call must use only
+        // their own share URL — never one URL across multiple composers.
+        // Body factory + recipient are passed per iteration.
+        TrayMain.Should().Contain("ComposeShareEmail(\n                    bulkRecipient,",
+            "each iteration must open a per-recipient composer with that recipient's own share URL");
+
+        // XAML tooltip + helper text must hint at multi-recipient capability
+        // so the sender knows comma/semicolon separation is allowed.
+        var trayXaml = File.ReadAllText(
+            Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml"));
+        trayXaml.Should().Contain("separate multiple recipients with a comma or semicolon",
+            "the inline hint below the recipient box must teach the bulk-send syntax");
+    }
+
+    [Fact]
     public void Mailto_helper_uses_shell_execute()
     {
         // mailto: URLs only work via the shell protocol handler on Windows.
