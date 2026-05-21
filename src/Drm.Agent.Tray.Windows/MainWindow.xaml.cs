@@ -617,6 +617,19 @@ public partial class MainWindow : Window
                 "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
 
             var bytes = await File.ReadAllBytesAsync(quickPickedFile);
+
+            // Per-share permission picker (Stage 7). When the
+            // "Customize permissions" expander is collapsed or every
+            // box is unchecked, the wire payload is byte-identical to
+            // pre-Stage-7 (View only, 7 days) — the new fields default
+            // to false on the server. Power users flip checkboxes +
+            // pick a longer expiry on a per-recipient basis.
+            var allowPrint          = QuickAllowPrintBox?.IsChecked == true;
+            var allowCopy           = QuickAllowCopyBox?.IsChecked == true;
+            var allowEdit           = QuickAllowEditBox?.IsChecked == true;
+            var allowExportOriginal = QuickAllowExportOriginalBox?.IsChecked == true;
+            var expiresInHours      = ParseQuickExpiryHours();
+
             var body = new
             {
                 tenantId,
@@ -625,8 +638,11 @@ public partial class MainWindow : Window
                 fileName = Path.GetFileName(quickPickedFile),
                 contentType = "application/octet-stream",
                 fileBytesBase64 = Convert.ToBase64String(bytes),
-                expiresInHours = 168,
-                allowPrint = false
+                expiresInHours,
+                allowPrint,
+                allowCopy,
+                allowEdit,
+                allowExportOriginal,
             };
             using var content = new StringContent(
                 System.Text.Json.JsonSerializer.Serialize(body),
@@ -652,6 +668,30 @@ public partial class MainWindow : Window
         {
             QuickSendButton.IsEnabled = true;
         }
+    }
+
+    /// <summary>
+    /// Reads QuickExpiryDropdown's selected item Tag (set in XAML to
+    /// "168" / "720" / "2160" / "8760") and returns the matching hour
+    /// count. Falls back to the default 7 days (168h) if the dropdown
+    /// hasn't been initialised yet (legacy code path / unit-test
+    /// constructor that doesn't run XAML).
+    /// </summary>
+    private int ParseQuickExpiryHours()
+    {
+        const int defaultHours = 168;
+
+        if (QuickExpiryDropdown?.SelectedItem is not System.Windows.Controls.ComboBoxItem item)
+        {
+            return defaultHours;
+        }
+
+        if (item.Tag is string tag && int.TryParse(tag, out var hours) && hours > 0)
+        {
+            return hours;
+        }
+
+        return defaultHours;
     }
 
     private async void CheckFolderWatcherButton_Click(object sender, RoutedEventArgs e)

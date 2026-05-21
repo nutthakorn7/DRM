@@ -75,6 +75,101 @@ public sealed class QuickShareEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Quick_share_with_full_permission_picker_grants_every_chosen_flag()
+    {
+        // Stage 7 per-share permission picker: the agent right-click
+        // flow now sends individual AllowCopy / AllowEdit /
+        // AllowExportOriginal flags. Verify they all map onto the
+        // Permission bitfield on the ProtectedFile.
+        using var client = factory.CreateClient();
+        var body = new
+        {
+            tenantId = Guid.NewGuid(),
+            userId = Guid.NewGuid(),
+            recipientEmail = "carol@example.com",
+            fileName = "spec.pdf",
+            contentType = "application/pdf",
+            fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("body")),
+            expiresInHours = 168,
+            allowPrint = true,
+            allowCopy = true,
+            allowEdit = true,
+            allowExportOriginal = true
+        };
+
+        using var resp = await client.PostAsJsonAsync("/api/me/share", body);
+        var result = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
+
+        result.Should().NotBeNull();
+        // Permission.ToString() emits the flags in declaration order,
+        // comma-separated. We don't lock the exact serialisation —
+        // just assert every chosen flag is present.
+        result!.Permissions.Should().Contain("View");
+        result.Permissions.Should().Contain("Print");
+        result.Permissions.Should().Contain("Copy");
+        result.Permissions.Should().Contain("Edit");
+        result.Permissions.Should().Contain("ExportOriginal");
+    }
+
+    [Fact]
+    public async Task Quick_share_picker_can_grant_copy_without_print_or_edit()
+    {
+        // Realistic mid-tier case: a finance team gets "View + Copy
+        // text" so they can paste numbers into a spreadsheet, but
+        // can't print or edit.
+        using var client = factory.CreateClient();
+        var body = new
+        {
+            tenantId = Guid.NewGuid(),
+            userId = Guid.NewGuid(),
+            recipientEmail = "dave@example.com",
+            fileName = "q3-revenue.pdf",
+            contentType = "application/pdf",
+            fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("body")),
+            expiresInHours = 24,
+            allowPrint = false,
+            allowCopy = true,
+            allowEdit = false,
+            allowExportOriginal = false
+        };
+
+        using var resp = await client.PostAsJsonAsync("/api/me/share", body);
+        var result = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
+
+        result!.Permissions.Should().Contain("View");
+        result.Permissions.Should().Contain("Copy");
+        result.Permissions.Should().NotContain("Print");
+        result.Permissions.Should().NotContain("Edit");
+        result.Permissions.Should().NotContain("ExportOriginal");
+    }
+
+    [Fact]
+    public async Task Quick_share_backwards_compat_works_without_the_new_fields()
+    {
+        // Existing /me/ web caller only sends AllowPrint — must keep
+        // working without the new bool? fields.
+        using var client = factory.CreateClient();
+        var body = new
+        {
+            tenantId = Guid.NewGuid(),
+            userId = Guid.NewGuid(),
+            recipientEmail = "eve@example.com",
+            fileName = "doc.pdf",
+            contentType = "application/pdf",
+            fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("hi")),
+            expiresInHours = 24,
+            allowPrint = false
+            // intentionally no allowCopy / allowEdit / allowExportOriginal
+        };
+
+        using var resp = await client.PostAsJsonAsync("/api/me/share", body);
+        var result = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
+
+        result!.Permissions.Should().Be("View",
+            "no extra perms means View only — same behaviour as before Stage 7");
+    }
+
+    [Fact]
     public async Task Quick_share_rejects_invalid_email()
     {
         using var client = factory.CreateClient();

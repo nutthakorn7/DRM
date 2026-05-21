@@ -50,6 +50,54 @@
                                 FontWeight="SemiBold" BorderThickness="0"
                                 Click="QuickSendButton_Click" />
                     </StackPanel>
+
+                    <!--
+                        Per-share permission picker (Stage 7). Collapsed
+                        by default so "Quick send" stays one-drop /
+                        one-email / one-click for the common case.
+                        Power users expand to override the tenant's
+                        default permission set + expiry per individual
+                        share.  Checkboxes map 1:1 to Permission flag
+                        bits on the wire; View is always granted.
+                    -->
+                    <Expander x:Name="QuickPermissionsExpander"
+                              Header="Customize permissions for this recipient"
+                              IsExpanded="False" Margin="0,10,0,0"
+                              Foreground="#374151" FontSize="11">
+                        <Border Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="1"
+                                CornerRadius="4" Padding="12,8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <TextBlock Text="View is always granted (recipient must open the file)."
+                                           Foreground="#6B7280" FontSize="11" Margin="0,0,0,6" />
+                                <StackPanel Orientation="Horizontal">
+                                    <CheckBox x:Name="QuickAllowPrintBox"   Content="Allow print"
+                                              Margin="0,0,16,0" FontSize="11" />
+                                    <CheckBox x:Name="QuickAllowCopyBox"    Content="Allow copy text"
+                                              Margin="0,0,16,0" FontSize="11" />
+                                    <CheckBox x:Name="QuickAllowEditBox"    Content="Allow edit"
+                                              Margin="0,0,16,0" FontSize="11" />
+                                    <CheckBox x:Name="QuickAllowExportOriginalBox"
+                                              Content="Allow download original (no DRM)"
+                                              FontSize="11" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <TextBlock Text="Access expires:" VerticalAlignment="Center"
+                                               Foreground="#374151" FontSize="11" Margin="0,0,8,0" />
+                                    <ComboBox x:Name="QuickExpiryDropdown" Width="160" FontSize="11"
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Tag="168">In 7 days (default)</ComboBoxItem>
+                                        <ComboBoxItem Tag="720">In 30 days</ComboBoxItem>
+                                        <ComboBoxItem Tag="2160">In 90 days</ComboBoxItem>
+                                        <ComboBoxItem Tag="8760">In 365 days (max)</ComboBoxItem>
+                                    </ComboBox>
+                                </StackPanel>
+                                <TextBlock Foreground="#6B7280" FontSize="10" Margin="0,8,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="Unchecked = denied. Defaults match a 'View only' policy — least privilege. Allow Download original is the DRM escape hatch — only enable for trusted internal use." />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
                     <TextBlock x:Name="QuickResultText" Foreground="#047857" FontSize="11"
                                TextWrapping="Wrap" Margin="0,8,0,0" />
                 </StackPanel>

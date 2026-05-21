@@ -77,9 +77,18 @@ public static class QuickShareEndpoints
         }
 
         var fileId = Guid.NewGuid();
-        var permissions = request.AllowPrint
-            ? Permission.View | Permission.Print
-            : Permission.View;
+
+        // Permission bits. View is always granted (recipient can't open
+        // the file otherwise). The other four are individually opt-in.
+        // Existing /me/ web callers only send AllowPrint; new agent
+        // callers send the full set. Backwards compatible because all
+        // four new fields are `bool?` defaulting to false at the wire.
+        var permissions = Permission.View;
+        if (request.AllowPrint)                  permissions |= Permission.Print;
+        if (request.AllowCopy == true)           permissions |= Permission.Copy;
+        if (request.AllowEdit == true)           permissions |= Permission.Edit;
+        if (request.AllowExportOriginal == true) permissions |= Permission.ExportOriginal;
+
         var expiresAt = DateTimeOffset.UtcNow.AddHours(request.ExpiresInHours);
 
         var file = new ProtectedFileEntity
@@ -165,7 +174,13 @@ public static class QuickShareEndpoints
         string? ContentType,
         string FileBytesBase64,
         int ExpiresInHours,
-        bool AllowPrint);
+        bool AllowPrint,
+        // New in v1.7 (Stage 7 agent per-share picker). All optional —
+        // when missing the wire shape is identical to the v1.0 callers
+        // (the /me/ web form), keeping backwards compat.
+        bool? AllowCopy = null,
+        bool? AllowEdit = null,
+        bool? AllowExportOriginal = null);
 
     private sealed record QuickShareResponse(
         Guid FileId,
