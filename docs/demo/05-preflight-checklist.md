@@ -50,6 +50,36 @@
   - เปิด share URL ใน incognito → ใส่อีเมล → ใส่รหัส 6 หลัก → ต้อง land ที่หน้า file พร้อมปุ่ม Download
   - ถ้า status ขึ้น `Share-link failed: HTTP 400` — เช็ค `ClientApiKeyBox` ว่าเป็น `DEMO_ADMIN_KEY`
 
+- [ ] **Stage 14 Outlook auto-attach smoke (ถ้า Outlook เป็น default mail client)**
+  - หลังกด "Send protected file" → ต้องเป็น Outlook ที่เด้งขึ้น (ไม่ใช่ webmail / built-in Mail)
+  - .drmx ต้องอยู่ในช่อง Attachments ของ Outlook **ก่อน** sender กดอะไร
+  - Status line ต้องเขียนว่า `✅ Wrote <file>.drmx + Outlook opened with it attached. Just hit Send.`
+  - ถ้า status เป็น `composer opened — attach the .drmx and send` แทน — แสดงว่า COM activation fail, ลูกค้าจะเห็น Quick Send ดู "ไม่เนียน" บน stage. เช็ค Outlook running + check `OutlookComEmailComposer` log
+  - **Workaround on stage:** ลาก .drmx จาก Desktop ใส่ Outlook attachment manually — flow ที่เหลือทำงาน
+
+- [ ] **Stage 17 mail-client warning banner (negative test)**
+  - **ทำหลัง** smoke test Stage 13 เสร็จแล้ว เพราะจะ break flow ชั่วคราว
+  - ลบ default mail client ชั่วคราว (Settings → Apps → Default apps → Mail → ล้างค่า)
+  - เปิด zcrDRM Agent ใหม่ → ที่หน้า Quick Send ต้องเห็นแถบเหลือง "⚠ No default mail client detected" พร้อม fix path
+  - **อย่าลืมตั้ง default mail client คืนก่อน demo เริ่ม**
+
+- [ ] **Stage 18 My Shares table smoke — `/me/` แสดงประวัติการส่ง**
+  - หลังจากส่งไฟล์เสร็จใน Stage 13 smoke → เปิด <https://drm.zcr.ai/me/> ในเบราว์เซอร์
+  - ใส่ Tenant ID + User ID (จาก 09-prod-seeded-credentials)
+  - ส่วน "My recent shares" ต้องโผล่ + row ของไฟล์ที่เพิ่งส่งต้อง land ในตาราง
+  - Columns: recipient + sent + expires + opens + permissions + status (สี: เขียว Active / แดง Revoked)
+
+- [ ] **Stage 19 Bulk Send smoke (real-customer feature, optional on stage)**
+  - ใน Quick send → recipient field พิมพ์ `test1@example.com, test2@example.com` (คั่นด้วย comma)
+  - ส่ง → status ต้องเขียนว่า `created 2 share link(s)` + 2 Outlook composers เด้งขึ้น
+  - `/me/` My Shares → ต้องเห็น 2 rows ใหม่ของไฟล์เดียวกัน (recipient ต่างกัน)
+
+- [ ] **Stage 20 Self-revoke smoke**
+  - บน `/me/` My Shares → row ที่ status เป็น Active → กดปุ่ม **Revoke** (สีแดง)
+  - confirm dialog เด้งขึ้น → กด OK
+  - row status flip เป็น Revoked ทันที + ปุ่ม Revoke หายไป
+  - เปิด share URL ใน incognito → ต้องขึ้นข้อความว่า link ถูก revoke แล้ว
+
 - [ ] **Demo tenant + template ยังอยู่**
   ```bash
   curl -s -H "X-DRM-Admin-Key: $DEMO_ADMIN_KEY" \
