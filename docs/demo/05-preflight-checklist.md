@@ -38,6 +38,18 @@
   - ทดสอบ right-click → ต้องเห็น "Protect with zcrDRM" → flyout มี 3 รายการ
   - ถ้าไม่เห็นเมนู → restart Explorer (`taskkill /im explorer.exe /f && explorer.exe`)
 
+- [ ] **Default mail client ตั้งไว้บน demo laptop** (Stage 13 — Quick Send เปิด mailto: ให้)
+  - Settings → Apps → Default apps → Mail → ต้องมีค่า (Outlook / Thunderbird / built-in Mail ก็ได้)
+  - ถ้าเป็นช่อง blank → mailto: จะเงียบหาย ตอน demo ลูกค้าเห็นแค่ status text ไม่เห็นอีเมลเด้ง
+  - ทดสอบ: เปิด PowerShell แล้ว `Start-Process "mailto:test@test.com?subject=preflight"` → mail client ต้องเด้งขึ้น
+
+- [ ] **Stage 13 Quick Send smoke — เครื่อง demo laptop ส่งจริงผ่านสำเร็จ**
+  - Right-click test PDF → Protect with zcrDRM → Quick send
+  - ใส่อีเมลจริงที่ engineer เช็คได้ → Send protected file
+  - ต้องเห็นทั้งสามอย่าง: status `✅ Wrote ... .drmx` + `.drmx` บน Desktop + mail composer เปิดเอง
+  - เปิด share URL ใน incognito → ใส่อีเมล → ใส่รหัส 6 หลัก → ต้อง land ที่หน้า file พร้อมปุ่ม Download
+  - ถ้า status ขึ้น `Share-link failed: HTTP 400` — เช็ค `ClientApiKeyBox` ว่าเป็น `DEMO_ADMIN_KEY`
+
 - [ ] **Demo tenant + template ยังอยู่**
   ```bash
   curl -s -H "X-DRM-Admin-Key: $DEMO_ADMIN_KEY" \
