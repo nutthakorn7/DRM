@@ -15,22 +15,24 @@ This package has **everything** needed to run a clean customer demo.
 | **Both** (15 นาทีก่อน demo) | [05-preflight-checklist.md](05-preflight-checklist.md) |
 | **Backup plan** (ถ้าเกิดปัญหาตอน demo) | [06-fallback-plan.md](06-fallback-plan.md) |
 
-## 3 ลิ้งก์ที่ใช้ demo
+## 3 surfaces ที่ใช้ demo
 
 ส่งให้ engineer test ก่อนเลย:
 
 1. **<https://drm.zcr.ai/admin/>** — admin console (ผู้ดูแลเห็นทุกอย่าง)
-2. **<https://drm.zcr.ai/me/>** — ส่งไฟล์ (พนักงานใช้)
+2. **zcrDRM Agent บน Windows** (right-click → Protect) — สิ่งที่พนักงานลูกค้าใช้จริงทุกวัน
 3. **<https://drm.zcr.ai/share/>** — เปิดไฟล์ที่รับมา (ลูกค้าที่รับไฟล์ใช้)
 
-แต่ละลิ้งก์มีคำอธิบายละเอียดใน [02-the-3-links.md](02-the-3-links.md)
+แต่ละ surface มีคำอธิบายละเอียดใน [02-the-3-links.md](02-the-3-links.md)
+
+> หมายเหตุ: <https://drm.zcr.ai/me/> ยังเปิดได้และยังใช้งานครบ — ใช้เป็น web fallback ถ้า agent install หรือ sign-in มีปัญหาตอน demo (ดู [06-fallback-plan.md](06-fallback-plan.md))
 
 ## Demo story สั้นๆ ที่คุณจะเล่า
 
 > "บริษัทคุณ ABC Co. ต้องส่งสัญญาความลับให้ลูกค้า XYZ
 > วันนี้ผมจะแสดง 3 อย่าง:
 > 1. **ฝ่ายไอทีตั้งค่านโยบาย** (admin) — เปิดได้กี่ครั้ง, ระยะเวลา, watermark
-> 2. **พนักงานส่งไฟล์** (me) — ลาก-วาง แล้วกดส่ง
+> 2. **พนักงาน right-click ไฟล์ → Protect** (Windows agent) — 2 click จบ ไม่ต้องเปิด website
 > 3. **ลูกค้าเปิดอ่าน** (share) — ไม่ต้องลงโปรแกรมอะไร, แค่ verify email
 >
 > ทั้งหมดเป็น on-premise — ข้อมูลลูกค้าไม่ออกจากเครื่องคุณ

@@ -2,7 +2,9 @@
 
 > **คุณ** = ผู้พรีเซนต์ (เจ้าของ / sales)
 > **อ่านได้เลย** ถ้าตื่นเต้น — ทุกประโยคใช้ได้จริง
-> **เครื่องที่ใช้:** เครื่องที่ engineer prep ไว้แล้ว มี Tenant + Sample file พร้อม
+> **เครื่องที่ใช้:** Windows laptop ที่ engineer prep ไว้ — **zcrDRM Agent ลงและ sign in ด้วย `demo@zcr.ai` แล้ว** + Sample PDF บน Desktop + เปิด `/admin/` กับ `/share/` รออยู่บนเบราว์เซอร์
+>
+> **สำคัญ:** demo ส่วนที่ 2 ใช้ตัว Windows Agent (right-click → Protect) แทนหน้า /me/ — agent คือ "หน้าตาจริง" ของระบบที่พนักงานลูกค้าจะใช้ทุกวัน /me/ เป็น fallback ถ้า agent มีปัญหา (ดู [06-fallback-plan.md](06-fallback-plan.md))
 
 ---
 
@@ -92,79 +94,94 @@ Integrations (Box, Outlook, SIEM webhooks), และ Tenants (multi-tenant mana
 
 ---
 
-## ส่วนที่ 2: เปิด /me/ — "พนักงานส่งไฟล์" (3-4 นาที)
+## ส่วนที่ 2: Windows Agent — "พนักงานคลิกขวา → Protect" (3-4 นาที)
 
-**[เปิด tab ใหม่ → https://drm.zcr.ai/me/]**
-
-```
-ตอนนี้เปลี่ยนมุมมอง — เป็นพนักงานสามัญที่ต้องส่งไฟล์ลับ
-หน้านี้คือ drm.zcr.ai/me/ — ออกแบบให้ง่ายที่สุด
-ไม่ต้องเรียนวิธีใช้
-```
-
-**[ชี้ที่หน้าจอ — header "Send a protected file"]**
+**[ปิด /admin/ ไปก่อน, สลับไปที่ Windows Desktop ของเครื่อง demo]**
 
 ```
-ก่อนเริ่ม จะสังเกตว่า:
-- มี zcrDRM wordmark เดียวกัน
-- มี "Sign-in needed" pill — บอกว่ายังไม่ login
-- topbar เรียบ มีแค่ Send, Open shared file, Personalize
-- **ไม่มี Admin link** — เพราะพนักงานคนนี้ไม่ใช่ admin
-  (ระบบรู้ว่าใครเป็นอะไร ไม่ทำให้เห็น link ที่ไม่ใช่หน้าที่ของเรา)
+ทีนี้ — สิ่งที่ผู้บริหารและฝ่าย IT ต้องการรู้คือ:
+"แล้วพนักงานทั่วไปของบริษัทเราจะใช้ระบบนี้อย่างไร?"
+
+คำตอบของ zcrDRM ง่ายมาก: **ไม่ต้องเปิด website เลย**
 ```
 
-**[คลิกที่ "You are signed in as (not configured)" details]**
+**[ชี้ที่ Desktop — มี PDF ตัวอย่าง Q4-Sales-Contract-ABC-XYZ.pdf วางอยู่]**
 
 ```
-ใส่ Tenant ID และ User ID ของพนักงาน — แค่ครั้งแรกครั้งเดียว
-ครั้งต่อไปเครื่องจำได้ ไม่ต้องพิมพ์ใหม่
+ฝ่าย IT ติดตั้ง zcrDRM Agent เป็น MSI ครั้งเดียวตอน setup laptop
+หลังจากนั้นพนักงานเปิด laptop วันแรก — ระบบถามแค่อีเมลที่ทำงาน
+แล้วก็จบ — ไม่มี GUID ที่ต้อง copy-paste, ไม่มี portal ที่ต้องล็อกอิน
 ```
 
-**[พิมพ์ Tenant ID, User ID ที่ engineer prep ไว้ — หรือถ้า engineer save session แล้ว ค่าจะ auto-fill]**
-
-**[ลาก-วางไฟล์ Q4-Sales-Contract-ABC-XYZ.pdf ลง drop zone]**
+**[คลิกขวาที่ไฟล์ PDF → context menu ขึ้นมา → ชี้ที่ "Protect with zcrDRM"]**
 
 ```
-ผมจะลาก-วางสัญญาตัวอย่างลงตรงนี้ — เห็นไหมครับ ไม่มี upload form
-แค่ลาก ก็พอ
+เห็นไหมครับ — เมนูคลิกขวาของ Windows มีคำว่า "Protect with zcrDRM"
+ใต้นั้น 3 ตัวเลือก:
+- Quick send (recommended)  — สำหรับส่งให้คนนอกบริษัท
+- Protect (advanced)         — เปิด policy editor ตั้งค่าเอง
+- Transparent protect        — ปกป้องไฟล์โดยไม่เปลี่ยนนามสกุล
+
+ผมจะเลือก Quick send
+```
+
+**[คลิก Quick send (recommended) → tray window เด้งขึ้น พร้อมไฟล์ pre-loaded]**
+
+```
+หน้าต่าง zcrDRM Agent เด้งขึ้น — สังเกตที่ title bar
+**"zcrDRM Agent — Demo Engineer (demo@zcr.ai)"**
+ระบบรู้ว่าใครเปิดอยู่ ไม่มี login form
+
+ไฟล์ Q4-Sales-Contract-ABC-XYZ.pdf อยู่ในช่องส่งแล้ว — ระบบเอามาให้
+```
+
+**[ชี้ที่ Tenant ID + Policy template ที่ pre-fill อยู่]**
+
+```
+และดูตรงนี้ — Tenant ID, Policy template "Confidential Contract"
+ระบบกรอกให้แล้ว ทั้งหมด เพราะตอน sign in ด้วย demo@zcr.ai
+ระบบไปถามที่ server แล้วว่า:
+- คนคนนี้เป็นของ tenant ไหน
+- tenant นี้ตั้ง default template ไว้ตัวไหน
+แล้วเก็บไว้เครื่องนี้ — ครั้งต่อไปเปิดมาทำงานต่อได้เลย
 ```
 
 **[พิมพ์ recipient email: malee@xyz.com]**
 
 ```
-ใส่อีเมลผู้รับ — Malee คือคนจาก XYZ Co.
-ผมจะกด "Advanced options" ก่อน
-```
-
-**[คลิก Advanced options → ชี้ "Allow print" checkbox]**
-
-```
-ตรงนี้ตั้งได้ทันทีว่า print ได้ไหม กี่วันหมดอายุ
-ผมจะปล่อยเป็น default — ใช้กฎจาก Confidential Contract template
+อย่างเดียวที่พนักงานต้องพิมพ์เองคือ — อีเมลผู้รับ
+Malee จาก XYZ Co.
 ```
 
 **[กดปุ่ม "Send protected file"]**
 
 ```
-กดส่ง — ระบบจะ:
-1. เข้ารหัสไฟล์ด้วย AES-256 ที่เครื่องนี้ทันที
-2. ส่งไปเก็บที่ server
-3. ส่งอีเมลแจ้ง Malee พร้อมลิ้งก์
-4. ส่งลิ้งก์กลับมาให้พนักงานเก็บไว้
+กดส่ง — ระบบทำที่เครื่องนี้:
+1. เข้ารหัสไฟล์ด้วย AES-256 ที่ laptop ตัวเองทันที — ไฟล์ไม่ขึ้น cloud
+2. ส่ง wrapped key + metadata ไปที่ server
+3. ระบบส่งอีเมลแจ้ง Malee พร้อม share link
+4. คืน share URL มาให้พนักงาน
 ```
 
-**[result panel ขึ้น — มี share URL + Copy link button]**
+**[result panel ขึ้น — share URL + Copy link button]**
 
 ```
-เสร็จแล้ว — ระบบสร้าง share URL กลับมา
-พนักงานคัดลอกไปแชร์ทางที่ไหนก็ได้ — email, LINE, Slack — ไม่ใช่ความลับ
+เสร็จแล้ว — share URL กลับมาให้ก็อปปี้
+จะส่งทาง email, LINE, Slack ก็ได้ ไม่ใช่ความลับ
 **เพราะลิ้งก์อย่างเดียวเปิดไฟล์ไม่ได้** — Malee ต้อง verify email ของตัวเองก่อน
 ```
 
-**[กดปุ่ม Copy link]**
+**[กดปุ่ม Copy link → จากนั้นปิดหน้าต่าง agent]**
 
 ```
-ผมคัดลอกแล้ว — จะเปิดเหมือนเป็น Malee ดูในหน้าถัดไป
+สังเกตว่าตั้งแต่ต้นจนเสร็จ:
+- พนักงานเปิด website **0 ครั้ง**
+- พนักงานพิมพ์ GUID **0 ครั้ง**
+- พนักงานต้องเลือก policy **0 ครั้ง** (ใช้ default ของ tenant)
+- click ทั้งหมด **2 ครั้ง** — Right-click → Quick send → ใส่อีเมล → ส่ง
+
+นี่คือ "easy to use ที่สุด" ที่เราอยากให้ลูกค้าได้
+ฝ่าย IT ตั้งค่าครั้งเดียว, พนักงานใช้ทุกวันโดยไม่รู้ว่ามีระบบความปลอดภัยอยู่
 ```
 
 ---
@@ -276,8 +293,10 @@ Malee เห็น "File revoked" — เปิดไม่ได้แล้ว
 1. **Admin ตั้งกฎ** — Policy templates, watermark, ระยะเวลา
    เห็นภาพรวมและตามรอยทุกอย่างจากที่เดียว
 
-2. **พนักงานส่งง่าย** — ลาก-วาง ไม่ต้องเรียนวิธีใช้
-   ระบบจัดการ encryption ให้เอง
+2. **พนักงานคลิกขวา → Protect** — ผ่าน zcrDRM Agent
+   ลง MSI ครั้งเดียวที่ laptop, sign in ด้วย work email ครั้งเดียว
+   หลังจากนั้นพนักงานไม่ต้องเปิด website ไม่ต้องจำ GUID
+   2 click ส่งไฟล์ลับให้ใครก็ได้
 
 3. **ลูกค้าเปิดง่าย** — แค่เบราว์เซอร์ ไม่ต้องลงโปรแกรม
    แต่ผู้ใช้ทุกคนถูกตามรอย และ revoke ได้ตลอด
