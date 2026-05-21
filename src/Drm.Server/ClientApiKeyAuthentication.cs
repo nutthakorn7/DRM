@@ -18,7 +18,14 @@ public static class ClientApiKeyAuthentication
         {
             if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) ||
                 context.Request.Path.StartsWithSegments("/api/admin", StringComparison.OrdinalIgnoreCase) ||
-                context.Request.Path.StartsWithSegments("/api/share-links", StringComparison.OrdinalIgnoreCase))
+                context.Request.Path.StartsWithSegments("/api/share-links", StringComparison.OrdinalIgnoreCase) ||
+                // /api/agent/discover is deliberately public — the Windows
+                // tray first-run dialog has no client API key yet (the
+                // whole point of the dialog is to bootstrap the user
+                // identity FROM their work email). Email enumeration
+                // exposure is acknowledged in AgentDiscoverEndpoints.cs
+                // and accepted for the demo/pilot phase.
+                context.Request.Path.StartsWithSegments("/api/agent/discover", StringComparison.OrdinalIgnoreCase))
             {
                 await next(context);
                 return;

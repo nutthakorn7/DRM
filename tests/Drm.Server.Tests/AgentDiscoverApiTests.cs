@@ -147,6 +147,58 @@ public sealed class AgentDiscoverApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Discover_is_public_even_when_client_api_key_is_configured()
+    {
+        // Regression: production at https://drm.zcr.ai had
+        // Drm:Security:ClientApiKey set, and ClientApiKeyAuthentication
+        // was rejecting /api/agent/discover with HTTP 401 + reasonCode
+        // "client_api_key_required". The whole point of the Stage 3
+        // first-run dialog is that the agent has NO key yet — it
+        // bootstraps the identity from a work email. That endpoint
+        // must therefore stay public regardless of whether other
+        // endpoints require auth.
+        var keyedDbPath = Path.Combine(
+            Path.GetTempPath(),
+            $"drm-agent-discover-keyed-{Guid.NewGuid():N}.db");
+        using var keyedFactory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:DrmDb", $"Data Source={keyedDbPath}");
+                builder.UseSetting("Drm:Mode", "OnPrem");
+                builder.UseSetting("Drm:KeyWrapping:MasterKeyBase64",
+                    Convert.ToBase64String(Enumerable.Range(0, 32).Select(value => (byte)value).ToArray()));
+                // Critical: simulate production by configuring a global
+                // client API key. With Stage 1's middleware before the
+                // bypass fix, this would have made every /api/* call 401.
+                builder.UseSetting("Drm:Security:ClientApiKey",
+                    "prod-style-client-key-this-is-not-a-real-secret");
+            });
+        try
+        {
+            using var client = keyedFactory.CreateClient();
+            var tenantId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+
+            await CreateUserAsync(client, tenantId, userId, "eve@example.test", "Eve");
+
+            using var response = await client.GetAsync(
+                "/api/agent/discover?email=eve@example.test");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK,
+                "discover stays unauthenticated even when ClientApiKey is configured on the server");
+            var body = await response.Content.ReadFromJsonAsync<DiscoveryResponse>();
+            body!.TenantId.Should().Be(tenantId);
+        }
+        finally
+        {
+            foreach (var p in new[] { keyedDbPath, keyedDbPath + "-wal", keyedDbPath + "-shm" })
+            {
+                if (File.Exists(p)) File.Delete(p);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Discover_does_not_leak_other_tenant_data()
     {
         using var client = factory.CreateClient();
