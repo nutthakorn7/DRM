@@ -34,7 +34,8 @@ public sealed class ProtectFileWorkflow(
         byte[] fileKey,
         ProtectFilePolicyOptions policyOptions,
         bool deleteOriginalAfterProtection,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DateTimeOffset? fileExpiresAtUtc = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentNullException.ThrowIfNull(fileKey);
@@ -50,6 +51,13 @@ public sealed class ProtectFileWorkflow(
         var fileId = ProtectedFileId.New();
         var destinationPath = $"{sourcePath}{ProtectedExtension}";
         var tempPath = $"{destinationPath}.{Guid.NewGuid():N}.tmp";
+        // External share-link expiry can't exceed the protected file's
+        // expiry (server rejects with `share_link_exceeds_file_expiry`).
+        // When a caller has a known share-link horizon (Stage 13 Quick
+        // Send picks 7d/30d/90d/1yr) it passes that horizon here so the
+        // file expiry meets or exceeds it. Default stays 7 days to match
+        // the pre-Stage-13 protected-file lifetime.
+        var fileExpiry = fileExpiresAtUtc ?? DateTimeOffset.UtcNow.AddDays(7);
 
         try
         {
@@ -59,7 +67,7 @@ public sealed class ProtectFileWorkflow(
                     fileId.Value,
                     ownerUserId.Value,
                     contentType,
-                    DateTimeOffset.UtcNow.AddDays(7),
+                    fileExpiry,
                     policyOptions.Permissions,
                     policyOptions.PolicyTemplateId,
                     policyOptions.Recipients),
