@@ -23,6 +23,12 @@ public sealed class RecipientUxPolishTests
         Path.Combine(Root, "src/Drm.Server/wwwroot/share/app.js"));
     private static readonly string TrayMain = File.ReadAllText(
         Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml.cs"));
+    // Stage 14 extracted the mailto: implementation out of MainWindow into
+    // a reusable composer in Drm.Agent.Core. Source-presence assertions
+    // about mailto plumbing now span both files.
+    private static readonly string EmailComposerCore = File.ReadAllText(
+        Path.Combine(Root, "src/Drm.Agent.Core/EmailComposer.cs"));
+    private static readonly string AgentEmailSurface = TrayMain + "\n" + EmailComposerCore;
 
     [Fact]
     public void Share_page_has_next_steps_panel_with_drmx_and_drmcontainer_callouts()
@@ -69,10 +75,16 @@ public sealed class RecipientUxPolishTests
     [Fact]
     public void Tray_opens_mailto_composer_after_quick_send_success()
     {
-        TrayMain.Should().Contain("OpenMailtoCompose",
+        // Stage 14: OpenMailtoCompose was inlined into ComposeShareEmail
+        // which now picks Outlook COM first and falls back to mailto:.
+        TrayMain.Should().Contain("ComposeShareEmail",
             "the agent must launch the mail client after Quick Send success");
         TrayMain.Should().Contain("BuildFileShareEmailBody",
             "subject + body must be pre-composed, not blank");
+        TrayMain.Should().Contain("OutlookComEmailComposer",
+            "Stage 14 — Outlook COM is the preferred composer so the .drmx auto-attaches");
+        TrayMain.Should().Contain("MailtoEmailComposer",
+            "Stage 14 — mailto stays as fallback for non-Outlook mail clients");
     }
 
     [Fact]
@@ -93,11 +105,28 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
+    public void Body_factory_branches_on_attachment_inlined_flag()
+    {
+        // Stage 14 — both BuildFileShareEmailBody and BuildContainerShareEmailBody
+        // pick different language based on whether the attachment was inlined
+        // (Outlook COM path) vs the sender drags it in manually (mailto fallback).
+        // Regression guard: if a refactor accidentally collapses the two branches
+        // into one string, the body lies on whichever path it didn't match.
+        // We can't call the private static methods directly, but we can grep the
+        // source for both branches' marker strings to prove both still exist.
+        TrayMain.Should().Contain("already attached to this email",
+            "Outlook-path body must say the attachment is there");
+        TrayMain.Should().Contain("BEFORE SENDING THIS EMAIL",
+            "mailto-fallback body must instruct the sender to attach the file");
+    }
+
+    [Fact]
     public void Mailto_helper_uses_shell_execute()
     {
         // mailto: URLs only work via the shell protocol handler on Windows.
         // Direct Process.Start without UseShellExecute=true silently fails.
-        TrayMain.Should().Contain("UseShellExecute = true",
+        // Stage 14 moved this into Drm.Agent.Core's ShellExecuteMailtoProtocolHandler.
+        AgentEmailSurface.Should().Contain("UseShellExecute = true",
             "mailto: must hand off to the registered protocol handler");
     }
 
@@ -106,7 +135,7 @@ public sealed class RecipientUxPolishTests
     {
         // Raw newlines and quotes in body break mailto on some clients.
         // EscapeDataString covers RFC 3986 reserved chars.
-        TrayMain.Should().Contain("Uri.EscapeDataString",
+        AgentEmailSurface.Should().Contain("Uri.EscapeDataString",
             "mailto subject/body must be percent-encoded");
     }
 

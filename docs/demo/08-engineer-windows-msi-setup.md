@@ -93,21 +93,28 @@ If you see the dialog say *"We couldn't find <email>"* — the email isn't regis
 
 This is what the customer will see on stage. Drive it once to confirm it works.
 
-**Before you start:** confirm Windows has a default mail client set
-(Settings → Apps → Default apps → "Mail"). After Quick Send, the
-agent opens a `mailto:` composer — if no default is configured the
-mailto silently no-ops and the audience sees nothing happen.
-Outlook desktop, Thunderbird, or the built-in Mail app are all fine.
+**Before you start:** confirm a mail client is installed and set as
+the default (Settings → Apps → Default apps → "Mail"). Stage 14
+prefers Outlook (it can attach the .drmx programmatically via COM)
+but Thunderbird / Mail.app / etc. work too — they just open as a
+`mailto:` composer without the attachment pre-filled. **If no default
+is configured at all** the mailto silently no-ops and the audience
+sees nothing happen. **Recommended for the demo:** install Outlook
+on the demo laptop and set it as default — that's the path that
+gives the cleanest "one-click Send" story.
 
 1. Drop any test PDF (or `.docx`, `.xlsx`) onto the Desktop.
 2. **Right-click it → Protect with zcrDRM → Quick send (recommended).**
 3. The tray's "Quick Send" tab opens with the file pre-selected.
 4. Type a recipient email (use a real address you can check), click **Send protected file**.
 5. Three things should happen, in this order:
-   - Status line: `✅ Wrote <filename>.drmx. Share URL copied + email composer opened`.
+   - Status line — **with Outlook as default** (Stage 14):
+     `✅ Wrote <filename>.drmx + Outlook opened with it attached. Just hit Send.`
+     **With any other default mail client** (mailto fallback):
+     `✅ Wrote <filename>.drmx. Share URL copied + email composer opened — attach the .drmx and send.`
    - File Explorer: `<filename>.drmx` appears next to the source file.
-   - Default mail client opens with `To:`, `Subject: Encrypted file: <name>.drmx`, and a body pre-filled with the share URL + the local `.drmx` path.
-6. Drag the `.drmx` from Explorer into the open email as an attachment, hit **Send**.
+   - Mail composer opens with `To:`, `Subject: Encrypted file: <name>.drmx`, body pre-filled with the share URL, AND — Outlook only — the `.drmx` already sitting in the attachments tray.
+6. **Outlook path:** click **Send**. Done. **Other clients:** drag the `.drmx` from Explorer into the composer as an attachment, then click Send.
 7. On the recipient side: open the share URL → enter the same recipient email → enter the 6-digit code from the verification email → land on the file page → click **Download .drmx**.
 8. Back on the demo laptop: double-click either the downloaded `.drmx` or the one the agent wrote → it should open in the zcrDRM viewer with the watermark overlay.
 

@@ -163,21 +163,23 @@ Malee จาก XYZ Co.
 4. คืน share URL มา + เปิดอีเมลให้พร้อมส่ง
 ```
 
-**[status panel ขึ้น — "✅ Wrote Q4-Sales-Contract-ABC-XYZ.pdf.drmx. Share URL copied + email composer opened" + default mail client เด้งขึ้นมาพร้อม recipient/subject/body กรอกแล้ว]**
+**[status panel ขึ้น — "✅ Wrote Q4-Sales-Contract-ABC-XYZ.pdf.drmx + Outlook opened with it attached. Just hit Send." + Outlook เด้งขึ้นมาพร้อม recipient/subject/body/attachment กรอกครบหมด]**
 
 ```
-สังเกตหน้าจอ — สองอย่างเกิดขึ้นพร้อมกัน:
+สังเกตหน้าจอ — สามอย่างเกิดขึ้นพร้อมกัน:
 
 1. **บน Desktop** มีไฟล์ใหม่: Q4-Sales-Contract-ABC-XYZ.pdf.drmx
    ไฟล์เข้ารหัสที่ Malee จะเปิดได้ (หลัง verify email)
 
-2. **default mail client เปิดเอง** — to: malee@xyz.com,
+2. **Outlook เปิดเอง** — to: malee@xyz.com,
    subject + body กรอกครบ พร้อม share URL ฝังในเนื้อหา
 
-พนักงานทำ **1 อย่าง** เท่านั้น: ลาก .drmx จาก Desktop ใส่เป็น attachment แล้ว Send
+3. **.drmx อยู่ในช่อง attachment แล้ว** — ระบบใส่ให้เอง ไม่ต้องลาก
+
+พนักงานทำ **1 อย่าง** เท่านั้น: กด Send
 ```
 
-**[ลาก .drmx จาก Desktop ใส่เป็น attachment → กดส่ง → ปิดหน้าต่าง agent]**
+**[กด Send บน Outlook → email ส่งออก → ปิดหน้าต่าง agent]**
 
 ```
 สังเกตว่าตั้งแต่ต้นจนเสร็จ:
@@ -185,11 +187,17 @@ Malee จาก XYZ Co.
 - พนักงานพิมพ์ GUID **0 ครั้ง**
 - พนักงานต้องเลือก policy **0 ครั้ง** (ใช้ default ของ tenant)
 - พนักงานก็อปปี้ share URL ใส่อีเมลเอง **0 ครั้ง** (ระบบเปิดอีเมลให้แล้ว)
-- click ทั้งหมด **3 ครั้ง** — Right-click → Quick send → ใส่อีเมล → ส่ง → drag .drmx → Send mail
+- พนักงานลาก .drmx ใส่อีเมลเอง **0 ครั้ง** (ระบบใส่ attachment ให้แล้ว — Outlook only)
+- click ทั้งหมด **3 ครั้ง** — Right-click → Quick send → ใส่อีเมล → Send mail
 
 นี่คือ "easy to use ที่สุด" ที่เราอยากให้ลูกค้าได้
 ฝ่าย IT ตั้งค่าครั้งเดียว, พนักงานใช้ทุกวันโดยไม่รู้ว่ามีระบบความปลอดภัยอยู่
 ```
+
+> **Note:** ถ้า demo laptop ไม่ใช้ Outlook (e.g., Thunderbird / built-in Mail)
+> ระบบจะกลับไปใช้ mailto: — attachment ไม่ถูกใส่ให้, body จะบอกพนักงานลาก
+> .drmx ใส่เอง. **แนะนำให้ engineer ติดตั้ง Outlook บน demo laptop** เพื่อให้
+> ได้ flow แบบ "one-click Send" ตามที่ script ข้างบนเขียนไว้.
 
 ---
 

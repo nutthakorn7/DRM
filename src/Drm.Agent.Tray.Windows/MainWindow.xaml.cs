@@ -691,12 +691,17 @@ public partial class MainWindow : Window
             // passphrase through a separate channel — never in the same
             // email as the .drmcontainer attachment.
             var containerFileName = Path.GetFileName(outPath);
-            OpenMailtoCompose(
+            var containerFullPath = Path.GetFullPath(outPath);
+            SetFolderShareResult("Opening email composer…", isError: false);
+            var composeResult = ComposeShareEmail(
                 recipient,
                 $"Encrypted folder: {containerFileName}",
-                BuildContainerShareEmailBody(shareUrl, containerFileName));
+                bodyFor: inlined => BuildContainerShareEmailBody(shareUrl, containerFileName, containerFullPath, inlined),
+                attachmentPath: containerFullPath);
             SetFolderShareResult(
-                $"✅ Share URL copied + email composer opened. Attach {containerFileName} and send the passphrase to {recipient} on a separate channel.",
+                composeResult.AttachmentInlined
+                    ? $"✅ Outlook opened with {containerFileName} attached. Hit Send — and remember to message the passphrase separately."
+                    : $"✅ Share URL copied + email composer opened. Attach {containerFileName} and send the passphrase to {recipient} on a separate channel.",
                 isError: false);
             if (ContainerDropHint != null)
             {
@@ -737,53 +742,61 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Stage 10 — recipient UX polish. After Quick Send / Share-with-recipient
-    /// succeeds, open the sender's default mail client with a pre-composed
-    /// message so they don't have to retype subject + body. The share URL
-    /// goes in the body alongside instructions for the recipient.
+    /// Stage 10 + 14 — recipient UX polish. After Quick Send /
+    /// Share-with-recipient succeeds, open the sender's email client with
+    /// a pre-composed message + (when possible) the encrypted file already
+    /// attached, so they just hit Send.
     ///
-    /// mailto: cannot pre-attach files in a portable way (Outlook MAPI is
-    /// brittle across Windows versions), so the sender still has to drag
-    /// the .drmx/.drmcontainer attachment in themselves. The pre-filled
-    /// body explicitly says "attach the file before sending" so the sender
-    /// doesn't forget.
+    /// Stage 14 added Outlook COM as the preferred path. mailto: stays as
+    /// the fallback for non-Outlook mail clients (Thunderbird, Mail.app,
+    /// webmail) — there mailto can't carry attachments so the body asks
+    /// the sender to drag the .drmx in themselves. The body factory takes
+    /// a bool that says which case we landed in so the body matches reality.
     /// </summary>
-    private static void OpenMailtoCompose(string recipientEmail, string subject, string body)
+    private static EmailComposeResult ComposeShareEmail(
+        string recipient,
+        string subject,
+        Func<bool, string> bodyFor,
+        string attachmentPath)
     {
-        try
+        // Try Outlook COM first — when Outlook is installed it can attach
+        // the .drmx programmatically and the sender just clicks Send.
+        var outlookResult = new OutlookComEmailComposer().Compose(new EmailComposition(
+            recipient,
+            subject,
+            bodyFor(true),
+            File.Exists(attachmentPath) ? [attachmentPath] : []));
+        if (outlookResult.ComposerOpened)
         {
-            // mailto requires percent-encoded subject/body. The .NET helper
-            // Uri.EscapeDataString uses RFC 3986 which is mailto-compatible.
-            var url = $"mailto:{Uri.EscapeDataString(recipientEmail)}" +
-                $"?subject={Uri.EscapeDataString(subject)}" +
-                $"&body={Uri.EscapeDataString(body)}";
-            // UseShellExecute=true is required for mailto on Windows — it
-            // hands the URL off to the registered email protocol handler
-            // (Outlook, Thunderbird, default Mail app, etc.).
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            });
+            return outlookResult;
         }
-        catch
-        {
-            // Best-effort — if the user has no mail client configured the
-            // shell call fails. The share URL is still on the clipboard so
-            // they can paste into webmail manually. Don't surface this as
-            // an error because the actual share succeeded.
-        }
+
+        // Fall back to mailto: — body asks the sender to attach the file
+        // manually because mailto: links can't pre-fill attachments. If
+        // the user has no default mail client configured even this fails;
+        // the share URL is still on the clipboard so they can paste it
+        // into webmail by hand.
+        return new MailtoEmailComposer().Compose(new EmailComposition(
+            recipient,
+            subject,
+            bodyFor(false),
+            attachmentPaths: []));
     }
 
-    private static string BuildFileShareEmailBody(string shareUrl, string fileName, string? localPath = null)
+    private static string BuildFileShareEmailBody(string shareUrl, string fileName, string? localPath, bool attachmentInlined)
     {
         // Stage 13: when ProtectAsync wrote the .drmx, we know the exact
         // path on disk and bake it into the body so the sender can drag
         // it straight in from Explorer rather than hunting in Sent.
-        var attachLine = string.IsNullOrEmpty(localPath)
-            ? $"BEFORE SENDING THIS EMAIL: attach the .drmx file from your sent folder " +
-              $"(your zcrDRM agent prepared it)."
-            : $"BEFORE SENDING THIS EMAIL: attach the file at:\n  {localPath}";
+        // Stage 14: when Outlook attaches the file programmatically, the
+        // body switches to "see attachment" — sender doesn't have to do
+        // anything but Send.
+        var attachLine = attachmentInlined
+            ? "The encrypted .drmx file is already attached to this email — just click Send."
+            : string.IsNullOrEmpty(localPath)
+                ? "BEFORE SENDING THIS EMAIL: attach the .drmx file from your sent folder " +
+                  "(your zcrDRM agent prepared it)."
+                : $"BEFORE SENDING THIS EMAIL: attach the file at:\n  {localPath}";
         return
             $"Hi,\n\n" +
             $"I'm sharing a DRM-protected file ({fileName}) with you through zcrDRM.\n\n" +
@@ -796,19 +809,35 @@ public partial class MainWindow : Window
             $"Thanks,";
     }
 
-    private static string BuildContainerShareEmailBody(string shareUrl, string containerFileName) =>
-        $"Hi,\n\n" +
-        $"I'm sharing a DRM-protected folder ({containerFileName}) with you through zcrDRM.\n\n" +
-        $"BEFORE SENDING THIS EMAIL: attach the .drmcontainer file (your zcrDRM " +
-        $"agent wrote it next to the source folder) and ALSO send me the " +
-        $"passphrase through a separate channel (e.g. SMS or chat — do NOT " +
-        $"include it in this email).\n\n" +
-        $"To open the folder:\n" +
-        $"1. Click this link to verify your email: {shareUrl}\n" +
-        $"2. Save the .drmcontainer attachment from this email\n" +
-        $"3. Double-click to open in the zcrDRM viewer\n" +
-        $"4. Enter the passphrase I send you separately\n\n" +
-        $"Thanks,";
+    private static string BuildContainerShareEmailBody(string shareUrl, string containerFileName, string? localPath, bool attachmentInlined)
+    {
+        // Stage 14: Outlook auto-attach lets us drop the "attach the file"
+        // sentence. The passphrase warning stays — sending the passphrase
+        // in the same email defeats the encryption, no matter how the
+        // attachment got there.
+        var attachLine = attachmentInlined
+            ? "The encrypted .drmcontainer is already attached to this email. " +
+              "REMEMBER: send the passphrase through a separate channel (SMS/chat) — " +
+              "do NOT include it in this email."
+            : string.IsNullOrEmpty(localPath)
+                ? "BEFORE SENDING THIS EMAIL: attach the .drmcontainer file (your " +
+                  "zcrDRM agent wrote it next to the source folder) and ALSO send me " +
+                  "the passphrase through a separate channel (e.g. SMS or chat — do " +
+                  "NOT include it in this email)."
+                : $"BEFORE SENDING THIS EMAIL: attach the file at:\n  {localPath}\n" +
+                  "ALSO send me the passphrase through a separate channel (e.g. SMS " +
+                  "or chat — do NOT include it in this email).";
+        return
+            $"Hi,\n\n" +
+            $"I'm sharing a DRM-protected folder ({containerFileName}) with you through zcrDRM.\n\n" +
+            $"{attachLine}\n\n" +
+            $"To open the folder:\n" +
+            $"1. Click this link to verify your email: {shareUrl}\n" +
+            $"2. Save the .drmcontainer attachment from this email\n" +
+            $"3. Double-click to open in the zcrDRM viewer\n" +
+            $"4. Enter the passphrase I send you separately\n\n" +
+            $"Thanks,";
+    }
 
     private string? quickPickedFile;
 
@@ -954,15 +983,21 @@ public partial class MainWindow : Window
 
             var drmxPath = Path.GetFullPath(protectResult.DestinationPath);
             var drmxName = Path.GetFileName(drmxPath);
-            // Stage 10/13: mailto with the real .drmx path baked in so the
-            // sender knows exactly which file to attach. Helper opens the
-            // default mail client; sender still drags the attachment in.
-            OpenMailtoCompose(
+            // Stage 10/13/14: open the sender's email client with subject
+            // + body pre-filled and (when Outlook is the default) the
+            // .drmx already attached. Sender clicks Send. Falls back to
+            // mailto: + drag-the-attachment when Outlook isn't available.
+            // Outlook cold-start can take 3-8s; surface that so the UI
+            // doesn't look frozen while the COM activation runs.
+            QuickResultText.Text = "Opening email composer…";
+            var composeResult = ComposeShareEmail(
                 recipient,
                 $"Encrypted file: {drmxName}",
-                BuildFileShareEmailBody(shareUrl, drmxName, drmxPath));
-            QuickResultText.Text =
-                $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.";
+                bodyFor: inlined => BuildFileShareEmailBody(shareUrl, drmxName, drmxPath, inlined),
+                attachmentPath: drmxPath);
+            QuickResultText.Text = composeResult.AttachmentInlined
+                ? $"✅ Wrote {drmxName} + Outlook opened with it attached. Just hit Send."
+                : $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.";
         }
         catch (Exception ex)
         {
