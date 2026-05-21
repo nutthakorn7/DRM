@@ -245,6 +245,57 @@ public sealed class QuickShareEndpointsTests : IDisposable
         result.ExpiresAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow.AddHours(720), TimeSpan.FromMinutes(1));
     }
 
+    [Fact]
+    public async Task Quick_share_token_is_verifiable_through_recipient_flow()
+    {
+        // Stage 12 regression guard. The QuickShare endpoint historically
+        // hashed the access token with Convert.ToHexString(SHA-256) while
+        // ExternalShareToken.Hash uses Convert.ToBase64String(SHA-256).
+        // That meant /share/ → /api/share-links/verification/start
+        // could NEVER find a QuickShare-created link → silent 404 → the
+        // recipient never received a verification code → the whole
+        // outbound demo flow broke. This test exercises Create-Share →
+        // Hit-Verification-Start as a round trip so the two formats
+        // can never drift again.
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        // 1) Create a share via Quick Send (the same way the agent does).
+        using var createResp = await client.PostAsJsonAsync("/api/me/share", new
+        {
+            tenantId,
+            userId,
+            recipientEmail = "round-trip@example.com",
+            fileName = "doc.pdf",
+            contentType = "application/pdf",
+            fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("hi")),
+            expiresInHours = 24,
+            allowPrint = false,
+        });
+        createResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var share = await createResp.Content.ReadFromJsonAsync<QuickShareResponse>();
+        share.Should().NotBeNull();
+
+        // 2) Extract the raw token from the share URL (recipient receives
+        //    this in the email).
+        var token = System.Web.HttpUtility.ParseQueryString(
+                new Uri(share!.ShareUrl).Query)["accessToken"];
+        token.Should().NotBeNullOrWhiteSpace();
+
+        // 3) Recipient hits /api/share-links/verification/start with the
+        //    raw token + their email. Pre-Stage-12 this returned 404
+        //    because the hash didn't match the stored TokenHash.
+        using var verifResp = await client.PostAsJsonAsync(
+            "/api/share-links/verification/start",
+            new { tenantId, accessToken = token, guestEmail = "round-trip@example.com" });
+
+        // Must be 200 OK with a verificationId — proving the share-link
+        // lookup found the row the QuickShare endpoint wrote.
+        verifResp.StatusCode.Should().Be(HttpStatusCode.OK,
+            "QuickShare token hash format must match what ExternalShareToken.Hash computes");
+    }
+
     public void Dispose()
     {
         factory.Dispose();
