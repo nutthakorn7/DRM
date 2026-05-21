@@ -1,9 +1,15 @@
-﻿<Application x:Class="Drm.Agent.Tray.Windows.App"
+<Application x:Class="Drm.Agent.Tray.Windows.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Drm.Agent.Tray.Windows"
-             StartupUri="MainWindow.xaml">
+             Startup="Application_Startup">
+    <!--
+        StartupUri is intentionally NOT set: App_OnStartup needs to
+        run the first-run identity check BEFORE the main window
+        appears, otherwise the user briefly sees an empty form before
+        the dialog steals focus.  See Application_Startup in App.xaml.cs.
+    -->
     <Application.Resources>
-         
+
     </Application.Resources>
 </Application>

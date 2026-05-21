@@ -81,6 +81,26 @@ public interface IDrmServerClient : IAgentAuditUploader
         Guid deviceId,
         string requestedPermission,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Resolve a work-email to a (tenantId, userId, displayName,
+    /// defaultPolicyTemplateId) tuple via GET /api/agent/discover.
+    /// Returns null when the server replies 404 (email not registered)
+    /// so callers can show "we couldn't find that email" without
+    /// having to catch a status-code exception.
+    /// Other failures (network, 4xx other than 404, 5xx) throw —
+    /// those are real bugs the user should hear about.
+    ///
+    /// Default implementation throws NotImplementedException — kept
+    /// as a default-interface-method so existing IDrmServerClient
+    /// test stubs (RecordingServerClient, FakeDrmServerClient, etc.)
+    /// don't need to be updated unless their tests exercise the
+    /// first-run discovery path. Production DrmServerClient overrides.
+    /// </summary>
+    Task<AgentDiscoveryResult?> DiscoverAsync(string email, CancellationToken cancellationToken)
+        => throw new NotImplementedException(
+            "This IDrmServerClient implementation does not support agent discovery. " +
+            "Use DrmServerClient or override DiscoverAsync in your test double.");
 }
 
 public sealed record OpenDecision(
@@ -338,6 +358,39 @@ public sealed class DrmServerClient : IDrmServerClient
         }
 
         throw new InvalidOperationException($"Policy decision returned invalid permissions '{permissions}'.");
+    }
+
+    /// <summary>
+    /// GET /api/agent/discover?email=...
+    /// The server returns 200 + body for a known active user, 404 for
+    /// an unknown one, 400 for malformed email.  This wrapper turns
+    /// 404 into a returned null (since "not found" is a normal flow
+    /// for the first-run dialog — the user just retypes the email).
+    /// </summary>
+    public async Task<AgentDiscoveryResult?> DiscoverAsync(string email, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Email must be supplied.", nameof(email));
+        }
+
+        // Uri.EscapeDataString catches the '+' and '@' characters that
+        // are legal in email local-parts but mean other things in URL
+        // query syntax.  GetAsync with a relative URI uses the
+        // HttpClient.BaseAddress.
+        var path = $"/api/agent/discover?email={Uri.EscapeDataString(email.Trim())}";
+        using var response = await httpClient.GetAsync(path, cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<AgentDiscoveryResult>(
+            JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("Server returned an empty discover response.");
     }
 
     private sealed record RegisterFileRequest(

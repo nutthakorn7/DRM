@@ -10,12 +10,86 @@ namespace Drm.Agent.Tray.Windows;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    /// <summary>
+    /// Legacy parameterless constructor — kept so the previous
+    /// StartupUri-driven launch path (and any unit-test code that
+    /// new'd MainWindow() directly) still compiles. App.xaml.cs has
+    /// been switched to the (serverUrl, cached) overload so it can
+    /// pre-fill from the discover-endpoint result.
+    /// </summary>
+    public MainWindow() : this(serverUrl: null, cachedIdentity: null)
+    {
+    }
+
+    /// <summary>
+    /// Identity-aware constructor: pre-fills Server URL / Tenant ID /
+    /// User ID / Policy Template fields from the cached
+    /// AgentIdentityCacheEntry produced by FirstRunDialog. Either
+    /// argument may be null — the corresponding field then stays
+    /// blank and the user fills it in manually.
+    /// </summary>
+    public MainWindow(Uri? serverUrl, AgentIdentityCacheEntry? cachedIdentity)
     {
         InitializeComponent();
         PrefillSourcePathFromCommandLine();
+        PrefillIdentityFromCache(serverUrl, cachedIdentity);
         SourcePathBox.TextChanged += (_, _) => UpdateDropZoneHint();
         UpdateDropZoneHint();
+    }
+
+    /// <summary>
+    /// Stage 3 pre-fill: the FirstRunDialog gave us a (TenantId,
+    /// UserId, server URL, default template) tuple. Drop those into
+    /// the existing textboxes so the operator sees them on first
+    /// open and doesn't have to copy-paste GUIDs.
+    ///
+    /// We pre-fill silently — no toast or modal — because at first
+    /// launch the user has just dismissed FirstRunDialog and any
+    /// additional "we set these for you" UI would feel paternalistic.
+    /// On subsequent launches the boxes are already filled from the
+    /// cache, so nothing surprising happens.
+    /// </summary>
+    private void PrefillIdentityFromCache(Uri? serverUrl, AgentIdentityCacheEntry? cached)
+    {
+        if (serverUrl is not null && ServerUrlBox is not null
+            && string.IsNullOrWhiteSpace(ServerUrlBox.Text))
+        {
+            ServerUrlBox.Text = serverUrl.ToString();
+        }
+
+        if (cached is null)
+        {
+            return;
+        }
+
+        // Prefer the URL we already resolved from registry/default
+        // over the one we cached previously — registry takes
+        // precedence so a sysadmin who re-pointed the MSI registry
+        // key gets honoured.
+        if (serverUrl is null && ServerUrlBox is not null
+            && string.IsNullOrWhiteSpace(ServerUrlBox.Text))
+        {
+            ServerUrlBox.Text = cached.ServerUrl.ToString();
+        }
+
+        if (TenantIdBox is not null && string.IsNullOrWhiteSpace(TenantIdBox.Text))
+        {
+            TenantIdBox.Text = cached.TenantId.ToString();
+        }
+
+        if (UserIdBox is not null && string.IsNullOrWhiteSpace(UserIdBox.Text))
+        {
+            UserIdBox.Text = cached.UserId.ToString();
+        }
+
+        if (cached.DefaultPolicyTemplateId is { } templateId
+            && PolicyTemplateIdBox is not null
+            && string.IsNullOrWhiteSpace(PolicyTemplateIdBox.Text))
+        {
+            PolicyTemplateIdBox.Text = templateId.ToString();
+        }
+
+        Title = $"zcrDRM Agent — {cached.DisplayName} ({cached.Email})";
     }
 
     private void UpdateDropZoneHint()
