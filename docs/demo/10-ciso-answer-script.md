@@ -111,11 +111,34 @@ Per-department, per-template, or per-user?"
 
 ### Q: Can a user see their own share history?
 
-**A:** "Admin can today via `/api/admin/files`. User-facing
-`My Shares` view is on Q3 — it surfaces the same JOIN
-(ProtectedFiles + ExternalShareLinks) filtered to the logged-in
-user, with a self-revoke button. Want to walk through how your team
-would use it?"
+**A:** "Yes — shipped this week. Sender opens `/me/`, scrolls to
+**My recent shares**, and sees a table with recipient, sent date,
+expiry, open count, permissions, and live status (Active / Revoked
+/ Expired / Used-up). Each active row has a **Revoke** button that
+flips the share dead immediately — no admin involvement needed.
+Endpoint is `/api/me/shares` (list) and
+`/api/me/shares/{id}/revoke` (self-revoke); both ownership-gated so
+a user only sees and acts on their own shares."
+
+### Q: What if a sender realises they shared with the wrong recipient?
+
+**A:** "Click **Revoke** on that row in `/me/` My Shares. The share
+link goes dead immediately; the recipient's next attempt to verify
+or open returns 'link revoked'. Audit row writes with ReasonCode
+`external_share_link_self_revoked` — distinct from admin revoke and
+the brute-force auto-revoke worker — so the IR timeline shows
+exactly who killed the share and when."
+
+### Q: Can a sender share one file with multiple recipients in one go?
+
+**A:** "Yes — the Quick Send recipient field accepts comma or
+semicolon-separated emails. The agent encrypts the file once, mints
+one share link per recipient against the same fileId, and opens
+one email composer per recipient. Each recipient gets only their
+own access token — never sees other recipients' links. Audit log
+shows one `protected_file_registered` row + N
+`external_share_link_created` rows, each tagged with the right
+guest email. Per-recipient revoke still works the same way."
 
 ### Q: Walk me through what happens when an employee shares a file.
 
