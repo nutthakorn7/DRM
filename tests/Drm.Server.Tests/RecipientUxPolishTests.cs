@@ -147,6 +147,26 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
+    public void Mail_client_warning_banner_appears_at_launch_when_no_handler_registered()
+    {
+        // Stage 17 — when Windows has no mailto: handler registered the
+        // agent surfaces a yellow banner at launch (visible BEFORE any
+        // Quick Send attempt) with the exact Windows Settings fix path.
+        var trayXaml = File.ReadAllText(
+            Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml"));
+        trayXaml.Should().Contain("MailClientWarningBanner",
+            "the banner element must exist in XAML so the code-behind can toggle it");
+        trayXaml.Should().Contain("No default mail client detected",
+            "the banner copy must name the problem clearly");
+        TrayMain.Should().Contain("IsAnyMailtoHandlerRegistered",
+            "MainWindow must probe the registry for a mailto handler");
+        TrayMain.Should().Contain(@"mailto\shell\open\command",
+            "the probe must check HKEY_CLASSES_ROOT\\mailto\\shell\\open\\command, the canonical handler key");
+        TrayMain.Should().Contain("UpdateMailClientWarningVisibility",
+            "the constructor must call the probe at launch, not lazily");
+    }
+
+    [Fact]
     public void Mailto_helper_uses_shell_execute()
     {
         // mailto: URLs only work via the shell protocol handler on Windows.
