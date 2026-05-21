@@ -54,9 +54,24 @@ audit row for compliance — same pattern most banking systems use."
 
 ### Q: AES key strength?
 
-**A:** "AES-256-GCM per file. The .drmcontainer format uses PBKDF2 with
-600,000 iterations + 16-byte random salt per container — that's the
-current OWASP recommendation."
+**A:** "AES-256-GCM per file — random 256-bit content key generated
+client-side by the agent, wrapped by the tenant master key on the
+server, never written to disk in plaintext. The `.drmcontainer`
+format (folder shares) uses PBKDF2 with 600,000 iterations + 16-byte
+random salt per container — that's the current OWASP recommendation."
+
+### Q: How is the share link itself protected?
+
+**A:** "256-bit random token generated server-side, hashed with
+SHA-256 before storing in `ExternalShareLinks.TokenHash` — same
+pattern as a password column. The plaintext token only exists in
+the URL we hand to the sender and in the verification email link;
+the database can only verify a presented token against the hash,
+never reconstruct the token. Single-use until verified, optional
+expiry + max-uses, brute-force protection auto-revokes after 5
+failed attempts. We hardened the token format in May after an
+internal audit found one endpoint emitting hex instead of base64
+— that's now caught by an integration test."
 
 ### Q: Where do keys live?
 
@@ -102,6 +117,22 @@ Per-department, per-template, or per-user?"
 user, with a self-revoke button. Want to walk through how your team
 would use it?"
 
+### Q: Walk me through what happens when an employee shares a file.
+
+**A:** "Four things, all in roughly two seconds: (1) Agent reads
+the file, generates a random AES-256-GCM key, encrypts the bytes,
+writes `<original>.drmx` next to the source. (2) Agent calls
+`/api/admin/files/{fileId}/share-links` to register the file and
+mint a single-use access token, wrapping the per-file key with the
+tenant master key. (3) Agent opens the sender's Outlook with the
+`.drmx` already attached + subject + body + share URL pre-filled;
+sender clicks Send. (4) On the audit side, two `AuditEvents` rows
+land: `protected_file_registered` and
+`external_share_link_created`. Every step is one log entry. The
+sender sees inline status — `'✅ Wrote <file>.drmx + Outlook
+opened with it attached. Just hit Send.'` — and a clipboard copy
+of the share URL as a fallback."
+
 ---
 
 ## 4. Recipient experience
@@ -132,6 +163,30 @@ detour. That's the FinalCode-style internal experience."
 typical deployments. Code expires in 10 minutes. Failed attempts
 auto-revoke the link after 5 — `BruteForceProtectionService` handles
 that. Resend is a separate button on the page."
+
+### Q: Who sees the encrypted file in transit?
+
+**A:** "Only the sender's mail provider and the recipient's mail
+provider — same path as any normal email attachment. The agent
+encrypts the file locally, attaches the resulting `.drmx` to a new
+mail item in the sender's own Outlook (via the Outlook COM API), and
+the email travels through whatever SMTP / Exchange path that
+mailbox already uses. **The file never touches our servers.** What
+DOES touch our servers is the wrapped content key (so we can
+authorize the recipient at /share/ time) and the audit record of
+the share. If the sender's mail client isn't Outlook we fall back
+to a `mailto:` composer — same data path, sender just drags the
+`.drmx` in themselves."
+
+### Q: What if my employee's laptop doesn't have a default mail client?
+
+**A:** "The agent warns at launch with a yellow banner on the Quick
+Send tab — `'No default mail client detected. Set a default at
+Settings → Apps → Default apps → Mail.'` Quick Send still encrypts
+the file and copies the share URL to clipboard either way, so the
+sender can paste into webmail manually. We shipped this guard in
+May after we noticed fresh corporate images sometimes ship with no
+mail client registered at all."
 
 ---
 
