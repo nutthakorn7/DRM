@@ -309,3 +309,22 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 .my-shares-table .status-revoked  { background: #FEE2E2; color: #B91C1C; }
 .my-shares-table .status-expired  { background: #FEF3C7; color: #92400E; }
 .my-shares-table .status-used-up  { background: #E0E7FF; color: #3730A3; }
+
+/* Stage 20 — small inline revoke button in the actions column. */
+.my-shares-table .revoke-btn {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  background: transparent;
+  color: #B91C1C;
+  border: 1px solid #FCA5A5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.my-shares-table .revoke-btn:hover:not(:disabled) {
+  background: #FEE2E2;
+}
+.my-shares-table .revoke-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

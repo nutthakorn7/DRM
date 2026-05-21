@@ -21,8 +21,94 @@ public static class MeSharesEndpoints
     public static IEndpointRouteBuilder MapMeSharesEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/me/shares", ListMySharesAsync);
+        endpoints.MapPost("/api/me/shares/{shareLinkId:guid}/revoke", RevokeOwnShareAsync);
         return endpoints;
     }
+
+    /// <summary>
+    /// Stage 20 — sender-side self-revoke. A user can flip Revoked=true
+    /// on any share-link they created (file.OwnerUserId == request.UserId).
+    /// Same audit + DB shape as the admin revoke path, just gated on
+    /// "your own file" instead of AdminPermissions.FilesRevoke so users
+    /// don't need to bug admin to cancel a misclick.
+    /// </summary>
+    private static async Task<IResult> RevokeOwnShareAsync(
+        Guid shareLinkId,
+        RevokeOwnShareRequest request,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!httpContext.MatchesHeader(request.TenantId))
+        {
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+        }
+        if (request.TenantId == Guid.Empty || request.UserId == Guid.Empty)
+        {
+            return Results.BadRequest(new ErrorResponse("invalid_identifiers"));
+        }
+
+        var shareLink = await dbContext.ExternalShareLinks
+            .SingleOrDefaultAsync(
+                candidate =>
+                    candidate.TenantId == request.TenantId &&
+                    candidate.ShareLinkId == shareLinkId,
+                cancellationToken);
+        if (shareLink is null)
+        {
+            return Results.NotFound();
+        }
+
+        // Ownership guard — user can ONLY revoke shares for files they
+        // own. This is the difference from the admin revoke endpoint:
+        // no FilesRevoke permission required, but file.OwnerUserId must
+        // match the caller. Look up the file and reject if not.
+        var file = await dbContext.ProtectedFiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                f => f.TenantId == request.TenantId && f.Id == shareLink.FileId,
+                cancellationToken);
+        if (file is null || file.OwnerUserId != request.UserId)
+        {
+            // 404 not 403 to avoid leaking "this share exists but isn't
+            // yours" — same shape as admin file-not-found.
+            return Results.NotFound();
+        }
+
+        if (!shareLink.Revoked)
+        {
+            var now = DateTimeOffset.UtcNow;
+            shareLink.Revoked = true;
+            shareLink.RevokedAtUtc = now;
+            shareLink.RevocationReason = "self_revoked";
+            dbContext.AuditEvents.Add(new AuditEventEntity
+            {
+                TenantId = request.TenantId,
+                FileId = shareLink.FileId,
+                UserId = request.UserId,
+                ActorAdminId = null, // self-revoke is a user action, not admin
+                EventType = "external_share_changed",
+                ReasonCode = "external_share_link_self_revoked",
+                CreatedAtUtc = now
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return Results.Ok(new RevokeOwnShareResponse(
+            shareLink.TenantId,
+            shareLink.ShareLinkId,
+            shareLink.FileId,
+            shareLink.Revoked,
+            shareLink.RevokedAtUtc));
+    }
+
+    public sealed record RevokeOwnShareRequest(Guid TenantId, Guid UserId);
+    public sealed record RevokeOwnShareResponse(
+        Guid TenantId,
+        Guid ShareLinkId,
+        Guid FileId,
+        bool Revoked,
+        DateTimeOffset? RevokedAtUtc);
 
     private static async Task<Results<Ok<MySharesResponse>, BadRequest<ErrorResponse>>> ListMySharesAsync(
         Guid tenantId,
