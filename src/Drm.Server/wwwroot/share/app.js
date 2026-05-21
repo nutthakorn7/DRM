@@ -121,7 +121,7 @@
 
   function renderViewerSession(payload) {
     document.querySelector(".preview-details")?.setAttribute("data-has-session", "true");
-    document.getElementById("documentTitle").textContent = "Verified metadata session";
+    document.getElementById("documentTitle").textContent = "Verified — open the attached file";
     document.getElementById("fileIdValue").textContent = payload.fileId || "-";
     document.getElementById("contentTypeValue").textContent = payload.contentType || "-";
     document.getElementById("guestEmailValue").textContent = payload.guestEmail || "-";
@@ -129,6 +129,12 @@
     document.getElementById("shareExpiresValue").textContent = formatDate(payload.shareLinkExpiresAtUtc);
     document.getElementById("watermarkValue").textContent = payload.watermarkTemplate || "-";
     document.getElementById("previewWatermark").textContent = payload.watermarkTemplate || "Watermark active";
+
+    // Stage 10 — sender hint stays as the default copy ("they") because
+    // the verifier intentionally doesn't return the sender email to the
+    // recipient session (leaking sender metadata would be a privacy
+    // regression). If a future endpoint surfaces sender-display-name
+    // without leaking PII, populate the span here.
   }
 
   function valueOf(id) {

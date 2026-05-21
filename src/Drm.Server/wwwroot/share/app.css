@@ -347,12 +347,63 @@ button:disabled {
 }
 
 .preview-details[data-has-session="false"] dl,
+.preview-details[data-has-session="false"] .next-steps,
 .preview-details[data-has-session="false"] + .viewer-actions { /* hide actions block during empty state */
   display: none;
 }
 
 .preview-details[data-has-session="true"] .preview-empty {
   display: none;
+}
+
+/* Post-verification recipient guide (Stage 10) — anchors the user
+   between the metadata table and the disabled action buttons so they
+   know the file lives in the email attachment, not on this page. */
+.next-steps {
+  margin: 24px 0 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.next-steps .eyebrow {
+  margin: 0 0 8px;
+  color: var(--brand-deep, #275d72);
+}
+
+.next-steps-list {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.next-steps-list li {
+  line-height: 1.5;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.next-steps-list code {
+  background: #eef2f7;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12.5px;
+}
+
+.next-steps-list a {
+  color: var(--brand-deep, #275d72);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.next-steps-footer {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: #6b7280;
 }
 
 dl {

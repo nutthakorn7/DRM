@@ -686,8 +686,17 @@ public partial class MainWindow : Window
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? string.Empty;
             System.Windows.Clipboard.SetText(shareUrl);
+            // Stage 10: open default mail client with subject + body
+            // pre-filled. Body explicitly instructs sender to share the
+            // passphrase through a separate channel — never in the same
+            // email as the .drmcontainer attachment.
+            var containerFileName = Path.GetFileName(outPath);
+            OpenMailtoCompose(
+                recipient,
+                $"Encrypted folder: {containerFileName}",
+                BuildContainerShareEmailBody(shareUrl, containerFileName));
             SetFolderShareResult(
-                $"✅ Share URL copied. Attach {Path.GetFileName(outPath)} + share the passphrase out-of-band with {recipient}.",
+                $"✅ Share URL copied + email composer opened. Attach {containerFileName} and send the passphrase to {recipient} on a separate channel.",
                 isError: false);
             if (ContainerDropHint != null)
             {
@@ -726,6 +735,71 @@ public partial class MainWindow : Window
         }
         return int.TryParse(item.Tag?.ToString(), out var hours) ? hours : defaultHours;
     }
+
+    /// <summary>
+    /// Stage 10 — recipient UX polish. After Quick Send / Share-with-recipient
+    /// succeeds, open the sender's default mail client with a pre-composed
+    /// message so they don't have to retype subject + body. The share URL
+    /// goes in the body alongside instructions for the recipient.
+    ///
+    /// mailto: cannot pre-attach files in a portable way (Outlook MAPI is
+    /// brittle across Windows versions), so the sender still has to drag
+    /// the .drmx/.drmcontainer attachment in themselves. The pre-filled
+    /// body explicitly says "attach the file before sending" so the sender
+    /// doesn't forget.
+    /// </summary>
+    private static void OpenMailtoCompose(string recipientEmail, string subject, string body)
+    {
+        try
+        {
+            // mailto requires percent-encoded subject/body. The .NET helper
+            // Uri.EscapeDataString uses RFC 3986 which is mailto-compatible.
+            var url = $"mailto:{Uri.EscapeDataString(recipientEmail)}" +
+                $"?subject={Uri.EscapeDataString(subject)}" +
+                $"&body={Uri.EscapeDataString(body)}";
+            // UseShellExecute=true is required for mailto on Windows — it
+            // hands the URL off to the registered email protocol handler
+            // (Outlook, Thunderbird, default Mail app, etc.).
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            // Best-effort — if the user has no mail client configured the
+            // shell call fails. The share URL is still on the clipboard so
+            // they can paste into webmail manually. Don't surface this as
+            // an error because the actual share succeeded.
+        }
+    }
+
+    private static string BuildFileShareEmailBody(string shareUrl, string fileName) =>
+        $"Hi,\n\n" +
+        $"I'm sharing a DRM-protected file ({fileName}) with you through zcrDRM.\n\n" +
+        $"BEFORE SENDING THIS EMAIL: attach the .drmx file from your sent folder " +
+        $"(your zcrDRM agent prepared it).\n\n" +
+        $"To open the file:\n" +
+        $"1. Click this link to verify your email: {shareUrl}\n" +
+        $"2. Save the .drmx attachment from this email\n" +
+        $"3. Double-click to open in the zcrDRM viewer\n" +
+        $"   (no viewer yet? the /share/ link has a download button)\n\n" +
+        $"Thanks,";
+
+    private static string BuildContainerShareEmailBody(string shareUrl, string containerFileName) =>
+        $"Hi,\n\n" +
+        $"I'm sharing a DRM-protected folder ({containerFileName}) with you through zcrDRM.\n\n" +
+        $"BEFORE SENDING THIS EMAIL: attach the .drmcontainer file (your zcrDRM " +
+        $"agent wrote it next to the source folder) and ALSO send me the " +
+        $"passphrase through a separate channel (e.g. SMS or chat — do NOT " +
+        $"include it in this email).\n\n" +
+        $"To open the folder:\n" +
+        $"1. Click this link to verify your email: {shareUrl}\n" +
+        $"2. Save the .drmcontainer attachment from this email\n" +
+        $"3. Double-click to open in the zcrDRM viewer\n" +
+        $"4. Enter the passphrase I send you separately\n\n" +
+        $"Thanks,";
 
     private string? quickPickedFile;
 
@@ -848,7 +922,16 @@ public partial class MainWindow : Window
             var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? "";
             var fileId = doc.RootElement.GetProperty("fileId").GetString() ?? "";
             System.Windows.Clipboard.SetText(shareUrl);
-            QuickResultText.Text = $"✅ Sent. Share URL copied to clipboard. File {fileId.Substring(0, 8)}…";
+            var fileName = Path.GetFileName(quickPickedFile);
+            // Stage 10: open the default mail client with subject + body
+            // pre-filled. Sender still has to drag the .drmx attachment in
+            // themselves (see helper comment).
+            OpenMailtoCompose(
+                recipient,
+                $"Encrypted file: {fileName}",
+                BuildFileShareEmailBody(shareUrl, fileName));
+            QuickResultText.Text =
+                $"✅ Sent. Share URL copied + email composer opened — attach the .drmx and send. File {fileId.Substring(0, 8)}…";
         }
         catch (Exception ex)
         {
