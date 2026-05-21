@@ -216,7 +216,7 @@
         .drmcontainer with the existing Drm.Crypto.SecureContainer
         format. The .drmcontainer file association (lines ~141-149) is
         already wired to open with the viewer, so end-to-end works as
-        soon as this verb shells the tray with --protect-folder.
+        soon as this verb shells the tray with the protect-folder switch.
 
         %V (the "verb path" token) is the Windows-canonical placeholder
         for the selected directory when invoking a Directory\shell verb,
