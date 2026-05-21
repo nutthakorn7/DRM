@@ -2,6 +2,56 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [1.7.0] — 2026-05-21
+
+**Sender easy-to-use sweep — eight stages (13-20) take Quick Send from "encrypts and shows a URL" to "one-click, file attached, recipient verified, sender self-serve."**
+
+The goal: cut every keystroke and friction step that wasn't strictly necessary, and give the sender the same visibility into their own shares that admins already had.
+
+### Added
+
+- **Stage 13 — Real `.drmx` from Quick Send.** Right-click → Quick Send now runs `ProtectFileWorkflow.ProtectAsync` so the agent actually encrypts the file (AES-256-GCM, content key wrapped server-side) and writes `<name>.drmx` next to the source. Before, Quick Send only POSTed bytes to `/api/me/share` and silently dropped them — a known broken path that Stage 12's token-format fix exposed.
+- **Stage 14 — Outlook COM auto-attach.** When Outlook is the default mail client the agent activates it via late-bound COM (`Outlook.Application` ProgID + `MailItem.Attachments.Add`) so the `.drmx` is already in the attachments tray when the composer opens. Sender clicks Send. Falls back to `mailto:` + manual drag-from-Explorer when Outlook isn't installed. Status text branches per-path so the body never lies about attachment state.
+- **Stage 15 — Recent-recipients dropdown.** Quick Send + Folder Share recipient boxes are now editable `ComboBox`es backed by a shared MRU store at `%LOCALAPPDATA%\zcrDRM\recent-recipients.json` (capacity 20, case-insensitive dedup, persist-on-success only). Typing behaves identically to the previous TextBox if the user ignores the dropdown.
+- **Stage 16 — Post-success picker reset + honest no-mail-client error.** After a successful Quick Send, the file picker (`quickPickedFile` + `QuickDropFile.Text`) resets so the next file drop just works; recipient stays so "same recipient, different file" is one drop away. When both Outlook COM and `mailto:` fail, the status line says so explicitly with the Windows Settings fix path — no more fake "✅ composer opened" claim.
+- **Stage 17 — Launch-time mail-client warning banner.** Agent probes `HKEY_CLASSES_ROOT\mailto\shell\open\command` at MainWindow load and surfaces a yellow banner at the top of the Quick Send tab if no handler is registered. Catches missing default mail client before the demo button is pressed.
+- **Stage 18 — Sender-side "My Shares" view.** New `GET /api/me/shares?tenantId=X&userId=Y&limit=10` endpoint JOINs `ExternalShareLinks` against `ProtectedFiles` filtered to the caller's `OwnerUserId`. `/me/` renders the last 10 shares with recipient/expiry/opens/permissions/status. Auto-refreshes after each send so a new row lands at the top without a page reload. Privacy guard: filters strictly on owner; cross-user leak prevention covered by a dedicated test.
+- **Stage 19 — Bulk Quick Send.** Recipient field accepts comma/semicolon/newline-separated emails. Agent encrypts the file once, mints one share-link per recipient (each with its own access token), opens one composer per recipient. Per-recipient share-link design (not multi-guest link) so each verification is independent, each audit row is distinct, and no recipient ever sees another's token.
+- **Stage 20 — Self-revoke from My Shares.** New `POST /api/me/shares/{shareLinkId}/revoke` endpoint flips `Revoked=true` after verifying the caller owns the underlying file. UI: per-row Revoke button that hides on already-dead rows; `confirm()` dialog before the call. Audit `ReasonCode` is `external_share_link_self_revoked` so the audit trail distinguishes user action from admin revoke or brute-force auto-revoke. Idempotent — re-POSTing a revoked share returns 200 silently.
+
+### Cross-cutting infrastructure
+
+- **`Drm.Agent.Core.EmailComposer`** — new abstraction (`IEmailComposer`, `EmailComposition`, `EmailComposeResult`) so the mailto/Outlook fallback is testable cross-platform. `MailtoEmailComposer` lives in Core; `OutlookComEmailComposer` lives in the WPF tray project (Windows-only). Stages 14 + 16 depend on this.
+- **`Drm.Agent.Core.BulkRecipientParser`** — cross-platform pure-string parser. Splits on comma / semicolon / newline / tab (so Excel-paste works), drops segments missing `@`, dedups case-insensitively.
+- **`Drm.Agent.Core.RecentRecipientsStore`** — JSON-backed MRU store. Mirrors the `JsonFileKeyStore` / `JsonProtectedFileInventory` pattern (atomic write via temp+rename, corrupt-file recovery, capacity cap).
+
+### Compose env vars in production docker-compose
+
+- `Drm__Email__SmtpHost` / `SmtpPort` / `SmtpUsername` / `SmtpPassword` / `FromAddress` / `FromName` now wired in `deploy/management/docker/docker-compose.yml`. Aligns the upstream compose with the manual patch applied during the May 21 Resend wire-up so a fresh deploy doesn't drift from prod.
+
+### Demo collateral
+
+- **CISO answer script (`10-ciso-answer-script.md`)** refreshed twice in this release:
+  - First pass added Q&As for share-link token hashing (Stage 12), the Outlook attach data path (file never touches our servers — only sender's and recipient's mail provider), default mail-client warning (Stage 17), and a complete sender data-flow walkthrough.
+  - Second pass converted three "Q3-coming-soon" answers to "shipped" — "Can a user see their own share history?", "What if a sender realises they shared with the wrong recipient?" (self-revoke), and "Can a sender share one file with multiple recipients in one go?" (bulk send).
+- **Demo script (`03-demo-script.md`)** updated for the Outlook auto-attach reality (status text + click count, 3 → 2 on the Outlook path) plus a Part 2 footer mentioning Stages 19-20 as optional on-stage material.
+- **Engineer prep (`08-engineer-windows-msi-setup.md` §6)** smoke-test rewritten for both the Outlook and mailto paths.
+- **Preflight checklist (`05-preflight-checklist.md`)** gained five new smoke items covering Stages 14, 17, 18, 19, 20 so nothing post-Stage-13 gets smoked by omission.
+
+### Test coverage
+
+- 11 new unit tests for `BulkRecipientParser` (separators, dedup, whitespace, Excel-paste, single-recipient passthrough).
+- 9 endpoint tests for `MeSharesEndpoints` covering list + recipient/expiry surfacing, cross-user privacy, sort order, validation, empty state, self-revoke happy path, cross-user authorization rejection, idempotent re-revoke, 404 for unknown share-link.
+- 8 unit tests for `JsonRecentRecipientsStore` (MRU order, dedup, capacity cap, persistence round-trip, corrupt-file recovery, whitespace trim, blank-arg rejection).
+- 2 unit tests for `MailtoEmailComposer` (URL encoding through `IMailtoProtocolHandler`, failure propagation).
+- 4 new `RecipientUxPolish` source-presence tests covering the Stage 14 body-factory branches, Stage 16 picker-reset markers, Stage 17 mail-client probe wiring, Stage 19 bulk-send loop wiring.
+- 1 new `ServerIntegratedWorkflow` integration test exercising the full Stage 13 chain: `ProtectFileWorkflow.ProtectAsync` → `/api/admin/files/{fileId}/share-links` → `/api/share-links/verification/start` returns 200. Guards against another Stage 12-style format drift across endpoints.
+
+### Notes
+
+- The Outlook COM path can be built by CI (`dynamic` + late-bound reflection so no Outlook PIA dependency) but never exercised by it. Manual smoke on Windows + Outlook is required before the Monday demo. Mailto fallback is covered.
+- Sender easy-to-use lands at ~9.7/10 across the three personas after this release. Recipient remains ~8/10 (in-browser PDF preview is the biggest remaining recipient lift). Admin remains ~7-8/10.
+
 ## [1.6.1] — 2026-05-21
 
 **`/me/` topbar: hide `Admin →` link for non-admin users (CSS specificity fix).**
