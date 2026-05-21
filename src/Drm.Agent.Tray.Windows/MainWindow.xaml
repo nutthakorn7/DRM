@@ -58,11 +58,14 @@
                         <!-- Stage 15: editable ComboBox so sender can pick from
                              recent recipients or type a fresh address.
                              IsEditable + IsTextSearchEnabled gives type-ahead
-                             autocomplete on the dropdown items. -->
+                             autocomplete on the dropdown items.
+                             Stage 19: also accepts comma- or semicolon-separated
+                             emails for bulk send (1 file → N recipients). -->
                         <ComboBox x:Name="QuickRecipientBox" Width="280" Height="26"
                                   IsEditable="True" IsTextSearchEnabled="True"
                                   StaysOpenOnEdit="True"
-                                  VerticalContentAlignment="Center" />
+                                  VerticalContentAlignment="Center"
+                                  ToolTip="One email — or multiple separated by , or ; for bulk send. Each recipient gets their own share link." />
                         <Button x:Name="QuickBrowseButton" Content="Browse" Margin="8,0,0,0"
                                 Padding="10,2" Click="QuickBrowseButton_Click" />
                         <Button x:Name="QuickSendButton" Content="Send protected file"
@@ -70,6 +73,8 @@
                                 FontWeight="SemiBold" BorderThickness="0"
                                 Click="QuickSendButton_Click" />
                     </StackPanel>
+                    <TextBlock Foreground="#6B7280" FontSize="10" Margin="34,2,0,0"
+                               Text="Tip: separate multiple recipients with a comma or semicolon — each gets their own share link." />
 
                     <!--
                         Per-share permission picker (Stage 7). Collapsed
