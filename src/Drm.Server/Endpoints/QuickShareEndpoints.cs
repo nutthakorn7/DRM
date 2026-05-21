@@ -106,9 +106,17 @@ public static class QuickShareEndpoints
         dbContext.ProtectedFiles.Add(file);
 
         // Auto-create a share link bound to the recipient email with a
-        // freshly minted token.
-        var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-        var tokenHash = HashToken(rawToken);
+        // freshly minted token. CRITICAL: ExternalShareToken.Create()
+        // matches the format ExternalShareEndpoints expects when the
+        // recipient hits /share/ → /api/share-links/verification/start.
+        // Pre-Stage-12 this used Convert.ToHexString + UTF-8 SHA-256
+        // which produced a different hash shape than what the
+        // verification endpoint computed → verification 404'd silently
+        // for every QuickShare-created link. See Stage 12 PR for the
+        // root-cause write-up.
+        var token = ExternalShareToken.Create();
+        var rawToken = token.Plaintext;
+        var tokenHash = token.Hash;
         var shareLinkId = Guid.NewGuid();
         dbContext.ExternalShareLinks.Add(new ExternalShareLinkEntity
         {
@@ -160,11 +168,9 @@ public static class QuickShareEndpoints
                 payload.Length));
     }
 
-    private static string HashToken(string rawToken)
-    {
-        var bytes = Encoding.UTF8.GetBytes(rawToken);
-        return Convert.ToHexString(SHA256.HashData(bytes));
-    }
+    // HashToken removed in Stage 12 — replaced by ExternalShareToken.Hash
+    // so the share-link is reachable from the recipient-side
+    // /api/share-links/verification/start endpoint. See PR #27.
 
     private sealed record QuickShareRequest(
         Guid TenantId,
