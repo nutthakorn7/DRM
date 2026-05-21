@@ -419,8 +419,47 @@ function renderMySharesTable(shares) {
       <td>${formatDate(row.expiresAtUtc)}</td>
       <td>${row.usedCount}/${row.maxUses}</td>
       <td>${escapeHtml(row.permissions)}</td>
-      <td>${renderShareStatus(row)}</td>`;
+      <td>${renderShareStatus(row)}</td>
+      <td>${renderRevokeAction(row)}</td>`;
+    const btn = tr.querySelector(".revoke-btn");
+    if (btn) {
+      btn.addEventListener("click", () => revokeShare(row.shareLinkId, btn));
+    }
     mySharesBody.appendChild(tr);
+  }
+}
+
+// Stage 20 — per-row Revoke button. Renders blank when the share is
+// already dead (revoked / file-revoked / expired) so the cell shows
+// nothing rather than a disabled button.
+function renderRevokeAction(row) {
+  const isDead = row.shareRevoked || row.fileRevoked
+    || (new Date(row.expiresAtUtc) < new Date());
+  if (isDead) return "";
+  return `<button type="button" class="revoke-btn" data-share-link-id="${escapeHtml(row.shareLinkId)}">Revoke</button>`;
+}
+
+async function revokeShare(shareLinkId, btn) {
+  if (!confirm("Revoke this share link? The recipient will lose access immediately.")) return;
+  const tenant = (tenantIdInput?.value || "").trim();
+  const user   = (userIdInput?.value || "").trim();
+  if (!tenant || !user) return;
+  btn.disabled = true;
+  btn.textContent = "Revoking…";
+  try {
+    const resp = await fetch(`/api/me/shares/${encodeURIComponent(shareLinkId)}/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId: tenant, userId: user })
+    });
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    // Pull the fresh row state so the Status pill flips to "Revoked"
+    // and the button column for this row becomes blank.
+    await refreshMyShares();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "Revoke";
+    showError(`Revoke failed: ${err.message ?? err}`);
   }
 }
 
