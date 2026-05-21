@@ -1142,6 +1142,7 @@ app.MapAdminAuditEndpoints();
 app.MapAdminSiemEndpoints();
 app.MapAdminExternalShareSettingsEndpoints();
 app.MapAdminBruteForcePolicyEndpoints();
+app.MapAgentDiscoverEndpoints();
 app.MapAdminDirectorySyncEndpoints();
 app.MapAdminBoxIntegrationEndpoints();
 app.MapBoxWebhookEndpoints();
