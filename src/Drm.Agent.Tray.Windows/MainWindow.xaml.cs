@@ -35,6 +35,54 @@ public partial class MainWindow : Window
         PrefillIdentityFromCache(serverUrl, cachedIdentity);
         SourcePathBox.TextChanged += (_, _) => UpdateDropZoneHint();
         UpdateDropZoneHint();
+        _ = LoadRecentRecipientsAsync();
+    }
+
+    // Stage 15 — shared store + helper. Both Quick Send and Folder Share
+    // hydrate their ComboBoxes from the same recent-recipients list so a
+    // recipient typed into either surface shows up next time on both.
+    private readonly IRecentRecipientsStore recentRecipientsStore =
+        new JsonRecentRecipientsStore(ResolveDataPath("recent-recipients.json"));
+
+    private async Task LoadRecentRecipientsAsync()
+    {
+        try
+        {
+            var recipients = await recentRecipientsStore.ListAsync(CancellationToken.None);
+            if (QuickRecipientBox is not null)
+            {
+                var preserved = QuickRecipientBox.Text;
+                QuickRecipientBox.ItemsSource = recipients;
+                QuickRecipientBox.Text = preserved;
+            }
+            if (FolderShareRecipientBox is not null)
+            {
+                var preserved = FolderShareRecipientBox.Text;
+                FolderShareRecipientBox.ItemsSource = recipients;
+                FolderShareRecipientBox.Text = preserved;
+            }
+        }
+        catch
+        {
+            // Recent-recipients is a polish feature — silently fall back
+            // to empty dropdowns if the JSON store can't be read for any
+            // reason. The user can still type addresses by hand.
+        }
+    }
+
+    private async Task RememberRecipientAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return;
+        try
+        {
+            await recentRecipientsStore.RememberAsync(email, CancellationToken.None);
+            await LoadRecentRecipientsAsync();
+        }
+        catch
+        {
+            // Don't surface storage errors — the share succeeded; this is
+            // just history bookkeeping.
+        }
     }
 
     /// <summary>
@@ -703,6 +751,8 @@ public partial class MainWindow : Window
                     ? $"✅ Outlook opened with {containerFileName} attached. Hit Send — and remember to message the passphrase separately."
                     : $"✅ Share URL copied + email composer opened. Attach {containerFileName} and send the passphrase to {recipient} on a separate channel.",
                 isError: false);
+            // Stage 15: same recent-recipients store as Quick Send.
+            await RememberRecipientAsync(recipient);
             if (ContainerDropHint != null)
             {
                 ContainerDropHint.Text = $"✓ Shared: {displayName} → {recipient}";
@@ -998,6 +1048,9 @@ public partial class MainWindow : Window
             QuickResultText.Text = composeResult.AttachmentInlined
                 ? $"✅ Wrote {drmxName} + Outlook opened with it attached. Just hit Send."
                 : $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.";
+            // Stage 15: persist after the share succeeded so a failed
+            // send doesn't pollute the dropdown with bad addresses.
+            await RememberRecipientAsync(recipient);
         }
         catch (Exception ex)
         {
