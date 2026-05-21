@@ -162,3 +162,7 @@ This removes everything: files, registry, file associations, right-click menu.
 | Tray exits immediately on launch | DPAPI cache file is corrupt | `Remove-Item "$env:LOCALAPPDATA\zcrDRM\identity.bin"` and relaunch |
 
 If you hit something that's not on this list, grab a screenshot and message Pop. Don't try to debug live during the demo — fall back to the script in [06-fallback-plan.md](06-fallback-plan.md).
+
+## 11. Next step: full pre-demo smoke
+
+The §6 quick smoke above covers Stage 13 only. **The day before the customer arrives, run the full Stage 13-20 smoke test in [11-engineer-full-smoke-test.md](11-engineer-full-smoke-test.md)** — explicit step-by-step for every shipped sender feature (Outlook auto-attach, recent recipients, mail-client warning, My Shares, bulk send, self-revoke), with expected results, failure modes, and recovery commands. ~30 minutes if everything works.
