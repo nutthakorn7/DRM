@@ -36,6 +36,44 @@ public partial class MainWindow : Window
         SourcePathBox.TextChanged += (_, _) => UpdateDropZoneHint();
         UpdateDropZoneHint();
         _ = LoadRecentRecipientsAsync();
+        UpdateMailClientWarningVisibility();
+    }
+
+    /// <summary>
+    /// Stage 17 — probe Windows for a registered mailto: protocol
+    /// handler. When none is registered (fresh Windows / customer
+    /// stripped the box / corporate policy) Quick Send's composer
+    /// silently fails to open. Surface a yellow banner at launch so
+    /// the sender knows BEFORE pressing Send.
+    /// </summary>
+    private void UpdateMailClientWarningVisibility()
+    {
+        if (MailClientWarningBanner is null) return;
+        MailClientWarningBanner.Visibility = IsAnyMailtoHandlerRegistered()
+            ? System.Windows.Visibility.Collapsed
+            : System.Windows.Visibility.Visible;
+    }
+
+    private static bool IsAnyMailtoHandlerRegistered()
+    {
+        // Non-Windows dev surfaces (Mac dev box / Linux CI) always
+        // report "ok" — they can't drive the registry and the warning
+        // only makes sense for the actual Windows MSI build.
+        if (!OperatingSystem.IsWindows()) return true;
+
+        try
+        {
+            using var key = Registry.ClassesRoot.OpenSubKey(@"mailto\shell\open\command", writable: false);
+            var command = key?.GetValue(null) as string;
+            return !string.IsNullOrWhiteSpace(command);
+        }
+        catch
+        {
+            // Registry permission errors shouldn't make the banner
+            // appear — that would falsely scare users. Default to
+            // "no warning" when we can't tell.
+            return true;
+        }
     }
 
     // Stage 15 — shared store + helper. Both Quick Send and Folder Share

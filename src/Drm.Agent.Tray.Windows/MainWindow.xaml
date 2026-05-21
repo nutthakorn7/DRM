@@ -25,6 +25,20 @@
                                Foreground="#1f2937" />
                     <TextBlock Text="One drop, one email, one click. The recipient gets a verification link."
                                Foreground="#6B7280" Margin="0,2,0,8" TextWrapping="Wrap" FontSize="11" />
+                    <!-- Stage 17: warn at launch if Windows has no default
+                         mail client registered. Quick Send still encrypts
+                         the file but the composer won't auto-open — far
+                         less alarming if the sender knows BEFORE pressing
+                         Send than discovering it mid-demo. -->
+                    <Border x:Name="MailClientWarningBanner" Background="#FEF3C7"
+                            BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="4"
+                            Padding="10,6" Margin="0,0,0,10" Visibility="Collapsed">
+                        <TextBlock TextWrapping="Wrap" Foreground="#92400E" FontSize="11">
+                            <Run FontWeight="SemiBold">⚠ No default mail client detected.</Run>
+                            <Run>Quick Send will still encrypt your file, but the email composer won't auto-open. Set a default at</Run>
+                            <Run FontWeight="SemiBold">Settings → Apps → Default apps → Mail.</Run>
+                        </TextBlock>
+                    </Border>
                     <Border x:Name="QuickDropZone" Background="#FAFAFA" BorderBrush="#D1D5DB"
                             BorderThickness="2" CornerRadius="6" Padding="14" AllowDrop="True"
                             DragEnter="QuickDropZone_DragEnter"
