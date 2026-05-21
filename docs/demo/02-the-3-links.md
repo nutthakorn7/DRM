@@ -1,4 +1,6 @@
-# 3 ลิ้งก์ที่ engineer ต้อง test ก่อน demo
+# 3 surfaces ที่ engineer ต้อง test ก่อน demo
+
+> **เปลี่ยนแปลง 2026-05-21:** demo ใหม่ใช้ **Windows Agent** เป็นหน้าตาฝั่งพนักงาน ไม่ใช่ /me/ แล้ว — /me/ ยังทำงานได้ แต่กลายเป็น fallback ถ้า agent มีปัญหา
 
 ส่งข้อความนี้ให้ engineer ทาง Slack/LINE/อีเมล:
 
@@ -6,28 +8,36 @@
 
 ```
 สวัสดีครับ
-อาทิตย์หน้ามี demo ลูกค้า ผมต้องการให้คุณช่วย test 3 ลิ้งก์นี้และเตรียมข้อมูลให้พร้อมก่อน demo
+อาทิตย์หน้ามี demo ลูกค้า ผมต้องการให้คุณช่วย test 3 surface นี้และเตรียมข้อมูลให้พร้อมก่อน demo
 
-ทั้ง 3 ลิ้งก์เป็นหน้าจอของระบบ DRM (Digital Rights Management) ที่ชื่อ zcrDRM ลูกค้าใช้ส่งไฟล์ลับและตามรอย/ดึงสิทธิ์คืนได้ตลอดเวลา
+ทั้ง 3 surface เป็นจุดที่ผู้ใช้ของลูกค้าจะสัมผัส:
 
-1) https://drm.zcr.ai/admin/
+1) https://drm.zcr.ai/admin/  (web)
    - หน้าหลังบ้านของผู้ดูแลระบบ — ตั้งนโยบาย ดู audit log ดูทุกอย่าง
    - มีกี่ tab? Overview/Identity/Policy/Files/Integrations/Tenants รวม 6 tab
    - test ครบ: คลิกได้ทุก tab โหลดได้ไม่มี console error
+   - ข้อมูล demo seed แล้วบน prod ไม่ต้องสร้างใหม่ ดู docs/demo/09-prod-seeded-credentials.md
 
-2) https://drm.zcr.ai/me/
-   - หน้าส่งไฟล์สำหรับพนักงาน — drag and drop แล้วใส่อีเมลผู้รับ
-   - ส่งสำเร็จแล้วได้ share URL กลับมา
+2) zcrDRM Agent บน Windows  (native MSI)
+   - หน้าตาที่พนักงานลูกค้าจะใช้ทุกวัน
+   - ลง MSI ครั้งเดียว — sign in ด้วย work email — เสร็จ
+   - หลังจากนั้น right-click ไฟล์ไหนก็ได้ใน Explorer → "Protect with zcrDRM" → Quick send → ใส่อีเมลผู้รับ
+   - ดู docs/demo/08-engineer-windows-msi-setup.md สำหรับวิธีติดตั้งและ smoke
 
-3) https://drm.zcr.ai/share/
+3) https://drm.zcr.ai/share/  (web)
    - หน้าผู้รับเปิดอ่าน — ใส่อีเมลรับรหัส 6 หลัก verify แล้วเปิดอ่านได้
    - ลูกค้าไม่ต้องลงโปรแกรมอะไรเลย
 
+(ของเดิม https://drm.zcr.ai/me/ ยังเปิดได้และใช้งานได้ครบ —
+ตอน demo ใช้เป็น fallback ถ้า agent install หรือ sign-in มีปัญหา
+ดู docs/demo/06-fallback-plan.md)
+
 ที่ต้องเตรียมก่อน demo:
-- ทำตาม docs/demo/01-engineer-prep.md ใน repo (มี checklist ครบ)
-- สร้าง tenant + user + policy template ทดสอบ
-- สร้าง sample protected file ที่เปิดได้จริง
-- ตรวจว่า verification code มาในอีเมล หรือถ้าไม่มา จะ fetch จาก server log ได้
+- ดู docs/demo/09-prod-seeded-credentials.md — seed บน prod แล้ว แค่ verify ครบ
+- ลง zcrDRM Agent MSI บน laptop ที่จะใช้ demo (docs/demo/08-engineer-windows-msi-setup.md)
+- sign in ด้วย demo@zcr.ai (ค่าใน 09)
+- เตรียม sample PDF บน Desktop ของ laptop demo
+- เปิด /admin/ กับ /share/ ค้างไว้บน browser ด้วย
 
 วันที่ demo: __________
 เวลา: __________

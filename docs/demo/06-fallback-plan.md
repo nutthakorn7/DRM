@@ -69,6 +69,51 @@ docker inspect docker-drm-server-1 --format "{{.State.Health.Status}}"
 session ของผมเคลียร์ไป — งั้นเข้าตรงไปที่ Policy templates เลยครับ
 ```
 
+### P2.5: zcrDRM Agent ไม่เปิด / Right-click menu หาย / Sign-in fail
+
+**สิ่งที่เห็น:** คลิกขวา PDF ไม่เห็น "Protect with zcrDRM" — หรือเปิด agent แล้วยังเห็นหน้า "Welcome to zcrDRM" — หรือ sign-in dialog แสดง "We couldn't find demo@zcr.ai"
+
+**สิ่งที่พูดต่อลูกค้า:**
+```
+ผมจะเล่าจากฝั่ง web แทนก็ได้ครับ — agent ลงในเครื่องพนักงานจริงทำงานนิ่งกว่านี้
+ของวันนี้เป็น demo cloud ที่ใช้ร่วมหลายทีม
+```
+
+**fallback flow ที่ใช้แทน Part 2:**
+
+เปิด <https://drm.zcr.ai/me/> (Browser Tab 3) — flow เดิมก่อนมี agent:
+
+1. Tenant ID = `dddddddd-1111-2222-3333-dddddddddddd` (จาก [09-prod-seeded-credentials.md](09-prod-seeded-credentials.md))
+2. User ID = `eeeeeeee-1111-2222-3333-eeeeeeeeeeee` (demo engineer) หรือ `aaaaaaaa-1111-2222-3333-aaaaaaaaaaaa` (Somchai)
+3. ลาก-วาง `Q4-Sales-Contract-ABC-XYZ.pdf`
+4. Recipient: `malee@xyz.com`
+5. กด Send protected file
+6. Copy share URL → ใช้ใน Part 3
+
+**สิ่งที่พูดต่อตอนทำ:**
+```
+หน้านี้คือ web fallback สำหรับองค์กรที่ยังไม่ลง agent
+ทำได้เหมือนกัน แต่พนักงานต้องเปิด website + จำ tenant/user
+agent ตัวจริงคลิกขวาเสร็จเลย ไม่ต้องเปิด browser
+```
+
+**Engineer recovery (ทำหลัง demo / ถ้า demo ยังไม่ถึง Part 3):**
+
+```powershell
+# ลบ identity cache แล้ว sign in ใหม่
+Remove-Item "$env:LOCALAPPDATA\zcrDRM\identity.bin" -Force -ErrorAction SilentlyContinue
+Start-Process "C:\Program Files\zcrDRM\Drm.Agent.Tray.Windows.exe"
+# จะขึ้น first-run dialog ใหม่ — พิมพ์ demo@zcr.ai
+```
+
+ถ้า right-click menu หาย:
+```powershell
+taskkill /im explorer.exe /f
+explorer.exe
+```
+
+ถ้า sign-in fail (404 จาก discover) — seed บน prod หาย → re-seed ตาม recipe ใน [09-prod-seeded-credentials.md](09-prod-seeded-credentials.md)
+
 ### P3: Send button ค้าง / spinner ไม่หาย ที่ /me/
 
 **สิ่งที่เห็น:** กด Send แล้วปุ่มเทาค้าง

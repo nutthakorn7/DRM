@@ -19,6 +19,25 @@
   ```
   คาดผล: ทั้ง 3 ขึ้น HTTP 200
 
+- [ ] **Agent discover ตอบ identity ของ demo@zcr.ai**
+  ```bash
+  curl -s "https://drm.zcr.ai/api/agent/discover?email=demo@zcr.ai" | head -c 300
+  ```
+  คาดผล: JSON ที่มี `tenantId`, `userId`, `defaultPolicyTemplateId` ครบ
+  (ดู [09-prod-seeded-credentials.md](09-prod-seeded-credentials.md) — ถ้า 404 ต้อง re-seed)
+
+- [ ] **zcrDRM Agent บน demo laptop เปิดอยู่ + sign in แล้ว**
+  - Start Menu → zcrDRM Agent → MainWindow ขึ้น
+  - Title bar อ่านว่า `zcrDRM Agent — Demo Engineer (demo@zcr.ai)` (ไม่ใช่ "Welcome to zcrDRM")
+  - Tenant ID + User ID + Policy Template GUIDs pre-fill อยู่ในฟอร์ม
+  - ถ้าเห็นหน้า "Welcome to zcrDRM" → คือ first-run ยังไม่เสร็จ → ใส่ `demo@zcr.ai` → Sign in → ทดสอบใหม่
+  - ถ้า dialog "We couldn't find..." → seed บน prod หาย → กลับไปทำ discover smoke ข้างบน
+
+- [ ] **Sample PDF บน Desktop ของ demo laptop**
+  - `Q4-Sales-Contract-ABC-XYZ.pdf` (~ 2 MB)
+  - ทดสอบ right-click → ต้องเห็น "Protect with zcrDRM" → flyout มี 3 รายการ
+  - ถ้าไม่เห็นเมนู → restart Explorer (`taskkill /im explorer.exe /f && explorer.exe`)
+
 - [ ] **Demo tenant + template ยังอยู่**
   ```bash
   curl -s -H "X-DRM-Admin-Key: $DEMO_ADMIN_KEY" \
@@ -48,10 +67,12 @@
 
 ## เจ้าของทำ (5 นาที)
 
-- [ ] **เปิด 3 tabs ใน browser** (Chrome แนะนำ):
-  - Tab 1: <https://drm.zcr.ai/admin/> — login ด้วย demo session แล้ว
-  - Tab 2: <https://drm.zcr.ai/me/> — ฟอร์มพร้อมกรอก
-  - Tab 3: <https://drm.zcr.ai/share/> — หรือเปิด share URL ใหม่ใน incognito
+- [ ] **เตรียม windows ทั้งหมดให้พร้อม:**
+  - Browser Tab 1: <https://drm.zcr.ai/admin/> — login ด้วย demo session แล้ว
+  - Browser Tab 2: <https://drm.zcr.ai/share/> — เปิด share URL ใหม่ใน incognito (สำหรับ Part 3)
+  - **zcrDRM Agent main window: ปิดไว้ก่อน** — จะเปิดผ่านคลิกขวาตอน demo จริง
+  - File Explorer: เปิดที่ Desktop, มี Q4-Sales-Contract-ABC-XYZ.pdf เห็นชัด
+  - Browser Tab 3 (fallback only): <https://drm.zcr.ai/me/> — ถ้าจำเป็นต้อง fallback
 
 - [ ] **ปิด notification ทั้งหมด:**
   - macOS: System Settings → Notifications → Focus mode
