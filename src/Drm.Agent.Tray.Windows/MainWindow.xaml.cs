@@ -586,6 +586,147 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Stage 9: per-recipient share for folders. Packs the folder with the
+    /// user-supplied passphrase (same crypto as Seal-self-share), writes
+    /// the .drmcontainer next to the source folder, and then calls
+    /// /api/me/share with contentType="application/vnd.zcrdrm.container"
+    /// to register the recipient binding (email + permissions + expiry).
+    /// The server returns a share URL which is copied to clipboard so the
+    /// operator can paste it into Outlook alongside the .drmcontainer
+    /// attachment. The passphrase is still conveyed out-of-band — this
+    /// path adds policy/audit, not key delivery, matching the file Quick
+    /// Send model exactly.
+    /// </summary>
+    private async void ShareFolderButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        var folder = pendingProtectFolder;
+        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+        {
+            SetFolderShareResult("Drop a folder or relaunch from Explorer right-click first.", isError: true);
+            return;
+        }
+
+        var recipient = FolderShareRecipientBox?.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(recipient) || !recipient.Contains('@'))
+        {
+            SetFolderShareResult("Enter the recipient's email address.", isError: true);
+            FolderShareRecipientBox?.Focus();
+            return;
+        }
+
+        var passphrase = ContainerPassphraseBox.Password;
+        if (string.IsNullOrEmpty(passphrase) || passphrase.Length < 6)
+        {
+            SetFolderShareResult("Set a passphrase ≥ 6 chars — recipient unpacks with this out-of-band.", isError: true);
+            ContainerPassphraseBox.Focus();
+            return;
+        }
+
+        ShareFolderButton.IsEnabled = false;
+        SetFolderShareResult("Packing and registering…", isError: false);
+
+        try
+        {
+            var serverUrl = ParseServerUrl();
+            var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
+            var ownerUserId = ParseRequiredGuid(UserIdBox.Text, "User ID");
+            var containerId = Guid.NewGuid();
+
+            var entries = new List<Drm.Crypto.SecureContainerEntry>();
+            foreach (var filePath in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(folder, filePath).Replace('\\', '/');
+                var bytes = await File.ReadAllBytesAsync(filePath);
+                entries.Add(new Drm.Crypto.SecureContainerEntry(rel, bytes));
+            }
+            if (entries.Count == 0)
+            {
+                SetFolderShareResult("Folder contains no files.", isError: true);
+                return;
+            }
+
+            var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(Drm.Crypto.SecureContainer.SaltSize);
+            var key = Drm.Crypto.SecureContainer.DeriveKey(passphrase, salt);
+            var container = Drm.Crypto.SecureContainer.Pack(containerId, entries, key, salt);
+            var displayName = Path.GetFileName(folder);
+            if (string.IsNullOrWhiteSpace(displayName)) displayName = "secure-container";
+            var outPath = Path.Combine(Path.GetDirectoryName(folder.TrimEnd(Path.DirectorySeparatorChar))!, $"{displayName}.drmcontainer");
+            await File.WriteAllBytesAsync(outPath, container);
+
+            using var httpClient = new HttpClient { BaseAddress = serverUrl };
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+                "X-DRM-Admin-Key", ClientApiKeyBox.Password.Trim());
+            var body = new
+            {
+                tenantId,
+                userId = ownerUserId,
+                recipientEmail = recipient,
+                fileName = $"{displayName}.drmcontainer",
+                contentType = "application/vnd.zcrdrm.container",
+                fileBytesBase64 = Convert.ToBase64String(container),
+                expiresInHours = ParseFolderShareExpiryHours(),
+                allowPrint          = FolderShareAllowPrintBox?.IsChecked == true,
+                allowCopy           = FolderShareAllowCopyBox?.IsChecked == true,
+                allowEdit           = FolderShareAllowEditBox?.IsChecked == true,
+                allowExportOriginal = FolderShareAllowExportOriginalBox?.IsChecked == true,
+            };
+            using var content = new StringContent(
+                System.Text.Json.JsonSerializer.Serialize(body),
+                System.Text.Encoding.UTF8, "application/json");
+            using var response = await httpClient.PostAsync("/api/me/share", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                SetFolderShareResult(
+                    $"Server register failed: HTTP {(int)response.StatusCode}. .drmcontainer was written to {outPath} for self-share.",
+                    isError: true);
+                return;
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? string.Empty;
+            System.Windows.Clipboard.SetText(shareUrl);
+            SetFolderShareResult(
+                $"✅ Share URL copied. Attach {Path.GetFileName(outPath)} + share the passphrase out-of-band with {recipient}.",
+                isError: false);
+            if (ContainerDropHint != null)
+            {
+                ContainerDropHint.Text = $"✓ Shared: {displayName} → {recipient}";
+            }
+            ContainerPassphraseBox.Password = string.Empty;
+            FolderShareRecipientBox!.Text = string.Empty;
+            pendingProtectFolder = null;
+        }
+        catch (Exception ex)
+        {
+            SetFolderShareResult($"Share failed: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            ShareFolderButton.IsEnabled = true;
+        }
+    }
+
+    private void SetFolderShareResult(string message, bool isError)
+    {
+        if (FolderShareResultText is null) return;
+        FolderShareResultText.Text = message;
+        FolderShareResultText.Foreground = new System.Windows.Media.SolidColorBrush(
+            isError
+                ? System.Windows.Media.Color.FromRgb(0xB9, 0x1C, 0x1C)
+                : System.Windows.Media.Color.FromRgb(0x04, 0x78, 0x57));
+    }
+
+    private int ParseFolderShareExpiryHours()
+    {
+        const int defaultHours = 168;
+        if (FolderShareExpiryDropdown?.SelectedItem is not System.Windows.Controls.ComboBoxItem item)
+        {
+            return defaultHours;
+        }
+        return int.TryParse(item.Tag?.ToString(), out var hours) ? hours : defaultHours;
+    }
+
     private string? quickPickedFile;
 
     private void QuickDropZone_DragEnter(object sender, System.Windows.DragEventArgs e)

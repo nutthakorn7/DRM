@@ -339,23 +339,82 @@
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                             <TextBlock Text="Container passphrase:" Foreground="#6B7280" Margin="0,0,6,0" VerticalAlignment="Center" />
                             <PasswordBox x:Name="ContainerPassphraseBox" Width="240" Height="22" />
-                            <!--
-                                Seal folder button — Phase 5AS-folder-rclick.
-                                When the agent is launched from Explorer's
-                                folder right-click ("Protect folder with
-                                zcrDRM"), the WiX entry passes the folder
-                                via the protect-folder switch so the
-                                drop-zone is pre-filled. The user just
-                                types a passphrase and clicks this button;
-                                no second drag-and-drop required. Drag-drop
-                                still works for power users.
-                            -->
                             <Button x:Name="SealFolderButton"
-                                    Content="Seal folder"
+                                    Content="Seal (self-share)"
                                     Margin="8,0,0,0"
                                     Padding="8,2,8,2"
-                                    Click="SealFolderButton_Click" />
+                                    Click="SealFolderButton_Click"
+                                    ToolTip="Pack with passphrase and write .drmcontainer next to the folder. You share the file + passphrase out-of-band yourself." />
                         </StackPanel>
+
+                        <!--
+                            Stage 9 — per-recipient share for folders. Mirrors the
+                            Quick Send picker shape (recipient + permissions + expiry).
+                            Clicking "Share with recipient" packs the container with
+                            the passphrase above AND calls /api/me/share with
+                            contentType="application/vnd.zcrdrm.container" so the
+                            server records the recipient binding, permissions,
+                            expiry and produces a share URL the operator can
+                            paste into Outlook alongside the .drmcontainer
+                            attachment. Same policy/audit trail as file Quick Send.
+                        -->
+                        <Border BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,10,0,0">
+                            <StackPanel>
+                                <TextBlock Text="OR share with a specific recipient (policy-tracked, like Quick Send)"
+                                           FontWeight="SemiBold" Foreground="#374151" FontSize="11" Margin="0,0,0,6" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Recipient email:" Foreground="#6B7280" Margin="0,0,6,0" VerticalAlignment="Center" FontSize="11" />
+                                    <TextBox x:Name="FolderShareRecipientBox" Width="220" Height="22" FontSize="11" />
+                                </StackPanel>
+
+                                <Expander x:Name="FolderSharePermissionsExpander"
+                                          Header="Customize permissions for this recipient"
+                                          IsExpanded="False" Margin="0,6,0,0"
+                                          Foreground="#374151" FontSize="11">
+                                    <Border Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="1"
+                                            CornerRadius="4" Padding="12,8" Margin="0,6,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="View is always granted (recipient must open the container)."
+                                                       Foreground="#6B7280" FontSize="11" Margin="0,0,0,6" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <CheckBox x:Name="FolderShareAllowPrintBox" Content="Allow print"
+                                                          Margin="0,0,16,0" FontSize="11" />
+                                                <CheckBox x:Name="FolderShareAllowCopyBox"  Content="Allow copy text"
+                                                          Margin="0,0,16,0" FontSize="11" />
+                                                <CheckBox x:Name="FolderShareAllowEditBox"  Content="Allow edit"
+                                                          Margin="0,0,16,0" FontSize="11" />
+                                                <CheckBox x:Name="FolderShareAllowExportOriginalBox"
+                                                          Content="Allow download original (no DRM)"
+                                                          FontSize="11" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                <TextBlock Text="Access expires:" VerticalAlignment="Center"
+                                                           Foreground="#374151" FontSize="11" Margin="0,0,8,0" />
+                                                <ComboBox x:Name="FolderShareExpiryDropdown" Width="160" FontSize="11"
+                                                          SelectedIndex="0">
+                                                    <ComboBoxItem Tag="168">In 7 days (default)</ComboBoxItem>
+                                                    <ComboBoxItem Tag="720">In 30 days</ComboBoxItem>
+                                                    <ComboBoxItem Tag="2160">In 90 days</ComboBoxItem>
+                                                    <ComboBoxItem Tag="8760">In 365 days (max)</ComboBoxItem>
+                                                </ComboBox>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </Expander>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button x:Name="ShareFolderButton"
+                                            Content="Share with recipient"
+                                            Padding="10,3,10,3"
+                                            Click="ShareFolderButton_Click"
+                                            ToolTip="Pack with passphrase + register recipient binding on server. Share URL is copied to clipboard; attach the .drmcontainer file and convey the passphrase in your email." />
+                                    <TextBlock x:Name="FolderShareResultText"
+                                               Foreground="#047857" FontSize="11"
+                                               TextWrapping="Wrap" Margin="10,0,0,0"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </StackPanel>

@@ -202,6 +202,49 @@ public sealed class QuickShareEndpointsTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Quick_share_accepts_container_content_type_with_full_picker()
+    {
+        // Stage 9 — folder per-recipient share. The agent's "Share with
+        // recipient" button on the Container section calls /api/me/share
+        // with the packed .drmcontainer as the payload and
+        // contentType="application/vnd.zcrdrm.container". The endpoint
+        // must accept this just like any other content type and produce
+        // the same recipient binding + permissions + expiry + share URL
+        // as a normal file Quick Send — confirms the agent's Container
+        // section can reuse the file Quick Send wire shape with zero
+        // server changes.
+        using var client = factory.CreateClient();
+        var body = new
+        {
+            tenantId = Guid.NewGuid(),
+            userId = Guid.NewGuid(),
+            recipientEmail = "frank@example.com",
+            fileName = "q3-deck.drmcontainer",
+            contentType = "application/vnd.zcrdrm.container",
+            fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("PRETEND CONTAINER BYTES")),
+            expiresInHours = 720,
+            allowPrint = true,
+            allowCopy = false,
+            allowEdit = true,
+            allowExportOriginal = false,
+        };
+
+        using var resp = await client.PostAsJsonAsync("/api/me/share", body);
+        resp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var result = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
+
+        result.Should().NotBeNull();
+        result!.ShareUrl.Should().Contain("/share/?");
+        result.RecipientEmail.Should().Be("frank@example.com");
+        result.Permissions.Should().Contain("View");
+        result.Permissions.Should().Contain("Print");
+        result.Permissions.Should().Contain("Edit");
+        result.Permissions.Should().NotContain("Copy");
+        result.Permissions.Should().NotContain("ExportOriginal");
+        result.ExpiresAtUtc.Should().BeCloseTo(DateTimeOffset.UtcNow.AddHours(720), TimeSpan.FromMinutes(1));
+    }
+
     public void Dispose()
     {
         factory.Dispose();
