@@ -747,9 +747,20 @@ public partial class MainWindow : Window
                 bodyFor: inlined => BuildContainerShareEmailBody(shareUrl, containerFileName, containerFullPath, inlined),
                 attachmentPath: containerFullPath);
             SetFolderShareResult(
-                composeResult.AttachmentInlined
-                    ? $"✅ Outlook opened with {containerFileName} attached. Hit Send — and remember to message the passphrase separately."
-                    : $"✅ Share URL copied + email composer opened. Attach {containerFileName} and send the passphrase to {recipient} on a separate channel.",
+                composeResult switch
+                {
+                    { AttachmentInlined: true } =>
+                        $"✅ Outlook opened with {containerFileName} attached. Hit Send — and remember to message the passphrase separately.",
+                    { ComposerOpened: true } =>
+                        $"✅ Share URL copied + email composer opened. Attach {containerFileName} and send the passphrase to {recipient} on a separate channel.",
+                    // Stage 16: no composer succeeded — share URL is on
+                    // clipboard, sender just has to paste into webmail.
+                    _ =>
+                        $"✅ Wrote {containerFileName} + share URL copied. " +
+                        "Couldn't open an email composer — set a default mail client in " +
+                        "Settings → Apps → Default apps → Mail. Send the passphrase to " +
+                        $"{recipient} on a separate channel."
+                },
                 isError: false);
             // Stage 15: same recent-recipients store as Quick Send.
             await RememberRecipientAsync(recipient);
@@ -1045,12 +1056,30 @@ public partial class MainWindow : Window
                 $"Encrypted file: {drmxName}",
                 bodyFor: inlined => BuildFileShareEmailBody(shareUrl, drmxName, drmxPath, inlined),
                 attachmentPath: drmxPath);
-            QuickResultText.Text = composeResult.AttachmentInlined
-                ? $"✅ Wrote {drmxName} + Outlook opened with it attached. Just hit Send."
-                : $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.";
+            QuickResultText.Text = composeResult switch
+            {
+                { AttachmentInlined: true } =>
+                    $"✅ Wrote {drmxName} + Outlook opened with it attached. Just hit Send.",
+                { ComposerOpened: true } =>
+                    $"✅ Wrote {drmxName}. Share URL copied + email composer opened — attach the .drmx and send.",
+                // Stage 16: no composer succeeded — surface the failure
+                // visibly instead of leaving a stale "Sending…" string.
+                // Share URL is still on the clipboard so the sender can
+                // paste into webmail by hand.
+                _ =>
+                    $"✅ Wrote {drmxName} + share URL copied to clipboard. " +
+                    "Couldn't open an email composer — set a default mail client in " +
+                    "Settings → Apps → Default apps → Mail, then paste the URL into a new email."
+            };
             // Stage 15: persist after the share succeeded so a failed
             // send doesn't pollute the dropdown with bad addresses.
             await RememberRecipientAsync(recipient);
+            // Stage 16: clear the file picker so the sender can drop the
+            // next file without first un-selecting. Recipient stays in
+            // the box — same-recipient-different-file is the common
+            // multi-send pattern.
+            quickPickedFile = null;
+            QuickDropFile.Text = string.Empty;
         }
         catch (Exception ex)
         {

@@ -121,6 +121,32 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
+    public void Quick_send_surfaces_actionable_message_when_no_composer_opens()
+    {
+        // Stage 16 — when both Outlook COM and mailto fail (no default
+        // mail client at all) the agent must NOT show "✅ composer opened"
+        // because nothing did open. The message tells the sender how to
+        // fix it (Settings → Apps → Default apps → Mail) and reminds them
+        // the share URL is on the clipboard.
+        TrayMain.Should().Contain("Settings → Apps → Default apps → Mail",
+            "the failure-mode message must give the sender the exact fix path");
+        TrayMain.Should().Contain("Couldn't open an email composer",
+            "the failure-mode message must say what failed, not lie about success");
+    }
+
+    [Fact]
+    public void Quick_send_clears_file_picker_after_success_for_send_another_flow()
+    {
+        // Stage 16 — after a successful Quick Send the file picker resets
+        // so the next file drop just works. Recipient stays so the
+        // "same recipient, next file" pattern is one drop away.
+        TrayMain.Should().Contain("quickPickedFile = null",
+            "post-success must clear the picked file so the sender can drop another");
+        TrayMain.Should().Contain("QuickDropFile.Text = string.Empty",
+            "the drop-zone label must reset too — otherwise it still shows the just-sent file");
+    }
+
+    [Fact]
     public void Mailto_helper_uses_shell_execute()
     {
         // mailto: URLs only work via the shell protocol handler on Windows.
