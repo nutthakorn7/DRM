@@ -123,6 +123,45 @@
           <div class="empty-hint">Finish verification on the left and the file metadata, expiry, and watermark show up in this panel.</div>
         </div>
 
+        <!--
+            Post-verification recipient guide (Stage 10). The /share/ flow
+            today gates policy + email identity, but the file bytes flow
+            out-of-band (the sender attached the .drmx to the same email).
+            Without this guide, recipients reach the metadata panel and
+            think the page "didn't show them the document" — friction #4
+            in the recipient UX audit. The guide is hidden until the
+            session is open (data-has-session="true") so it doesn't
+            distract pre-verification.
+        -->
+        <div class="next-steps" id="nextStepsPanel">
+          <p class="eyebrow">What to do next</p>
+          <ol class="next-steps-list">
+            <li>
+              <strong>Open the attached file.</strong>
+              The sender attached a <code>.drmx</code> (or
+              <code>.drmcontainer</code>) file to the same email. Save it
+              to your computer and double-click to open.
+            </li>
+            <li>
+              <strong>The viewer enforces the permissions shown above.</strong>
+              Print, copy, edit and download are allowed only when the
+              row above says so. The watermark is stamped on every page.
+            </li>
+            <li id="viewerInstallStep">
+              <strong>No viewer installed yet?</strong>
+              <a id="viewerDownloadLink" href="/static/zcrdrm-agent.msi" download>
+                Download the zcrDRM viewer (Windows MSI)
+              </a>
+              and double-click the installer. After installing, the
+              <code>.drmx</code> attachment opens automatically.
+            </li>
+          </ol>
+          <p class="next-steps-footer">
+            Questions about your access? Contact the person who shared
+            this file with you, or reply to the verification email.
+          </p>
+        </div>
+
         <dl>
           <div>
             <dt>File ID</dt>
