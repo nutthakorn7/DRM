@@ -780,7 +780,7 @@ public partial class MainWindow : Window
             recipient,
             subject,
             bodyFor(false),
-            attachmentPaths: []));
+            AttachmentPaths: []));
     }
 
     private static string BuildFileShareEmailBody(string shareUrl, string fileName, string? localPath, bool attachmentInlined)
