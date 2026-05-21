@@ -71,7 +71,9 @@ try {
         throw "dotnet SDK not on PATH. Install .NET 10 SDK from https://dot.net/."
     }
     if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
-        throw "WiX 4 not on PATH. Install with: dotnet tool install --global wix"
+        # WiX 5+ required: Product.wxs uses <Files Include="**\*"/>
+        # which lands in WiX 5 (WiX 4 errors with WIX0005 here).
+        throw "WiX 5 not on PATH. Install with: dotnet tool install --global wix --version 5.0.2"
     }
 
     # ------------------------------------------------------------------

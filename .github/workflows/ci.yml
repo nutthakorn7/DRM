@@ -116,14 +116,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install WiX 4 toolset
-        # Pin to a specific WiX 4.x version so the CI behaviour is
-        # reproducible — a `wix` upstream change shouldn't silently
-        # break demo-prep day. 4.0.6 is the latest stable 4.x at time
-        # of writing and matches the v4 schema in Product.wxs. Bump
-        # when we want a newer version (5.x changed enough that
-        # Product.wxs would need updates).
-        run: dotnet tool install --global wix --version 4.0.6
+      - name: Install WiX 5 toolset
+        # WiX 5 (not WiX 4): the `<Files Include="**\*"/>` bulk-harvest
+        # element used in Product.wxs is a WiX-5-and-later feature.
+        # WiX 5 keeps the same `schemas/v4/wxs` XML namespace and is
+        # source-compatible with WiX 4 — only the toolset version bumps.
+        # See https://docs.firegiant.com/wix/fivefour/.
+        # Pinned to a specific version so demo-prep day doesn't get
+        # surprised by an upstream release.
+        run: dotnet tool install --global wix --version 5.0.2
 
       - name: Build MSI
         working-directory: deploy/windows-msi

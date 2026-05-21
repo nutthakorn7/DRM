@@ -20,7 +20,9 @@ no PowerShell, no GUIDs, no manual registry steps.
 
 ```powershell
 # One-time setup
-dotnet tool install --global wix
+# WiX 5 (not WiX 4) — the bulk <Files Include="**\*"/> harvester is a
+# WiX 5+ feature. Same XML namespace as WiX 4, fully source-compatible.
+dotnet tool install --global wix --version 5.0.2
 
 # Build
 cd deploy\windows-msi
