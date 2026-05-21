@@ -93,13 +93,25 @@ If you see the dialog say *"We couldn't find <email>"* — the email isn't regis
 
 This is what the customer will see on stage. Drive it once to confirm it works.
 
+**Before you start:** confirm Windows has a default mail client set
+(Settings → Apps → Default apps → "Mail"). After Quick Send, the
+agent opens a `mailto:` composer — if no default is configured the
+mailto silently no-ops and the audience sees nothing happen.
+Outlook desktop, Thunderbird, or the built-in Mail app are all fine.
+
 1. Drop any test PDF (or `.docx`, `.xlsx`) onto the Desktop.
 2. **Right-click it → Protect with zcrDRM → Quick send (recommended).**
 3. The tray's "Quick Send" tab opens with the file pre-selected.
-4. Type a recipient email, click **Send protected file**.
-5. The status line shows `Protected: ...`.
+4. Type a recipient email (use a real address you can check), click **Send protected file**.
+5. Three things should happen, in this order:
+   - Status line: `✅ Wrote <filename>.drmx. Share URL copied + email composer opened`.
+   - File Explorer: `<filename>.drmx` appears next to the source file.
+   - Default mail client opens with `To:`, `Subject: Encrypted file: <name>.drmx`, and a body pre-filled with the share URL + the local `.drmx` path.
+6. Drag the `.drmx` from Explorer into the open email as an attachment, hit **Send**.
+7. On the recipient side: open the share URL → enter the same recipient email → enter the 6-digit code from the verification email → land on the file page → click **Download .drmx**.
+8. Back on the demo laptop: double-click either the downloaded `.drmx` or the one the agent wrote → it should open in the zcrDRM viewer with the watermark overlay.
 
-Then double-click the resulting `.drmx` file → it should open in the viewer. If it asks for an "open decision" check, the policy is working end-to-end.
+If step 5 shows `Share-link failed: HTTP 400` — the .drmx was still written (look in Explorer), but the share-link request was rejected. Most likely cause: the demo tenant's admin key is wrong; check `ClientApiKeyBox` in the agent's main window matches `DEMO_ADMIN_KEY` in your shell.
 
 ## 7. Screenshots for the demo deck
 
