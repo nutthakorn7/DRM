@@ -162,6 +162,25 @@
           </p>
         </div>
 
+        <!--
+            Stage 11 R1 — permission badges. Each chip represents one
+            DRM capability with a clear allowed/denied state so the
+            recipient sees at a glance what the viewer will let them
+            do. JS toggles data-state on each chip based on the
+            payload.permissions string returned by /viewer/session.
+        -->
+        <div class="permission-badges" id="permissionBadges" aria-label="Permissions granted to you">
+          <p class="eyebrow">Your permissions</p>
+          <div class="badge-row">
+            <span class="perm-badge" data-perm="View"           data-state="denied">👁 View</span>
+            <span class="perm-badge" data-perm="Print"          data-state="denied">🖨 Print</span>
+            <span class="perm-badge" data-perm="Copy"           data-state="denied">📋 Copy text</span>
+            <span class="perm-badge" data-perm="Edit"           data-state="denied">✏️ Edit</span>
+            <span class="perm-badge" data-perm="ExportOriginal" data-state="denied">📥 Download original</span>
+          </div>
+          <p class="badge-hint">Green = allowed, gray strikethrough = denied. The zcrDRM viewer enforces these when you open the attached file.</p>
+        </div>
+
         <dl>
           <div>
             <dt>File ID</dt>

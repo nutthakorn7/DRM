@@ -413,6 +413,12 @@ public static class ExternalShareEndpoints
             shareLink.ExpiresAtUtc,
             verification.SessionExpiresAtUtc.Value,
             file.WatermarkTemplate,
+            // Stage 11 R1: emit the bitfield-string so /share/ can render
+            // chip-style badges. The disabled flags below are intentionally
+            // kept all-true because /share/ never delivers actual bytes —
+            // the viewer (Drm.Viewer.Windows) enforces print/copy/edit
+            // against this same Permissions value when the .drmx is opened.
+            file.Permissions.ToString(),
             DownloadDisabled: true,
             PrintDisabled: true,
             ExportDisabled: true,
@@ -598,6 +604,12 @@ public static class ExternalShareEndpoints
         DateTimeOffset ShareLinkExpiresAtUtc,
         DateTimeOffset SessionExpiresAtUtc,
         string WatermarkTemplate,
+        // Stage 11 R1: Permissions surfaced so /share/ can render visual
+        // badges (View ✓, Print ✗, ...) instead of forcing the recipient
+        // to mentally parse "DownloadDisabled: true, PrintDisabled: true".
+        // Serialized as the flagged-enum string ("View, Print") — JS
+        // splits + maps to badge state.
+        string Permissions,
         bool DownloadDisabled,
         bool PrintDisabled,
         bool ExportDisabled,

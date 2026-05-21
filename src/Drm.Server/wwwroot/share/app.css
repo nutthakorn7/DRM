@@ -348,8 +348,63 @@ button:disabled {
 
 .preview-details[data-has-session="false"] dl,
 .preview-details[data-has-session="false"] .next-steps,
+.preview-details[data-has-session="false"] .permission-badges,
 .preview-details[data-has-session="false"] + .viewer-actions { /* hide actions block during empty state */
   display: none;
+}
+
+/* Stage 11 R1 — chip-style permission badges. Each capability is one
+   chip; data-state on the chip drives the look. Allowed = solid green,
+   denied = gray with strikethrough so the recipient sees both axes
+   (what's possible vs what they got) in a single glance. */
+.permission-badges {
+  margin: 18px 0 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.permission-badges .eyebrow {
+  margin: 0 0 8px;
+  color: var(--brand-deep, #275d72);
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.perm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.perm-badge[data-state="allowed"] {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.perm-badge[data-state="denied"] {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  text-decoration: line-through;
+}
+
+.badge-hint {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: #6b7280;
 }
 
 .preview-details[data-has-session="true"] .preview-empty {
