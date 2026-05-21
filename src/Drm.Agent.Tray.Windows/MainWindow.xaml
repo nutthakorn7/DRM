@@ -296,10 +296,10 @@
                                 When the agent is launched from Explorer's
                                 folder right-click ("Protect folder with
                                 zcrDRM"), the WiX entry passes the folder
-                                via --protect-folder so the drop-zone is
-                                pre-filled. The user just types a
-                                passphrase and clicks this button — no
-                                second drag-and-drop required. Drag-drop
+                                via the protect-folder switch so the
+                                drop-zone is pre-filled. The user just
+                                types a passphrase and clicks this button;
+                                no second drag-and-drop required. Drag-drop
                                 still works for power users.
                             -->
                             <Button x:Name="SealFolderButton"
