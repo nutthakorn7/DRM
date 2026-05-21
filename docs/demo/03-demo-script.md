@@ -158,27 +158,34 @@ Malee จาก XYZ Co.
 ```
 กดส่ง — ระบบทำที่เครื่องนี้:
 1. เข้ารหัสไฟล์ด้วย AES-256 ที่ laptop ตัวเองทันที — ไฟล์ไม่ขึ้น cloud
-2. ส่ง wrapped key + metadata ไปที่ server
-3. ระบบส่งอีเมลแจ้ง Malee พร้อม share link
-4. คืน share URL มาให้พนักงาน
+2. เขียนไฟล์ .drmx ลงข้าง source — เห็นบน Desktop ทันที
+3. ส่ง wrapped key + metadata ไปที่ server เพื่อ register
+4. คืน share URL มา + เปิดอีเมลให้พร้อมส่ง
 ```
 
-**[result panel ขึ้น — share URL + Copy link button]**
+**[status panel ขึ้น — "✅ Wrote Q4-Sales-Contract-ABC-XYZ.pdf.drmx. Share URL copied + email composer opened" + default mail client เด้งขึ้นมาพร้อม recipient/subject/body กรอกแล้ว]**
 
 ```
-เสร็จแล้ว — share URL กลับมาให้ก็อปปี้
-จะส่งทาง email, LINE, Slack ก็ได้ ไม่ใช่ความลับ
-**เพราะลิ้งก์อย่างเดียวเปิดไฟล์ไม่ได้** — Malee ต้อง verify email ของตัวเองก่อน
+สังเกตหน้าจอ — สองอย่างเกิดขึ้นพร้อมกัน:
+
+1. **บน Desktop** มีไฟล์ใหม่: Q4-Sales-Contract-ABC-XYZ.pdf.drmx
+   ไฟล์เข้ารหัสที่ Malee จะเปิดได้ (หลัง verify email)
+
+2. **default mail client เปิดเอง** — to: malee@xyz.com,
+   subject + body กรอกครบ พร้อม share URL ฝังในเนื้อหา
+
+พนักงานทำ **1 อย่าง** เท่านั้น: ลาก .drmx จาก Desktop ใส่เป็น attachment แล้ว Send
 ```
 
-**[กดปุ่ม Copy link → จากนั้นปิดหน้าต่าง agent]**
+**[ลาก .drmx จาก Desktop ใส่เป็น attachment → กดส่ง → ปิดหน้าต่าง agent]**
 
 ```
 สังเกตว่าตั้งแต่ต้นจนเสร็จ:
 - พนักงานเปิด website **0 ครั้ง**
 - พนักงานพิมพ์ GUID **0 ครั้ง**
 - พนักงานต้องเลือก policy **0 ครั้ง** (ใช้ default ของ tenant)
-- click ทั้งหมด **2 ครั้ง** — Right-click → Quick send → ใส่อีเมล → ส่ง
+- พนักงานก็อปปี้ share URL ใส่อีเมลเอง **0 ครั้ง** (ระบบเปิดอีเมลให้แล้ว)
+- click ทั้งหมด **3 ครั้ง** — Right-click → Quick send → ใส่อีเมล → ส่ง → drag .drmx → Send mail
 
 นี่คือ "easy to use ที่สุด" ที่เราอยากให้ลูกค้าได้
 ฝ่าย IT ตั้งค่าครั้งเดียว, พนักงานใช้ทุกวันโดยไม่รู้ว่ามีระบบความปลอดภัยอยู่
