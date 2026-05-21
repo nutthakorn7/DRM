@@ -39,6 +39,16 @@ services:
       Drm__Security__TransparentTrailerSecret: ${DRM_TRAILER_SECRET}
       Drm__License__EnabledTiers: ${DRM_LICENSE_TIERS:-All}
       Drm__License__PaidEncrypterCount: ${DRM_PAID_ENCRYPTERS:-10}
+      # Stage 12 — outbound SMTP for /share/ recipient verification.
+      # Empty defaults keep the agent's no-email path working
+      # (NoopExternalShareVerificationSender) for dev. Set these in .env
+      # on the prod host to enable real delivery (Resend/SendGrid/SES).
+      Drm__Email__SmtpHost: ${Drm__Email__SmtpHost:-}
+      Drm__Email__SmtpPort: ${Drm__Email__SmtpPort:-587}
+      Drm__Email__SmtpUsername: ${Drm__Email__SmtpUsername:-}
+      Drm__Email__SmtpPassword: ${Drm__Email__SmtpPassword:-}
+      Drm__Email__FromAddress: ${Drm__Email__FromAddress:-}
+      Drm__Email__FromName: ${Drm__Email__FromName:-zcrDRM Security}
     volumes:
       - drm-data:/var/lib/drm
     healthcheck:
