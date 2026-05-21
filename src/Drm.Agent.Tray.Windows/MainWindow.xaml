@@ -339,6 +339,22 @@
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                             <TextBlock Text="Container passphrase:" Foreground="#6B7280" Margin="0,0,6,0" VerticalAlignment="Center" />
                             <PasswordBox x:Name="ContainerPassphraseBox" Width="240" Height="22" />
+                            <!--
+                                Seal folder button — Phase 5AS-folder-rclick.
+                                When the agent is launched from Explorer's
+                                folder right-click ("Protect folder with
+                                zcrDRM"), the WiX entry passes the folder
+                                via the protect-folder switch so the
+                                drop-zone is pre-filled. The user just
+                                types a passphrase and clicks this button;
+                                no second drag-and-drop required. Drag-drop
+                                still works for power users.
+                            -->
+                            <Button x:Name="SealFolderButton"
+                                    Content="Seal folder"
+                                    Margin="8,0,0,0"
+                                    Padding="8,2,8,2"
+                                    Click="SealFolderButton_Click" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

@@ -205,6 +205,35 @@
     </Component>
 
     <!--
+        Phase 5AS-folder-rclick (Stage 8): folder right-click → seal into
+        .drmcontainer.
+
+        Files use HKCR\*\shell (the universal file verb root). Folders
+        live under HKCR\Directory\shell — a separate verb namespace, so
+        the file submenu above DOES NOT show up for folders. We add a
+        single top-level verb here (no submenu) because folders only
+        have one DRM operation: pack the tree into a single
+        .drmcontainer with the existing Drm.Crypto.SecureContainer
+        format. The .drmcontainer file association (lines ~141-149) is
+        already wired to open with the viewer, so end-to-end works as
+        soon as this verb shells the tray with the protect-folder switch.
+
+        %V (the "verb path" token) is the Windows-canonical placeholder
+        for the selected directory when invoking a Directory\shell verb,
+        whereas %1 is the canonical token for file verbs. We use %V
+        here to be unambiguous about the substitution semantics.
+    -->
+    <Component Id="ProtectFolderShellMenu" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKCR" Key="Directory\shell\zcrDRMProtectFolder">
+        <RegistryValue Type="string" Value="Protect folder with zcrDRM" KeyPath="yes" />
+        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-78" />
+      </RegistryKey>
+      <RegistryKey Root="HKCR" Key="Directory\shell\zcrDRMProtectFolder\command">
+        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --protect-folder &quot;%V&quot;" />
+      </RegistryKey>
+    </Component>
+
+    <!--
         Tray auto-start at login is INTENTIONALLY NOT in Stage 2.
 
         The tray today (Drm.Agent.Tray.Windows/MainWindow.xaml.cs) only
@@ -258,6 +287,7 @@
       <ComponentRef Id="ProtectShellSubQuickSend" />
       <ComponentRef Id="ProtectShellSubProtect" />
       <ComponentRef Id="ProtectShellSubTransparent" />
+      <ComponentRef Id="ProtectFolderShellMenu" />
       <!-- TrayAutoStart deferred to Stage 3 (needs background-start switch in the tray first). -->
       <ComponentRef Id="TrayStartMenuShortcut" />
     </Feature>

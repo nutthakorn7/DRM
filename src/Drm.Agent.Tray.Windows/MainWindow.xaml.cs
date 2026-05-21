@@ -466,13 +466,61 @@ public partial class MainWindow : Window
             SetStatus("Drop a folder (not a single file).");
             return;
         }
+
+        await PackContainerFromFolderAsync(folder);
+    }
+
+    /// <summary>
+    /// Folder right-click "Protect folder with zcrDRM" handler (Stage 8 /
+    /// Phase 5AS-folder-rclick): the WiX <c>Directory\shell\zcrDRMProtectFolder</c>
+    /// entry passes the selected directory via <c>--protect-folder</c>.
+    /// We pre-fill the Container drop-zone hint with the picked folder and
+    /// stash the path so the "Seal folder" button (or another drop) can
+    /// kick off the actual packing without forcing the user to drag the
+    /// same folder back in.
+    /// </summary>
+    private string? pendingProtectFolder;
+
+    private void BeginProtectFolderFromCommandLine(string folder)
+    {
+        pendingProtectFolder = folder;
+        UpdateContainerWizardDots(2);
+        if (ContainerDropHint != null)
+        {
+            ContainerDropHint.Text =
+                $"Folder ready (right-click): {Path.GetFileName(folder)} — type a passphrase ≥ 6 chars and click 'Seal folder'.";
+        }
+        ContainerPassphraseBox?.Focus();
+    }
+
+    private async void SealFolderButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        var folder = pendingProtectFolder;
+        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+        {
+            SetStatus("No folder loaded — drop one into the box or relaunch from Explorer right-click.");
+            return;
+        }
+        await PackContainerFromFolderAsync(folder);
+    }
+
+    /// <summary>
+    /// Core container packaging logic — shared by the drag-and-drop entry
+    /// point and the Explorer-right-click + Seal-button entry point. Reads
+    /// every file in the folder, runs <see cref="Drm.Crypto.SecureContainer.Pack"/>
+    /// with a freshly derived per-container key (passphrase + random salt),
+    /// writes the <c>.drmcontainer</c> next to the folder, and registers
+    /// the container's metadata with the server.
+    /// </summary>
+    private async Task PackContainerFromFolderAsync(string folder)
+    {
         UpdateContainerWizardDots(2);
 
         var passphrase = ContainerPassphraseBox.Password;
         if (string.IsNullOrEmpty(passphrase) || passphrase.Length < 6)
         {
-            SetStatus("Step 2: set a passphrase ≥ 6 characters, then drop the folder again.");
-            ContainerDropHint.Text = $"Folder ready: {Path.GetFileName(folder)} — fill the passphrase below and drop again.";
+            SetStatus("Step 2: set a passphrase ≥ 6 characters, then drop the folder again or click 'Seal folder'.");
+            ContainerDropHint.Text = $"Folder ready: {Path.GetFileName(folder)} — fill the passphrase below and click 'Seal folder' (or drop again).";
             ContainerPassphraseBox.Focus();
             return;
         }
@@ -530,6 +578,7 @@ public partial class MainWindow : Window
             ContainerDropHint.Text = $"✓ Sealed: {displayName} ({entries.Count} files → {Path.GetFileName(outPath)})";
             UpdateContainerWizardDots(0);
             ContainerPassphraseBox.Password = string.Empty;
+            pendingProtectFolder = null;
         }
         catch (Exception ex)
         {
@@ -952,6 +1001,17 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(quickSendRecipient) && QuickRecipientBox != null)
         {
             QuickRecipientBox.Text = quickSendRecipient;
+        }
+
+        // Phase 5AS-folder-rclick (Stage 8): the WiX
+        // HKCR\Directory\shell\zcrDRMProtectFolder entry shells the tray
+        // with this flag pointing at the selected folder. Pre-fill the
+        // Container drop-zone instead of forcing the user to drag the
+        // same folder in.
+        var protectFolderPath = TryGetCommandLineValue("--protect-folder", args);
+        if (!string.IsNullOrWhiteSpace(protectFolderPath) && Directory.Exists(protectFolderPath))
+        {
+            BeginProtectFolderFromCommandLine(protectFolderPath);
         }
     }
 
