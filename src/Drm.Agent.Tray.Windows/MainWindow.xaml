@@ -41,8 +41,14 @@
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <TextBlock Text="Send to:" Foreground="#374151" VerticalAlignment="Center"
                                    Margin="0,0,6,0" />
-                        <TextBox x:Name="QuickRecipientBox" Width="280" Height="26"
-                                 VerticalContentAlignment="Center" />
+                        <!-- Stage 15: editable ComboBox so sender can pick from
+                             recent recipients or type a fresh address.
+                             IsEditable + IsTextSearchEnabled gives type-ahead
+                             autocomplete on the dropdown items. -->
+                        <ComboBox x:Name="QuickRecipientBox" Width="280" Height="26"
+                                  IsEditable="True" IsTextSearchEnabled="True"
+                                  StaysOpenOnEdit="True"
+                                  VerticalContentAlignment="Center" />
                         <Button x:Name="QuickBrowseButton" Content="Browse" Margin="8,0,0,0"
                                 Padding="10,2" Click="QuickBrowseButton_Click" />
                         <Button x:Name="QuickSendButton" Content="Send protected file"
@@ -364,7 +370,11 @@
                                            FontWeight="SemiBold" Foreground="#374151" FontSize="11" Margin="0,0,0,6" />
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                     <TextBlock Text="Recipient email:" Foreground="#6B7280" Margin="0,0,6,0" VerticalAlignment="Center" FontSize="11" />
-                                    <TextBox x:Name="FolderShareRecipientBox" Width="220" Height="22" FontSize="11" />
+                                    <!-- Stage 15: pick from recent OR type new (same store as Quick Send). -->
+                                    <ComboBox x:Name="FolderShareRecipientBox" Width="220" Height="22"
+                                              IsEditable="True" IsTextSearchEnabled="True"
+                                              StaysOpenOnEdit="True"
+                                              FontSize="11" />
                                 </StackPanel>
 
                                 <Expander x:Name="FolderSharePermissionsExpander"
