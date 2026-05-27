@@ -23,9 +23,26 @@ On install it registers:
 
 ## 2. Get the MSI
 
-The MSI is uploaded as an artifact by every CI run on master.
+### Primary: tagged release (recommended — no GitHub login required)
 
-1. Open <https://github.com/nutthakorn7/DRM/actions/workflows/ci.yml?query=branch%3Amaster>
+Every shipped release attaches the MSI as a public download asset. **This is the path you should use** for normal demos and customer hand-offs.
+
+1. Open the latest release: <https://github.com/nutthakorn7/DRM/releases/latest>
+2. Scroll to **Assets**.
+3. Click `zcrdrm-agent.msi` → file downloads directly (~50 MB, no `.zip` extraction needed).
+4. Verify the download isn't corrupt — also download `zcrdrm-agent.msi.sha256.txt` from the same release and run:
+   ```powershell
+   Get-FileHash zcrdrm-agent.msi -Algorithm SHA256
+   ```
+   The two hex strings must match.
+
+The current latest is **v1.7.0**: <https://github.com/nutthakorn7/DRM/releases/tag/v1.7.0> — direct MSI link <https://github.com/nutthakorn7/DRM/releases/download/v1.7.0/zcrdrm-agent.msi>.
+
+### Fallback: latest CI artifact (when you need an unreleased build)
+
+If you need a build from a master commit that hasn't been tagged as a release yet (e.g. a hotfix that just merged), the MSI is also uploaded as an artifact by every CI run.
+
+1. Open <https://github.com/nutthakorn7/DRM/actions/workflows/ci.yml?query=branch%3Amaster> (**requires GitHub login + collaborator access** — this is why the release path above is preferred).
 2. Click the most recent **green** run (status: ✅).
 3. Scroll to the **Artifacts** section at the bottom.
 4. Download `zcrdrm-agent-msi`. It comes as a `.zip`.

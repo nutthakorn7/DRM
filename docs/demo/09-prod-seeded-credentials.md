@@ -61,7 +61,7 @@ done
 
 With the seed in place, the engineer's pre-demo prep collapses to:
 
-1. Download `zcrdrm-agent.msi` from the latest green master CI run (see [08-engineer-windows-msi-setup.md](08-engineer-windows-msi-setup.md))
+1. Download `zcrdrm-agent.msi` from the latest tagged release: <https://github.com/nutthakorn7/DRM/releases/latest> — no GitHub login required (see [08-engineer-windows-msi-setup.md §2](08-engineer-windows-msi-setup.md#2-get-the-msi) for the full path and the CI-artifact fallback)
 2. Install on the demo laptop, clear SmartScreen
 3. Launch the agent → first-run dialog → type **`demo@zcr.ai`** → sign in
 4. Main window opens with `Display name = Demo Engineer`, `Tenant ID = dddd...dddd`, `Template = cccc...cccc` all pre-filled
