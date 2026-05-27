@@ -17,6 +17,19 @@ the network.
 
 Production: <https://drm.zcr.ai>
 
+## Demo prep
+
+Running a customer demo? The complete demo collateral lives in [`docs/demo/`](docs/demo/):
+
+| Role | Start here |
+|---|---|
+| **Presenter** (sales / owner) | [`docs/demo/03-demo-script.md`](docs/demo/03-demo-script.md) → [`docs/demo/04-customer-questions.md`](docs/demo/04-customer-questions.md) → [`docs/demo/10-ciso-answer-script.md`](docs/demo/10-ciso-answer-script.md) |
+| **Engineer** (demo-laptop prep) | [`docs/demo/09-prod-seeded-credentials.md`](docs/demo/09-prod-seeded-credentials.md) → [`docs/demo/08-engineer-windows-msi-setup.md`](docs/demo/08-engineer-windows-msi-setup.md) → [`docs/demo/11-engineer-full-smoke-test.md`](docs/demo/11-engineer-full-smoke-test.md) |
+| **Both** (15 min before customer) | [`docs/demo/05-preflight-checklist.md`](docs/demo/05-preflight-checklist.md) |
+| **If something breaks on stage** | [`docs/demo/06-fallback-plan.md`](docs/demo/06-fallback-plan.md) |
+
+Latest release with public MSI download: [**v1.7.0**](https://github.com/nutthakorn7/DRM/releases/tag/v1.7.0) — direct link to the Windows agent installer is on that page (no GitHub login required).
+
 ## Foundation MVP
 
 The first vertical slice protects PDF files into an encrypted container, registers file policy with the management server, checks policy before opening, applies watermark metadata, audits access, and supports revoke.
