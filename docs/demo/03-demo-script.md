@@ -199,14 +199,9 @@ Malee จาก XYZ Co.
 > .drmx ใส่เอง. **แนะนำให้ engineer ติดตั้ง Outlook บน demo laptop** เพื่อให้
 > ได้ flow แบบ "one-click Send" ตามที่ script ข้างบนเขียนไว้.
 
-> **เพิ่มเติม (Stage 19, agent-side feature — มี แต่ไม่ต้อง demo บน stage ถ้าเวลาไม่พอ):**
+> **เพิ่มเติม (Stage 19-20, มี แต่ไม่ต้อง demo บน stage ถ้าเวลาไม่พอ):**
 > - **Bulk send:** พิมพ์ recipient หลายอีเมล คั่นด้วย `,` หรือ `;` — encrypt 1 ครั้ง, share link N อัน, Outlook เปิด N หน้าต่าง — ลูกค้าใช้ทุกวันส่งไปหลายคน
->
-> **⚠ DO NOT demo today** (server still on pre-Stage-18 build, restore after prod redeploy):
-> - `/me/` "My recent shares" table (Stage 18) — section ไม่ render เพราะ endpoint `/api/me/shares` ยังไม่ deploy บน prod
-> - Self-revoke ปุ่มที่ row (Stage 20) — endpoint `/api/me/shares/{id}/revoke` ยังไม่ deploy
-> - ถ้าลูกค้าถาม "ถ้าส่งผิดคนทำยังไง" → ตอบ "admin revoke จาก `/admin/` Files tab" (อย่าพา customer ไป `/me/`)
-> - หลัง demo เสร็จ redeploy prod แล้ว revert PR ที่ commit นี้กลับ
+> - **Self-revoke:** เปิด `/me/` → My recent shares → กดปุ่ม **Revoke** ที่ row ที่ต้องการยกเลิก. Share dead ทันที, ไม่ต้องผ่าน admin. ถ้าลูกค้าถามเรื่อง "ถ้าส่งผิดคนทำยังไง" ใช้คำตอบนี้.
 
 ---
 
