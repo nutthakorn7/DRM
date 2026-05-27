@@ -111,23 +111,41 @@ Per-department, per-template, or per-user?"
 
 ### Q: Can a user see their own share history?
 
-**A:** "Yes — shipped this week. Sender opens `/me/`, scrolls to
-**My recent shares**, and sees a table with recipient, sent date,
-expiry, open count, permissions, and live status (Active / Revoked
-/ Expired / Used-up). Each active row has a **Revoke** button that
-flips the share dead immediately — no admin involvement needed.
-Endpoint is `/api/me/shares` (list) and
-`/api/me/shares/{id}/revoke` (self-revoke); both ownership-gated so
-a user only sees and acts on their own shares."
+<!--
+⚠ DEMO-DAY HEDGE (2026-05-27): the server-side endpoint `/api/me/shares`
+and the `/me/` "My recent shares" UI are shipped to master + v1.7.0
+release but NOT yet deployed to prod (prod docker image is still on
+the pre-Stage-18 build that was hand-patched for Resend SMTP). DO NOT
+demo the /me/ table today. Once prod is redeployed (~5-8 min via
+`git pull && docker compose build drm-server && docker compose up -d
+drm-server` on drm.zcr.ai), revert this hedge by restoring the
+"shipped this week" answer in PR history — the full answer lives in
+the previous commit (search git log for "refresh CISO + demo script
+for Stages 18-20 shipped features").
+-->
+
+**A:** "Admin can today via `/api/admin/files`. User-facing
+`My Shares` view is on Q3 — same JOIN as admin sees
+(ProtectedFiles + ExternalShareLinks) filtered to the logged-in
+user, with a self-revoke button. Want to walk through how your
+team would use it?"
 
 ### Q: What if a sender realises they shared with the wrong recipient?
 
-**A:** "Click **Revoke** on that row in `/me/` My Shares. The share
-link goes dead immediately; the recipient's next attempt to verify
-or open returns 'link revoked'. Audit row writes with ReasonCode
-`external_share_link_self_revoked` — distinct from admin revoke and
-the brute-force auto-revoke worker — so the IR timeline shows
-exactly who killed the share and when."
+<!--
+⚠ DEMO-DAY HEDGE (2026-05-27): self-revoke endpoint `/api/me/shares/{id}/revoke`
+is shipped to master + v1.7.0 but NOT deployed to prod. Until redeploy,
+direct customers at admin revoke. Restore "Click Revoke on /me/" answer
+from git history after redeploy.
+-->
+
+**A:** "Today the admin revokes from `/admin/` Files → click the
+file → Revoke share link. The share link goes dead immediately;
+the recipient's next attempt to verify or open returns 'link
+revoked'. Self-service revoke from `/me/` is a Q3 item — wiring's
+done, we're rolling it out post-pilot. Audit row writes with a
+distinct ReasonCode so the IR timeline shows exactly who killed
+the share and when."
 
 ### Q: Can a sender share one file with multiple recipients in one go?
 
@@ -138,7 +156,7 @@ one email composer per recipient. Each recipient gets only their
 own access token — never sees other recipients' links. Audit log
 shows one `protected_file_registered` row + N
 `external_share_link_created` rows, each tagged with the right
-guest email. Per-recipient revoke still works the same way."
+guest email."
 
 ### Q: Walk me through what happens when an employee shares a file.
 
