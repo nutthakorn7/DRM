@@ -19,11 +19,14 @@
 You should already have done [08-engineer-windows-msi-setup.md](08-engineer-windows-msi-setup.md)
 (MSI install + first-run sign-in). This doc assumes:
 
-- [ ] zcrDRM Agent MSI installed from the **latest** master CI run.
-      Confirm by right-clicking the tray icon → "About" — version
-      string should read `1.7.0` or later.
+- [ ] zcrDRM Agent MSI installed from the latest **tagged release**:
+      <https://github.com/nutthakorn7/DRM/releases/latest>
+      (no GitHub login required — see [08 §2](08-engineer-windows-msi-setup.md#2-get-the-msi)
+      for the full download path).
+      Confirm version after install:
       ```powershell
       Get-ItemProperty HKLM:\SOFTWARE\zcrDRM | Select Version
+      # Expect: 1.7.0 or later
       ```
 - [ ] Agent signed in as `demo@zcr.ai` (first-run dialog dismissed,
       MainWindow shows the title bar with email + name).
