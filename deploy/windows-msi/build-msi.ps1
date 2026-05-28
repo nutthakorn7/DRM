@@ -58,6 +58,7 @@ try {
     $viewerProject  = Join-Path $repoRoot "src\Drm.Viewer.Windows\Drm.Viewer.Windows.csproj"
     $serviceProject = Join-Path $repoRoot "src\Drm.Agent.Service.Windows\Drm.Agent.Service.Windows.csproj"
     $publishDir     = Join-Path $scriptDir "publish\agent"
+    $servicePayloadDir = Join-Path $scriptDir "publish\service"
 
     Write-Host ""
     Write-Host "==== zcrDRM Agent MSI build ====" -ForegroundColor Cyan
@@ -84,6 +85,9 @@ try {
     if (Test-Path $publishDir) {
         Write-Host "Cleaning previous publish output..." -ForegroundColor Yellow
         Remove-Item -Recurse -Force $publishDir
+    }
+    if (Test-Path $servicePayloadDir) {
+        Remove-Item -Recurse -Force $servicePayloadDir
     }
 
     # ------------------------------------------------------------------
@@ -138,6 +142,15 @@ try {
     if (-not (Test-Path $trayExe))    { throw "Expected $trayExe after publish." }
     if (-not (Test-Path $viewerExe))  { throw "Expected $viewerExe after publish." }
     if (-not (Test-Path $serviceExe)) { throw "Expected $serviceExe after publish." }
+
+    # WiX must place ServiceInstall in the same component as the service
+    # executable. Move only the EXE out of the bulk-harvested folder so
+    # Product.wxs can own it explicitly while the service's DLL/deps/
+    # runtimeconfig remain in INSTALLFOLDER with the rest of the payload.
+    New-Item -ItemType Directory -Force -Path $servicePayloadDir | Out-Null
+    Copy-Item -Force $serviceExe (Join-Path $servicePayloadDir "Drm.Agent.Service.Windows.exe")
+    Remove-Item -Force $serviceExe
+
     $fileCount = (Get-ChildItem -Recurse $publishDir).Count
     Write-Host "  Publish OK ($fileCount files)" -ForegroundColor Green
 

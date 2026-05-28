@@ -52,6 +52,8 @@ public sealed class MsiFolderRightClickTests
     public void Wix_provisions_desktop_no_password_machine_config()
     {
         ProductWxs.Should().Contain(@"HKLM\SOFTWARE\zcrDRM");
+        ProductWxs.Should().NotContain(@"Value=""""",
+            "WiX 5 rejects empty Property values; optional MSI properties must be unset and Secure/Hidden instead");
         ProductWxs.Should().Contain(@"Name=""ClientApiKey""");
         ProductWxs.Should().Contain(@"Name=""TenantId""");
         ProductWxs.Should().Contain(@"Name=""UserId""");
@@ -65,7 +67,10 @@ public sealed class MsiFolderRightClickTests
     [Fact]
     public void Wix_installs_and_starts_posture_service()
     {
-        ProductWxs.Should().Contain("Drm.Agent.Service.Windows.exe");
+        ProductWxs.Should().Contain(@"Source=""publish\service\Drm.Agent.Service.Windows.exe""",
+            "the service EXE must be owned by the service component, not by bulk harvesting");
+        ProductWxs.Should().NotContain(@"Exclude=""Drm.Agent.Service.Windows.exe""",
+            "WiX 5 Files does not support Exclude on the bulk payload element");
         ProductWxs.Should().Contain(@"<ServiceInstall Id=""AgentPostureServiceInstall""");
         ProductWxs.Should().Contain(@"Name=""zcrDRMAgent""");
         ProductWxs.Should().Contain(@"Start=""auto""");

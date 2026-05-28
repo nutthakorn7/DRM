@@ -66,11 +66,11 @@
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Property Id="SERVERURL" Value="https://drm.zcr.ai" />
-    <Property Id="CLIENTAPIKEY" Value="" />
-    <Property Id="TENANTID" Value="" />
-    <Property Id="USERID" Value="" />
-    <Property Id="DEVICEID" Value="" />
-    <Property Id="DEVICESECRET" Value="" />
+    <Property Id="CLIENTAPIKEY" Secure="yes" Hidden="yes" />
+    <Property Id="TENANTID" Secure="yes" />
+    <Property Id="USERID" Secure="yes" />
+    <Property Id="DEVICEID" Secure="yes" />
+    <Property Id="DEVICESECRET" Secure="yes" Hidden="yes" />
 
     <!--
         Install layout. ProgramFiles64Folder is the 64-bit
@@ -178,7 +178,7 @@
 
     <Component Id="AgentPostureService" Directory="INSTALLFOLDER" Guid="*">
       <File Id="AgentPostureServiceExe"
-            Source="publish\agent\Drm.Agent.Service.Windows.exe"
+            Source="publish\service\Drm.Agent.Service.Windows.exe"
             KeyPath="yes" />
       <ServiceInstall Id="AgentPostureServiceInstall"
                       Name="zcrDRMAgent"
@@ -247,11 +247,13 @@
       producing one Component per file with WiX-generated stable IDs.
       Directory subtree (e.g. runtimes\win-x64\native\) is preserved
       into INSTALLFOLDER, so WebView2 native deps land where the
-      viewer expects them.
+      viewer expects them. build-msi.ps1 moves the service EXE to
+      publish\service\ first so its File element can own the Windows
+      service install without duplicating that file in AgentBinaries.
   -->
   <Fragment>
     <ComponentGroup Id="AgentBinaries" Directory="INSTALLFOLDER" Source="publish\agent">
-      <Files Include="**\*" Exclude="Drm.Agent.Service.Windows.exe" />
+      <Files Include="**\*" />
     </ComponentGroup>
   </Fragment>
 </Wix>
