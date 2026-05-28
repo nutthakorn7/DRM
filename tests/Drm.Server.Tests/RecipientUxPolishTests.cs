@@ -73,14 +73,15 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
-    public void Tray_opens_mailto_composer_after_quick_send_success()
+    public void Folder_share_still_has_mail_composer_helpers()
     {
-        // Stage 14: OpenMailtoCompose was inlined into ComposeShareEmail
-        // which now picks Outlook COM first and falls back to mailto:.
+        // The internal CAD primary flow no longer opens an external share
+        // email, but the legacy folder-share surface still uses the
+        // reusable composer helpers.
         TrayMain.Should().Contain("ComposeShareEmail",
-            "the agent must launch the mail client after Quick Send success");
+            "folder share still launches the mail client after recipient share success");
         TrayMain.Should().Contain("BuildFileShareEmailBody",
-            "subject + body must be pre-composed, not blank");
+            "legacy file-share subject + body helpers remain for non-CAD surfaces");
         TrayMain.Should().Contain("OutlookComEmailComposer",
             "Stage 14 — Outlook COM is the preferred composer so the .drmx auto-attaches");
         TrayMain.Should().Contain("MailtoEmailComposer",
@@ -121,21 +122,21 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
-    public void Quick_send_surfaces_actionable_message_when_no_composer_opens()
+    public void Internal_cad_quick_protect_has_no_mail_client_warning_dependency()
     {
-        // Stage 16 — when both Outlook COM and mailto fail (no default
-        // mail client at all) the agent must NOT show "✅ composer opened"
-        // because nothing did open. The message tells the sender how to
-        // fix it (Settings → Apps → Default apps → Mail) and reminds them
-        // the share URL is on the clipboard.
-        TrayMain.Should().Contain("Settings → Apps → Default apps → Mail",
-            "the failure-mode message must give the sender the exact fix path");
-        TrayMain.Should().Contain("Couldn't open an email composer",
-            "the failure-mode message must say what failed, not lie about success");
+        var trayXaml = File.ReadAllText(
+            Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml"));
+
+        trayXaml.Should().NotContain("MailClientWarningBanner",
+            "internal CAD protect does not open an external email composer");
+        TrayMain.Should().NotContain("IsAnyMailtoHandlerRegistered",
+            "internal CAD protect should not gate UX on a mailto registry probe");
+        TrayMain.Should().NotContain(@"mailto\shell\open\command",
+            "internal CAD protect should not probe the mailto handler at launch");
     }
 
     [Fact]
-    public void Quick_send_clears_file_picker_after_success_for_send_another_flow()
+    public void Internal_cad_quick_protect_clears_file_picker_after_success()
     {
         // Stage 16 — after a successful Quick Send the file picker resets
         // so the next file drop just works. Recipient stays so the
@@ -147,51 +148,32 @@ public sealed class RecipientUxPolishTests
     }
 
     [Fact]
-    public void Mail_client_warning_banner_appears_at_launch_when_no_handler_registered()
+    public void Internal_cad_quick_protect_copy_names_the_customer_flow()
     {
-        // Stage 17 — when Windows has no mailto: handler registered the
-        // agent surfaces a yellow banner at launch (visible BEFORE any
-        // Quick Send attempt) with the exact Windows Settings fix path.
         var trayXaml = File.ReadAllText(
             Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml"));
-        trayXaml.Should().Contain("MailClientWarningBanner",
-            "the banner element must exist in XAML so the code-behind can toggle it");
-        trayXaml.Should().Contain("No default mail client detected",
-            "the banner copy must name the problem clearly");
-        TrayMain.Should().Contain("IsAnyMailtoHandlerRegistered",
-            "MainWindow must probe the registry for a mailto handler");
-        TrayMain.Should().Contain(@"mailto\shell\open\command",
-            "the probe must check HKEY_CLASSES_ROOT\\mailto\\shell\\open\\command, the canonical handler key");
-        TrayMain.Should().Contain("UpdateMailClientWarningVisibility",
-            "the constructor must call the probe at launch, not lazily");
+
+        trayXaml.Should().Contain("Protect CAD file (internal)");
+        trayXaml.Should().Contain("Encrypt CAD files for AD-joined company devices");
+        trayXaml.Should().Contain("Protect CAD file");
     }
 
     [Fact]
-    public void Bulk_send_parses_multi_recipient_input_and_loops_per_recipient()
+    public void Internal_cad_quick_protect_uses_empty_recipients_and_cad_gate()
     {
-        // Stage 19 — typing "alice@a.com, bob@b.com" in the recipient
-        // ComboBox should encrypt the file once and create one share-link
-        // per recipient, each with its own access token. Verify the wiring
-        // exists in the source by greping for the canonical markers.
-        TrayMain.Should().Contain("BulkRecipientParser.Parse",
-            "QuickSendButton_Click must use the cross-platform parser, not inline string splitting");
-        TrayMain.Should().Contain("for (var index = 0; index < recipients.Count; index++)",
-            "the bulk send loop must iterate every parsed recipient");
-        TrayMain.Should().Contain("BulkSendOutcome",
-            "per-recipient outcome record must exist so the summary can report partial failures");
-
-        // Privacy guard: each recipient's composer call must use only
-        // their own share URL — never one URL across multiple composers.
-        // Body factory + recipient are passed per iteration.
-        TrayMain.Should().Contain("ComposeShareEmail(\n                    bulkRecipient,",
-            "each iteration must open a per-recipient composer with that recipient's own share URL");
-
-        // XAML tooltip + helper text must hint at multi-recipient capability
-        // so the sender knows comma/semicolon separation is allowed.
         var trayXaml = File.ReadAllText(
             Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml"));
-        trayXaml.Should().Contain("separate multiple recipients with a comma or semicolon",
-            "the inline hint below the recipient box must teach the bulk-send syntax");
+
+        TrayMain.Should().Contain("IsSupportedCadFile(quickPickedFile)",
+            "internal protect must reject non-CAD files before encryption");
+        TrayMain.Should().Contain("new ProtectFilePolicyOptions(Permission.View, PolicyTemplateId: null, Recipients: [])",
+            "internal CAD protect does not create guest recipients or external share links");
+        TrayMain.Should().NotContain("BulkRecipientParser.Parse",
+            "the CAD-only path should not parse external recipient input");
+        TrayMain.Should().NotContain("for (var index = 0; index < recipients.Count; index++)",
+            "the CAD-only path should not loop over guest recipients");
+        trayXaml.Should().NotContain("separate multiple recipients with a comma or semicolon",
+            "the primary UX must not teach external bulk-share syntax for this customer flow");
     }
 
     [Fact]

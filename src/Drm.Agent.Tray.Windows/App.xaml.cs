@@ -25,7 +25,9 @@ public partial class App : Application
     private void Application_Startup(object sender, StartupEventArgs e)
     {
         // ---- 1. Read server URL: MSI registry first, fallback to constant
-        var serverUrl = RegistryServerConfig.TryReadServerUrl()
+        var desktopConfiguration = DesktopAgentConfiguration.Load();
+        var serverUrl = desktopConfiguration.ServerUrl
+                        ?? RegistryServerConfig.TryReadServerUrl()
                         ?? new Uri(DefaultServerUrlFallback);
 
         // ---- 2. Read cached identity (DPAPI)
@@ -46,7 +48,9 @@ public partial class App : Application
         }
 
         // ---- 3. If no cached identity, show the FirstRunDialog
-        if (cached is null)
+        var provisionedIdentity = desktopConfiguration.TryCreateIdentity(cached);
+
+        if (cached is null && provisionedIdentity is null)
         {
             var dialog = new FirstRunDialog(serverUrl);
             if (dialog.ShowDialog() == true && dialog.Result is { } newEntry)
@@ -73,7 +77,7 @@ public partial class App : Application
         }
 
         // ---- 4. Open MainWindow, pre-filled from the cached identity
-        var mainWindow = new MainWindow(serverUrl, cached);
+        var mainWindow = new MainWindow(serverUrl, cached, desktopConfiguration);
         mainWindow.Show();
     }
 }

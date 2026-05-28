@@ -66,10 +66,16 @@ public sealed class I18nGlossaryAssetsTests
     private static string LocateRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        while (dir is not null)
         {
+            var gitPath = Path.Combine(dir.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
+            {
+                return dir.FullName;
+            }
+
             dir = dir.Parent;
         }
-        return dir?.FullName ?? throw new InvalidOperationException("Repo root not found.");
+        throw new InvalidOperationException("Repo root not found.");
     }
 }

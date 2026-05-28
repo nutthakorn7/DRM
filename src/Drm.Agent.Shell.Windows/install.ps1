@@ -5,9 +5,9 @@
 
 .DESCRIPTION
     Writes per-user registry entries under HKCU\Software\Classes that add a
-    "DRM" submenu (Quick send / Protect / Transparent protect) to the
-    right-click menu for any file, and associates .drmx / .drmcontainer
-    files with the DRM viewer.
+    "DRM" submenu with a single Protect CAD file (internal) action to the
+    right-click menu for files, and associates .drmx / .drmcontainer files
+    with the DRM viewer.
 
     No COM, no compilation, no admin rights required.
 
@@ -52,14 +52,12 @@ $entries = @(
     @{
         Name        = "DrmProtect"
         DisplayName = "DRM"
-        Subcommands = "Drm.QuickSend;Drm.Protect;Drm.TransparentProtect"
+        Subcommands = "Drm.QuickSend"
     }
 )
 
 $commands = @(
-    @{ Verb = "Drm.QuickSend";          Label = "Quick send (recommended)";              Exe = $tray;   Argument = "--quick-protect" },
-    @{ Verb = "Drm.Protect";            Label = "Protect (advanced)";                    Exe = $tray;   Argument = "--protect" },
-    @{ Verb = "Drm.TransparentProtect"; Label = "Transparent protect (preserve extension)"; Exe = $tray;   Argument = "--transparent-protect" }
+    @{ Verb = "Drm.QuickSend"; Label = "Protect CAD file (internal)"; Exe = $tray; Argument = "--quick-protect" }
 )
 
 $assocs = @(
@@ -103,16 +101,7 @@ Set-RegistryValue -Path $baseKey -Name "Icon" -Value "imageres.dll,-78"
 foreach ($cmd in $commands) {
     $verbKey = "HKCU:\Software\Classes\CommandStore\shell\$($cmd.Verb)"
     Set-RegistryValue -Path $verbKey -Name "" -Value $cmd.Label
-    # Each sub-action also gets a glyph — Send picks the share icon, Protect
-    # picks the lock, Transparent picks the eye-with-lock. ImageRes.dll
-    # ships on every modern Windows install.
-    $subIcon = switch ($cmd.Verb) {
-        "Drm.QuickSend"          { "imageres.dll,-1024" }   # share-style icon
-        "Drm.Protect"            { "imageres.dll,-78" }     # padlock
-        "Drm.TransparentProtect" { "imageres.dll,-5366" }   # shield+eye
-        default { "imageres.dll,-78" }
-    }
-    Set-RegistryValue -Path $verbKey -Name "Icon" -Value $subIcon
+    Set-RegistryValue -Path $verbKey -Name "Icon" -Value "imageres.dll,-78"
     $cmdLine = "`"$($cmd.Exe)`" $($cmd.Argument) `"%1`""
     Set-RegistryValue -Path "$verbKey\command" -Name "" -Value $cmdLine
 }
@@ -130,7 +119,7 @@ foreach ($assoc in $assocs) {
 
 Write-Host ""
 Write-Host "✓ DRM shell integration installed for current user."
-Write-Host "  Right-click any file → DRM → (Quick send / Protect / Transparent protect)"
+Write-Host "  Right-click a CAD file → DRM → Protect CAD file (internal)"
 Write-Host "  Double-click .drmx / .drmcontainer → opens in DRM Viewer"
 Write-Host ""
 Write-Host "If the new menus do not appear immediately, sign out and back in,"

@@ -1,4 +1,5 @@
 using Drm.Crypto;
+using Drm.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drm.Server.Endpoints;
@@ -90,6 +91,16 @@ public static class FileKeyEndpoints
         if (ipDenied)
             return Results.Json(new ErrorResponse("ip_not_allowed"), statusCode: StatusCodes.Status403Forbidden);
 
+        var signatureFailure = await ValidateDeviceSignatureForTrustedTenantAsync(
+            request,
+            fileId,
+            dbContext,
+            cancellationToken);
+        if (signatureFailure is not null)
+        {
+            return signatureFailure;
+        }
+
         var decision = await policyDecisionService.DecideAsync(
             request.TenantId,
             fileId,
@@ -153,7 +164,8 @@ public static class FileKeyEndpoints
         Guid TenantId,
         Guid UserId,
         Guid DeviceId,
-        string RequestedPermission);
+        string RequestedPermission,
+        DeviceRequestSignature? DeviceSignature);
 
     private sealed record UnwrapFileKeyResponse(
         Guid TenantId,
@@ -166,4 +178,64 @@ public static class FileKeyEndpoints
         int? OpensRemaining);
 
     private sealed record ErrorResponse(string ReasonCode);
+
+    private static async Task<IResult?> ValidateDeviceSignatureForTrustedTenantAsync(
+        UnwrapFileKeyRequest request,
+        Guid fileId,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var trustEnabled = await dbContext.TenantDeviceTrustConfigs
+            .AsNoTracking()
+            .AnyAsync(config => config.TenantId == request.TenantId && config.Enabled, cancellationToken);
+        if (!trustEnabled)
+        {
+            return null;
+        }
+
+        if (request.DeviceId == Guid.Empty)
+        {
+            return null;
+        }
+
+        var device = await dbContext.AgentDevices
+            .AsNoTracking()
+            .SingleOrDefaultAsync(candidate =>
+                candidate.TenantId == request.TenantId &&
+                candidate.DeviceId == request.DeviceId,
+                cancellationToken);
+
+        if (device is null ||
+            string.IsNullOrWhiteSpace(device.DeviceSigningKeyHashBase64) ||
+            request.DeviceSignature is null)
+        {
+            return Results.Json(
+                new ErrorResponse("device_signature_required"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (device.UserId != request.UserId)
+        {
+            return Results.Json(
+                new ErrorResponse("device_user_mismatch"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var payload = DeviceRequestSigning.UnwrapPayload(
+            request.TenantId,
+            fileId,
+            request.UserId,
+            request.DeviceId,
+            request.RequestedPermission);
+
+        return DeviceRequestSigning.Verify(
+            device.DeviceSigningKeyHashBase64,
+            payload,
+            request.DeviceSignature,
+            DateTimeOffset.UtcNow)
+            ? null
+            : Results.Json(
+                new ErrorResponse("device_signature_invalid"),
+                statusCode: StatusCodes.Status403Forbidden);
+    }
 }

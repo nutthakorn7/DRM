@@ -3398,6 +3398,8 @@ async function refreshDeviceTrust() {
   if (!config) return;
   document.getElementById("deviceTrustEnabled").checked = config.enabled;
   document.getElementById("deviceTrustCheckinDays").value = config.requiredCheckinDays;
+  document.getElementById("deviceTrustRequireDomainJoined").checked = config.requireDomainJoined;
+  document.getElementById("deviceTrustAllowedDomains").value = (config.allowedAdDomains || []).join(", ");
 }
 
 document.getElementById("refreshDeviceTrust")?.addEventListener("click", refreshDeviceTrust);
@@ -3405,11 +3407,23 @@ document.getElementById("refreshDeviceTrust")?.addEventListener("click", refresh
 document.getElementById("saveDeviceTrustBtn")?.addEventListener("click", async () => {
   const tenantId = currentTenantId();
   if (!tenantId) return;
+  const requireDomainJoined = document.getElementById("deviceTrustRequireDomainJoined").checked;
+  const allowedAdDomains = document.getElementById("deviceTrustAllowedDomains").value
+    .split(",")
+    .map((domain) => domain.trim())
+    .filter(Boolean);
+  if (requireDomainJoined && allowedAdDomains.length === 0) {
+    setStatus("Allowed AD domains are required when domain join is enforced", "error");
+    return;
+  }
+
   await apiFetch(`/api/admin/tenants/${tenantId}/device-trust`, {
     method: "PUT",
     body: JSON.stringify({
       enabled: document.getElementById("deviceTrustEnabled").checked,
       requiredCheckinDays: parseInt(document.getElementById("deviceTrustCheckinDays").value, 10) || 7,
+      requireDomainJoined,
+      allowedAdDomains,
     }),
   });
   await refreshDeviceTrust();

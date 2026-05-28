@@ -1,3 +1,4 @@
+using Drm.Domain;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,16 +53,46 @@ public static class AgentEndpoints
                 return Results.Json(new ErrorResponse("device_disabled"), statusCode: StatusCodes.Status403Forbidden);
             }
 
-            device.UserId = request.UserId;
+            if ((DeviceRequiresSignature(device) || HasPosturePayload(request.DomainJoined, request.DomainName, request.WindowsUser)) &&
+                ValidateDeviceSignature(
+                    device,
+                    request.UserId,
+                    DeviceRequestSigning.RegisterDevicePayload(
+                        request.TenantId,
+                        request.UserId,
+                        request.DeviceId,
+                        request.Hostname,
+                        request.OperatingSystem,
+                        request.AgentVersion,
+                        request.DomainJoined,
+                        request.DomainName,
+                        request.WindowsUser),
+                    request.DeviceSignature) is { } signatureFailure)
+            {
+                return signatureFailure;
+            }
+
+            if (!DeviceRequiresSignature(device))
+            {
+                device.UserId = request.UserId;
+            }
             device.Hostname = request.Hostname.Trim();
             device.OperatingSystem = request.OperatingSystem.Trim();
             device.AgentVersion = request.AgentVersion.Trim();
             device.Status = "registered";
             device.UpdatedAtUtc = now;
+            ApplyPosture(device, request.DomainJoined, request.DomainName, request.WindowsUser);
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Results.Ok(ToRegisterResponse(device));
+        }
+
+        if (HasPosturePayload(request.DomainJoined, request.DomainName, request.WindowsUser))
+        {
+            return Results.Json(
+                new ErrorResponse("device_signature_required"),
+                statusCode: StatusCodes.Status403Forbidden);
         }
 
         device = new AgentDeviceEntity
@@ -76,6 +107,7 @@ public static class AgentEndpoints
             RegisteredAtUtc = now,
             UpdatedAtUtc = now
         };
+        ApplyPosture(device, request.DomainJoined, request.DomainName, request.WindowsUser);
 
         dbContext.AgentDevices.Add(device);
         dbContext.AuditEvents.Add(new AuditEventEntity
@@ -119,12 +151,34 @@ public static class AgentEndpoints
             return Results.Json(new ErrorResponse("device_disabled"), statusCode: StatusCodes.Status403Forbidden);
         }
 
+        if ((DeviceRequiresSignature(device) || HasPosturePayload(request.DomainJoined, request.DomainName, request.WindowsUser)) &&
+            ValidateDeviceSignature(
+                device,
+                request.UserId,
+                DeviceRequestSigning.HeartbeatPayload(
+                    request.TenantId,
+                    request.UserId,
+                    deviceId,
+                    request.Status,
+                    request.AgentVersion,
+                    request.DomainJoined,
+                    request.DomainName,
+                    request.WindowsUser),
+                request.DeviceSignature) is { } signatureFailure)
+        {
+            return signatureFailure;
+        }
+
         var now = DateTimeOffset.UtcNow;
-        device.UserId = request.UserId;
+        if (!DeviceRequiresSignature(device))
+        {
+            device.UserId = request.UserId;
+        }
         device.Status = request.Status.Trim();
         device.AgentVersion = request.AgentVersion.Trim();
         device.LastHeartbeatAtUtc = now;
         device.UpdatedAtUtc = now;
+        ApplyPosture(device, request.DomainJoined, request.DomainName, request.WindowsUser);
 
         dbContext.AuditEvents.Add(new AuditEventEntity
         {
@@ -257,13 +311,65 @@ public static class AgentEndpoints
     private static bool IsBlank(string value)
         => string.IsNullOrWhiteSpace(value);
 
+    private static void ApplyPosture(
+        AgentDeviceEntity device,
+        bool? domainJoined,
+        string? domainName,
+        string? windowsUser)
+    {
+        device.DomainJoined = domainJoined == true;
+        device.DomainName = domainName?.Trim() ?? string.Empty;
+        device.WindowsUser = windowsUser?.Trim() ?? string.Empty;
+    }
+
+    private static bool HasPosturePayload(bool? domainJoined, string? domainName, string? windowsUser)
+        => domainJoined is not null || domainName is not null || windowsUser is not null;
+
+    private static IResult? ValidateDeviceSignature(
+        AgentDeviceEntity device,
+        Guid requestUserId,
+        string canonicalPayload,
+        DeviceRequestSignature? signature)
+    {
+        if (DeviceRequiresSignature(device) && device.UserId != requestUserId)
+        {
+            return Results.Json(
+                new ErrorResponse("device_user_mismatch"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        if (string.IsNullOrWhiteSpace(device.DeviceSigningKeyHashBase64) || signature is null)
+        {
+            return Results.Json(
+                new ErrorResponse("device_signature_required"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return DeviceRequestSigning.Verify(
+            device.DeviceSigningKeyHashBase64,
+            canonicalPayload,
+            signature,
+            DateTimeOffset.UtcNow)
+            ? null
+            : Results.Json(
+                new ErrorResponse("device_signature_invalid"),
+                statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    private static bool DeviceRequiresSignature(AgentDeviceEntity device)
+        => !string.IsNullOrWhiteSpace(device.DeviceSigningKeyHashBase64);
+
     private sealed record RegisterDeviceRequest(
         Guid TenantId,
         Guid UserId,
         Guid DeviceId,
         string Hostname,
         string OperatingSystem,
-        string AgentVersion);
+        string AgentVersion,
+        bool? DomainJoined,
+        string? DomainName,
+        string? WindowsUser,
+        DeviceRequestSignature? DeviceSignature);
 
     private sealed record RegisterDeviceResponse(
         Guid TenantId,
@@ -280,7 +386,11 @@ public static class AgentEndpoints
         Guid TenantId,
         Guid UserId,
         string Status,
-        string AgentVersion);
+        string AgentVersion,
+        bool? DomainJoined,
+        string? DomainName,
+        string? WindowsUser,
+        DeviceRequestSignature? DeviceSignature);
 
     private sealed record HeartbeatResponse(Guid DeviceId, string Status, DateTimeOffset LastHeartbeatAtUtc);
 

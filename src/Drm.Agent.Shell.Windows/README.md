@@ -2,7 +2,7 @@
 
 This is **not a compiled component**. It is a pair of PowerShell scripts that
 register Windows Explorer right-click context-menu entries pointing at the
-already-installed `Drm.Agent.Tray.Windows.exe` (protect / send) and
+already-installed `Drm.Agent.Tray.Windows.exe` (internal CAD protect) and
 `Drm.Viewer.Windows.exe` (open). The scripts use plain registry keys, so:
 
 - No COM, no C++, no compiled DLL — pure `*.reg` / `*.ps1`
@@ -11,14 +11,12 @@ already-installed `Drm.Agent.Tray.Windows.exe` (protect / send) and
 
 ## What gets registered
 
-Right-clicking **any file** in Explorer adds a top-level "DRM" submenu with
-three actions:
+Right-clicking a CAD file in Explorer adds a top-level "DRM" submenu with
+one internal action:
 
 | Menu entry | Launches | Argument |
 |---|---|---|
-| **DRM → Quick send (recommended)** | `Drm.Agent.Tray.Windows.exe` | `--quick-protect "<file>"` |
-| **DRM → Protect (advanced)** | `Drm.Agent.Tray.Windows.exe` | `--protect "<file>"` |
-| **DRM → Transparent protect (preserve extension)** | `Drm.Agent.Tray.Windows.exe` | `--transparent-protect "<file>"` |
+| **DRM → Protect CAD file (internal)** | `Drm.Agent.Tray.Windows.exe` | `--quick-protect "<file>"` |
 
 Double-clicking a `.drmx` or `.drmcontainer` file launches:
 
@@ -66,9 +64,8 @@ cd src\Drm.Agent.Shell.Windows
 ## Why a submenu and not a top-level entry?
 
 Top-level entries pollute the right-click menu. The Microsoft-recommended
-`SubCommands` / `ExtendedSubCommandsKey` registry pattern collapses our
-three entries under one "DRM" group, matching the FinalCode catalogue
-pattern (single "FinalCode" entry with sub-actions).
+`SubCommands` / `ExtendedSubCommandsKey` registry pattern keeps the "DRM"
+group stable if more internal actions are added later.
 
 ## Limitations
 

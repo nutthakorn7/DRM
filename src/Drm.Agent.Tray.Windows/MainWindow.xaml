@@ -1,7 +1,7 @@
 <Window x:Class="Drm.Agent.Tray.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DRM Agent" Height="1040" Width="760" MinHeight="980" MinWidth="700"
+        Title="DRM Agent" Height="420" Width="760" MinHeight="360" MinWidth="700"
         Background="#F7F8FA"
         AllowDrop="True"
         DragEnter="Window_DragEnter"
@@ -11,7 +11,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="20" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="0" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -21,24 +21,10 @@
             <Border Margin="0,16,0,0" Background="#FFFFFF" BorderBrush="#D1D5DB" BorderThickness="1"
                     CornerRadius="8" Padding="14">
                 <StackPanel>
-                    <TextBlock Text="🚀 Quick Send (recommended)" FontSize="14" FontWeight="SemiBold"
+                    <TextBlock Text="Protect CAD file (internal)" FontSize="14" FontWeight="SemiBold"
                                Foreground="#1f2937" />
-                    <TextBlock Text="One drop, one email, one click. The recipient gets a verification link."
+                    <TextBlock Text="Encrypt CAD files for AD-joined company devices. No password, guest link, or external recipient."
                                Foreground="#6B7280" Margin="0,2,0,8" TextWrapping="Wrap" FontSize="11" />
-                    <!-- Stage 17: warn at launch if Windows has no default
-                         mail client registered. Quick Send still encrypts
-                         the file but the composer won't auto-open — far
-                         less alarming if the sender knows BEFORE pressing
-                         Send than discovering it mid-demo. -->
-                    <Border x:Name="MailClientWarningBanner" Background="#FEF3C7"
-                            BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="4"
-                            Padding="10,6" Margin="0,0,0,10" Visibility="Collapsed">
-                        <TextBlock TextWrapping="Wrap" Foreground="#92400E" FontSize="11">
-                            <Run FontWeight="SemiBold">⚠ No default mail client detected.</Run>
-                            <Run>Quick Send will still encrypt your file, but the email composer won't auto-open. Set a default at</Run>
-                            <Run FontWeight="SemiBold">Settings → Apps → Default apps → Mail.</Run>
-                        </TextBlock>
-                    </Border>
                     <Border x:Name="QuickDropZone" Background="#FAFAFA" BorderBrush="#D1D5DB"
                             BorderThickness="2" CornerRadius="6" Padding="14" AllowDrop="True"
                             DragEnter="QuickDropZone_DragEnter"
@@ -46,40 +32,32 @@
                             DragOver="QuickDropZone_DragEnter"
                             Drop="QuickDropZone_Drop">
                         <StackPanel>
-                            <TextBlock Text="Drop file here, or click Browse below" Foreground="#9CA3AF"
+                            <TextBlock Text="Drop CAD file here, or click Browse CAD below" Foreground="#9CA3AF"
                                        FontSize="11" HorizontalAlignment="Center" />
                             <TextBlock x:Name="QuickDropFile" Foreground="#6f3a08" FontWeight="SemiBold"
                                        FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <TextBlock Text="Send to:" Foreground="#374151" VerticalAlignment="Center"
-                                   Margin="0,0,6,0" />
-                        <!-- Stage 15: editable ComboBox so sender can pick from
-                             recent recipients or type a fresh address.
-                             IsEditable + IsTextSearchEnabled gives type-ahead
-                             autocomplete on the dropdown items.
-                             Stage 19: also accepts comma- or semicolon-separated
-                             emails for bulk send (1 file → N recipients). -->
-                        <ComboBox x:Name="QuickRecipientBox" Width="280" Height="26"
-                                  IsEditable="True" IsTextSearchEnabled="True"
-                                  StaysOpenOnEdit="True"
-                                  VerticalContentAlignment="Center"
-                                  ToolTip="One email — or multiple separated by , or ; for bulk send. Each recipient gets their own share link." />
-                        <Button x:Name="QuickBrowseButton" Content="Browse" Margin="8,0,0,0"
+                        <ComboBox x:Name="QuickRecipientBox" Visibility="Collapsed" Width="0" Height="0"
+                                  IsEditable="True" VerticalContentAlignment="Center" />
+                        <Button x:Name="QuickBrowseButton" Content="Browse CAD" Margin="0,0,0,0"
                                 Padding="10,2" Click="QuickBrowseButton_Click" />
-                        <Button x:Name="QuickSendButton" Content="Send protected file"
+                        <Button x:Name="QuickSendButton" Content="Protect CAD file"
                                 Margin="8,0,0,0" Padding="14,4" Background="#A45B13" Foreground="White"
                                 FontWeight="SemiBold" BorderThickness="0"
                                 Click="QuickSendButton_Click" />
+                        <TextBlock Text="Internal AD policy is checked when the file is opened."
+                                   Foreground="#6B7280" FontSize="11" VerticalAlignment="Center"
+                                   Margin="10,0,0,0" />
                     </StackPanel>
                     <TextBlock Foreground="#6B7280" FontSize="10" Margin="34,2,0,0"
-                               Text="Tip: separate multiple recipients with a comma or semicolon — each gets their own share link." />
+                               Text="Supported: DWG, DXF, STEP, IGES, SolidWorks, Parasolid, CATIA, JT, IFC, SAT, STL." />
 
                     <!--
                         Per-share permission picker (Stage 7). Collapsed
-                        by default so "Quick send" stays one-drop /
-                        one-email / one-click for the common case.
+                        by default so the internal CAD flow stays one-drop /
+                        one-click for the common case.
                         Power users expand to override the tenant's
                         default permission set + expiry per individual
                         share.  Checkboxes map 1:1 to Permission flag
@@ -88,6 +66,7 @@
                     <Expander x:Name="QuickPermissionsExpander"
                               Header="Customize permissions for this recipient"
                               IsExpanded="False" Margin="0,10,0,0"
+                              Visibility="Collapsed"
                               Foreground="#374151" FontSize="11">
                         <Border Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="1"
                                 CornerRadius="4" Padding="12,8" Margin="0,6,0,0">
@@ -127,11 +106,11 @@
                                TextWrapping="Wrap" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>
-            <Expander Header="Advanced (manual protect, integrations, status)" IsExpanded="False"
-                      Margin="0,12,0,0" Foreground="#374151" />
+            <Expander Header="Advanced (status)" IsExpanded="False"
+                      Margin="0,12,0,0" Foreground="#374151" Visibility="Collapsed" />
         </StackPanel>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" />
                 <ColumnDefinition Width="*" />
@@ -295,9 +274,10 @@
                              VerticalContentAlignment="Center" />
                 </StackPanel>
                 <Border BorderBrush="#D1D5DB" BorderThickness="1" Background="#F9FAFB"
+                        Visibility="Collapsed"
                         Padding="10" Margin="0,10,0,0" CornerRadius="4">
                     <StackPanel>
-                        <TextBlock Text="Transparent protect (extension preserved)"
+                        <TextBlock Text="Legacy extension-preserving flow disabled"
                                    FontWeight="SemiBold" Foreground="#374151" />
                         <TextBlock Text="Drop a file onto the box below to append a DRM trailer. The file remains openable in its native application."
                                    Foreground="#6B7280" TextWrapping="Wrap" Margin="0,4,0,8" />
@@ -321,6 +301,7 @@
                     </StackPanel>
                 </Border>
                 <Border BorderBrush="#D1D5DB" BorderThickness="1" Background="#F9FAFB"
+                        Visibility="Collapsed"
                         Padding="10" Margin="0,10,0,0" CornerRadius="4">
                     <StackPanel>
                         <TextBlock Text="Create secure container (folder)"

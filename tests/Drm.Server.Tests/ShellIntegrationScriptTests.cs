@@ -26,11 +26,20 @@ public sealed class ShellIntegrationScriptTests
         Path.Combine(Root, "src/Drm.Viewer.Windows/MainWindow.xaml.cs"));
 
     [Fact]
-    public void Install_script_declares_three_verbs_quicksend_protect_transparent()
+    public void Install_script_declares_only_internal_cad_protect_verb()
     {
         InstallScript.Should().Contain("Drm.QuickSend");
-        InstallScript.Should().Contain("Drm.Protect");
-        InstallScript.Should().Contain("Drm.TransparentProtect");
+        InstallScript.Should().NotContain("Drm.Protect");
+        InstallScript.Should().NotContain("Drm.TransparentProtect");
+        InstallScript.Should().Contain("--quick-protect");
+        InstallScript.Should().NotContain("--transparent-protect");
+    }
+
+    [Fact]
+    public void Install_script_labels_quicksend_as_internal_cad_protect()
+    {
+        InstallScript.Should().Contain("Protect CAD file (internal)");
+        InstallScript.Should().NotContain("Quick send (recommended)");
     }
 
     [Fact]
@@ -127,7 +136,7 @@ public sealed class ShellIntegrationScriptTests
     public void Install_script_assigns_an_icon_to_the_drm_submenu_and_every_subverb()
     {
         // Phase 5AS-polish stopgap: rely on Windows system icons (imageres.dll)
-        // so the right-click "DRM" submenu and every sub-action carry a
+        // so the right-click "DRM" submenu and internal CAD action carry a
         // recognisable glyph without a compiled COM in-proc server.
         InstallScript.Should().Contain("imageres.dll,-78",
             "DRM submenu must have a padlock icon");
@@ -135,8 +144,8 @@ public sealed class ShellIntegrationScriptTests
             "Icon values must be set on the registry keys");
 
         var subIconCount = Regex.Matches(InstallScript, "imageres\\.dll,-\\d+").Count;
-        subIconCount.Should().BeGreaterThanOrEqualTo(3,
-            "submenu + at least three sub-verbs each get an icon");
+        subIconCount.Should().BeGreaterThanOrEqualTo(2,
+            "submenu + the internal CAD sub-verb each get an icon");
     }
 
     private static string GetTopLevelKey(string fullKey)
@@ -152,10 +161,16 @@ public sealed class ShellIntegrationScriptTests
     private static string LocateRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        while (dir is not null)
         {
+            var gitPath = Path.Combine(dir.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath))
+            {
+                return dir.FullName;
+            }
+
             dir = dir.Parent;
         }
-        return dir?.FullName ?? throw new InvalidOperationException("Repo root not found.");
+        throw new InvalidOperationException("Repo root not found.");
     }
 }

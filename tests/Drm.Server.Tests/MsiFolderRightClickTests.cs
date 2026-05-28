@@ -3,9 +3,8 @@ using FluentAssertions;
 namespace Drm.Server.Tests;
 
 /// <summary>
-/// Static validation that the WiX MSI registers the
-/// folder-right-click → "Protect folder with zcrDRM" verb and that the
-/// tray accepts the --protect-folder CLI flag it shells out with.
+/// Static validation that the WiX MSI exposes only the internal CAD protect
+/// shell surface for the customer demo.
 ///
 /// CI builds on Linux (no Windows installer toolchain), so the only way
 /// to catch a typo / missing reference is to grep the source files.
@@ -18,75 +17,77 @@ public sealed class MsiFolderRightClickTests
         Path.Combine(Root, "deploy/windows-msi/Product.wxs"));
     private static readonly string TrayMain = File.ReadAllText(
         Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml.cs"));
-    private static readonly string TrayXaml = File.ReadAllText(
-        Path.Combine(Root, "src/Drm.Agent.Tray.Windows/MainWindow.xaml"));
+    private static readonly string ServiceProgram = File.ReadAllText(
+        Path.Combine(Root, "src/Drm.Agent.Service.Windows/Program.cs"));
+    private static readonly string ViewerMain = File.ReadAllText(
+        Path.Combine(Root, "src/Drm.Viewer.Windows/MainWindow.xaml.cs"));
 
     [Fact]
-    public void Wix_registers_directory_shell_protect_folder_verb()
+    public void Wix_registers_single_internal_cad_file_verb()
     {
-        // Folders live under HKCR\Directory\shell — file verbs at
-        // HKCR\*\shell don't fire on folders. The verb is "zcrDRMProtectFolder"
-        // (no submenu — folders only have one DRM operation).
-        ProductWxs.Should().Contain(@"Directory\shell\zcrDRMProtectFolder",
-            "WiX must register the Directory verb so folder right-click works");
-        ProductWxs.Should().Contain(@"Directory\shell\zcrDRMProtectFolder\command",
-            "the Directory verb needs a \\command subkey or right-click does nothing");
+        ProductWxs.Should().Contain(@"*\shell\zcrDRMProtect");
+        ProductWxs.Should().Contain("Protect CAD file (internal)");
+        ProductWxs.Should().Contain("--quick-protect &quot;%1&quot;");
     }
 
     [Fact]
-    public void Wix_folder_verb_shells_tray_with_protect_folder_flag_and_v_token()
+    public void Wix_does_not_register_external_or_folder_protect_surfaces()
     {
-        // %V is the canonical Directory\shell selection token; using %1
-        // also works on most builds but isn't guaranteed. The tray must
-        // also be quoted to survive paths with spaces (Program Files).
-        ProductWxs.Should().Contain("--protect-folder &quot;%V&quot;",
-            "the verb's command must pass --protect-folder \"%V\" so the tray gets the picked folder");
-        ProductWxs.Should().Contain("[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe",
-            "the verb must shell the tray, not the viewer");
+        ProductWxs.Should().NotContain("transparent-protect");
+        ProductWxs.Should().NotContain("Protect (advanced)");
+        ProductWxs.Should().NotContain("protect-folder");
+        ProductWxs.Should().NotContain(@"Directory\shell\zcrDRMProtectFolder");
     }
 
     [Fact]
-    public void Wix_main_feature_references_the_new_folder_verb_component()
+    public void Wix_main_feature_references_only_the_internal_cad_verb_component()
     {
-        // A Component without a ComponentRef in the Feature is silently
-        // dropped from the MSI — easy to miss in code review.
-        ProductWxs.Should().Contain(@"<ComponentRef Id=""ProtectFolderShellMenu"" />",
-            "Main feature must reference ProtectFolderShellMenu or the verb is missing from the MSI");
+        ProductWxs.Should().Contain(@"<ComponentRef Id=""ProtectShellMenu"" />");
+        ProductWxs.Should().NotContain(@"<ComponentRef Id=""ProtectShellSubProtect"" />");
+        ProductWxs.Should().NotContain(@"<ComponentRef Id=""ProtectShellSubTransparent"" />");
+        ProductWxs.Should().NotContain(@"<ComponentRef Id=""ProtectFolderShellMenu"" />");
     }
 
     [Fact]
-    public void Tray_accepts_protect_folder_cli_flag()
+    public void Wix_provisions_desktop_no_password_machine_config()
     {
-        // The verb passes --protect-folder; the tray must parse it.
-        // Otherwise the folder path is dropped on the floor and the user
-        // sees an empty drop zone.
-        TrayMain.Should().Contain("--protect-folder",
-            "tray must parse --protect-folder or the folder-right-click flow is broken");
+        ProductWxs.Should().Contain(@"HKLM\SOFTWARE\zcrDRM");
+        ProductWxs.Should().Contain(@"Name=""ClientApiKey""");
+        ProductWxs.Should().Contain(@"Name=""TenantId""");
+        ProductWxs.Should().Contain(@"Name=""UserId""");
+        ProductWxs.Should().Contain(@"Name=""DeviceId""");
+        ProductWxs.Should().Contain(@"Name=""DeviceSecret""");
+        ProductWxs.Should().Contain("[CLIENTAPIKEY]");
+        ProductWxs.Should().Contain("[DEVICEID]");
+        ProductWxs.Should().Contain("[DEVICESECRET]");
     }
 
     [Fact]
-    public void Tray_xaml_exposes_seal_folder_button_for_cli_entry_path()
+    public void Wix_installs_and_starts_posture_service()
     {
-        // The CLI entry path (right-click → tray launched fresh) can't
-        // simulate a drag-and-drop event. The tray needs an explicit
-        // button so the user can finish the workflow after typing the
-        // passphrase.
-        TrayXaml.Should().Contain("SealFolderButton_Click",
-            "Container section must have a Seal folder button or CLI launches force re-drop");
-        TrayXaml.Should().Contain(@"x:Name=""SealFolderButton""",
-            "the button needs a stable name for the code-behind handler");
-        TrayMain.Should().Contain("SealFolderButton_Click",
-            "code-behind must implement the button handler");
+        ProductWxs.Should().Contain("Drm.Agent.Service.Windows.exe");
+        ProductWxs.Should().Contain(@"<ServiceInstall Id=""AgentPostureServiceInstall""");
+        ProductWxs.Should().Contain(@"Name=""zcrDRMAgent""");
+        ProductWxs.Should().Contain(@"Start=""auto""");
+        ProductWxs.Should().Contain(@"<ServiceControl Id=""AgentPostureServiceControl""");
+        ProductWxs.Should().Contain(@"Start=""install""");
+        ProductWxs.Should().Contain(@"<ComponentRef Id=""AgentPostureService"" />");
+        ServiceProgram.Should().Contain("options.ServiceName = \"zcrDRMAgent\"");
     }
 
     [Fact]
-    public void Tray_seal_handler_delegates_to_shared_pack_method()
+    public void Viewer_asks_local_service_to_sign_device_unwrap_requests()
     {
-        // Drag-drop and the Seal button both must funnel through
-        // PackContainerFromFolderAsync — otherwise drift creeps in (one
-        // path forgets to register with the server, etc).
-        TrayMain.Should().Contain("PackContainerFromFolderAsync",
-            "drop + button must share the packaging code path");
+        ViewerMain.Should().Contain("new LocalDeviceRequestSigner()");
+        ViewerMain.Should().NotContain("desktopConfiguration.DeviceSecret");
+    }
+
+    [Fact]
+    public void Tray_accepts_quick_protect_cli_flag_only_for_shell_protect()
+    {
+        TrayMain.Should().Contain("--quick-protect");
+        TrayMain.Should().NotContain("--transparent-protect");
+        TrayMain.Should().NotContain("--protect-folder");
     }
 
     private static string LocateRepoRoot()

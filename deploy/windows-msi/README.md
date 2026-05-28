@@ -9,11 +9,12 @@ no PowerShell, no GUIDs, no manual registry steps.
 | | |
 |---|---|
 | **Install location** | `C:\Program Files\zcrDRM\` |
-| **Bundled apps** | `Drm.Agent.Tray.Windows.exe` + `Drm.Viewer.Windows.exe` (self-contained .NET 10, no runtime prereq) |
+| **Bundled apps** | `Drm.Agent.Tray.Windows.exe` + `Drm.Viewer.Windows.exe` + `Drm.Agent.Service.Windows.exe` (self-contained .NET 10, no runtime prereq) |
 | **Server URL** | Baked into `HKLM\SOFTWARE\zcrDRM\ServerUrl = https://drm.zcr.ai` |
+| **Machine config** | Optional MSI properties `CLIENTAPIKEY`, `TENANTID`, `USERID`, `DEVICEID`, `DEVICESECRET` are written under `HKLM\SOFTWARE\zcrDRM` so protect/open flows do not ask the user for secrets or GUIDs |
 | **File association** | `.drmx` and `.drmcontainer` → open in zcrDRM Viewer |
-| **Right-click menu** | "Protect with zcrDRM" → submenu with Quick send / Protect / Transparent protect |
-| **Auto-start** | Tray starts at every user's Windows login (system-wide `HKLM\…\Run`) |
+| **Right-click menu** | "Protect CAD file (internal)" → tray `--quick-protect` flow |
+| **Device posture** | Windows service `zcrDRMAgent` starts automatically and reports AD-domain posture with the provisioned device secret |
 | **Start Menu** | "zcrDRM Agent" and "zcrDRM Viewer" shortcuts |
 
 ## Build from a Windows machine
@@ -43,8 +44,12 @@ asserts that all the registry keys + file paths landed. Download the
 # Install silently
 msiexec /i zcrdrm-agent.msi /qn /l*v install.log
 
+# Provisioned install for an internal AD demo
+msiexec /i zcrdrm-agent.msi /qn CLIENTAPIKEY="drm_client_..." TENANTID="<tenant-guid>" USERID="<user-guid>" DEVICEID="<device-guid>" DEVICESECRET="<device-secret-from-admin-provisioning>"
+
 # Spot-check
 Test-Path "C:\Program Files\zcrDRM\Drm.Agent.Tray.Windows.exe"
+Get-Service zcrDRMAgent
 Get-ItemProperty HKLM:\SOFTWARE\zcrDRM
 Get-Item HKCR:\.drmx
 Get-Item 'HKCR:\*\shell\zcrDRMProtect'
@@ -66,18 +71,15 @@ script. Tracked separately.
 
 ## Schema overview
 
-`Product.wxs` declares **10 components**:
+`Product.wxs` declares these main components:
 
-1. `AgentBinaries` — all files under `publish\agent\**`
+1. `AgentBinaries` — all files under `publish\agent\**` except the service EXE, which is owned by the service component
 2. `ServerConfigRegistry` — `HKLM\SOFTWARE\zcrDRM\*`
 3. `DrmxFileAssociation` — `.drmx` → `zcrDRM.ProtectedFile.1`
 4. `DrmContainerFileAssociation` — `.drmcontainer` → `zcrDRM.SecureContainer.1`
 5. `ProtectShellMenu` — `HKCR\*\shell\zcrDRMProtect` (top-level menu)
-6. `ProtectShellSubQuickSend` — submenu item 1
-7. `ProtectShellSubProtect` — submenu item 2
-8. `ProtectShellSubTransparent` — submenu item 3
-9. `TrayAutoStart` — `HKLM\…\Run\zcrDRM Agent`
-10. `TrayStartMenuShortcut` — Start Menu shortcut
+6. `AgentPostureService` — installs and starts `zcrDRMAgent`
+7. `TrayStartMenuShortcut` — Start Menu shortcut
 
 Every `RegistryValue` is its component's `KeyPath` so MSI uninstall
 removes them all automatically — no separate uninstaller logic needed.

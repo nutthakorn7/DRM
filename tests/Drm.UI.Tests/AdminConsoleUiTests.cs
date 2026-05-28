@@ -55,12 +55,15 @@ public sealed class AdminConsoleUiTests
         var initialSubnav = await page.Locator("#subTabNav .subtab-link").CountAsync();
         initialSubnav.Should().BeGreaterThan(0, "Overview tab should have at least one panel in the sub-nav");
 
-        // Switch to Identity. Sub-nav should rebuild with Identity panels (4: directory, users, groups, devices).
+        // Switch to Identity. Sub-nav should rebuild with the Identity panels.
         await page.Locator("[data-tab-link='identity']").ClickAsync();
         await page.WaitForFunctionAsync(
             "() => document.body.dataset.activeTab === 'identity' && document.querySelectorAll('#subTabNav .subtab-link').length > 0");
         var identitySubnav = await page.Locator("#subTabNav .subtab-link").CountAsync();
-        identitySubnav.Should().Be(4, "Identity has 4 panels (directory, users, groups, devices)");
+        var identityPanels = await page.EvaluateAsync<string[]>(
+            "() => [...document.querySelectorAll('section.panel[data-tab=\\'identity\\']')].map(p => p.id)");
+        identityPanels.Should().Equal("directory", "users", "groups", "devices", "adminIdentity");
+        identitySubnav.Should().Be(identityPanels.Length, "Identity sub-nav should mirror the rendered Identity panels");
 
         // Active sub-tab should match the active panel. No more than one panel should be visible at a time.
         var visiblePanelIds = await page.EvaluateAsync<string[]>(

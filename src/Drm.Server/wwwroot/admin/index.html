@@ -1899,6 +1899,13 @@
             Max days since last heartbeat:
             <input id="deviceTrustCheckinDays" type="number" min="1" max="365" value="7" style="width:60px">
           </label>
+          <label class="label-row">
+            <input id="deviceTrustRequireDomainJoined" type="checkbox"> Require on-prem AD domain join
+          </label>
+          <label class="label-row">
+            Allowed AD domains:
+            <input id="deviceTrustAllowedDomains" type="text" placeholder="CORP, ENGINEERING" autocomplete="off">
+          </label>
           <button id="saveDeviceTrustBtn" type="button">Save</button>
         </div>
       </section>

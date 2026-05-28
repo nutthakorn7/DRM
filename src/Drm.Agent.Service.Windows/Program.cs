@@ -5,9 +5,13 @@ using Microsoft.Extensions.Options;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddWindowsService(options =>
 {
-    options.ServiceName = "DRM Agent";
+    options.ServiceName = "zcrDRMAgent";
 });
 builder.Services.Configure<AgentServiceOptions>(builder.Configuration.GetSection("DrmAgent"));
+builder.Services.PostConfigure<AgentServiceOptions>(options =>
+{
+    options.ApplyDesktopDefaults(DesktopAgentConfiguration.Load(includeDeviceSecret: true));
+});
 builder.Services.AddHttpClient<IDrmServerClient, DrmServerClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<AgentServiceOptions>>().Value;
@@ -37,6 +41,7 @@ builder.Services.AddSingleton<IProtectedFileInventory>(serviceProvider =>
 builder.Services.AddSingleton<AgentHeartbeatWorkflow>();
 builder.Services.AddSingleton<AgentCommandProcessor>();
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<DeviceSigningPipeServer>();
 
 var host = builder.Build();
 host.Run();

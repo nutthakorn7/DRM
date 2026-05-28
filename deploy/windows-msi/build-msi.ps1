@@ -3,7 +3,8 @@
     Build the zcrDRM Agent MSI from this directory.
 
 .DESCRIPTION
-    Publishes Drm.Agent.Tray.Windows and Drm.Viewer.Windows as
+    Publishes Drm.Agent.Tray.Windows, Drm.Viewer.Windows, and
+    Drm.Agent.Service.Windows as
     self-contained .NET 10 win-x64 binaries, merges them into one
     install folder, then invokes the WiX 4 toolset to produce
     zcrdrm-agent.msi.
@@ -53,9 +54,10 @@ try {
     # levels up. Resolve it via path arithmetic rather than `git
     # rev-parse` so the script works in a tarball / non-git checkout.
     $repoRoot = (Resolve-Path "$scriptDir\..\..").Path
-    $trayProject   = Join-Path $repoRoot "src\Drm.Agent.Tray.Windows\Drm.Agent.Tray.Windows.csproj"
-    $viewerProject = Join-Path $repoRoot "src\Drm.Viewer.Windows\Drm.Viewer.Windows.csproj"
-    $publishDir    = Join-Path $scriptDir "publish\agent"
+    $trayProject    = Join-Path $repoRoot "src\Drm.Agent.Tray.Windows\Drm.Agent.Tray.Windows.csproj"
+    $viewerProject  = Join-Path $repoRoot "src\Drm.Viewer.Windows\Drm.Viewer.Windows.csproj"
+    $serviceProject = Join-Path $repoRoot "src\Drm.Agent.Service.Windows\Drm.Agent.Service.Windows.csproj"
+    $publishDir     = Join-Path $scriptDir "publish\agent"
 
     Write-Host ""
     Write-Host "==== zcrDRM Agent MSI build ====" -ForegroundColor Cyan
@@ -114,16 +116,28 @@ try {
         --output $publishDir
     if ($LASTEXITCODE -ne 0) { throw "Viewer publish failed." }
 
+    Write-Host "Publishing Drm.Agent.Service.Windows (self-contained, win-x64)..." -ForegroundColor Yellow
+    dotnet publish $serviceProject `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained true `
+        -p:PublishSingleFile=false `
+        -p:PublishReadyToRun=false `
+        --output $publishDir
+    if ($LASTEXITCODE -ne 0) { throw "Service publish failed." }
+
     # ------------------------------------------------------------------
     # 6. Sanity-check the publish output contains the EXE files the
     #    MSI is going to reference. Catches "publish succeeded but
     #    nothing landed in the folder" early — that failure mode is
     #    confusing to debug at MSI-build time.
     # ------------------------------------------------------------------
-    $trayExe   = Join-Path $publishDir "Drm.Agent.Tray.Windows.exe"
-    $viewerExe = Join-Path $publishDir "Drm.Viewer.Windows.exe"
-    if (-not (Test-Path $trayExe))   { throw "Expected $trayExe after publish." }
-    if (-not (Test-Path $viewerExe)) { throw "Expected $viewerExe after publish." }
+    $trayExe    = Join-Path $publishDir "Drm.Agent.Tray.Windows.exe"
+    $viewerExe  = Join-Path $publishDir "Drm.Viewer.Windows.exe"
+    $serviceExe = Join-Path $publishDir "Drm.Agent.Service.Windows.exe"
+    if (-not (Test-Path $trayExe))    { throw "Expected $trayExe after publish." }
+    if (-not (Test-Path $viewerExe))  { throw "Expected $viewerExe after publish." }
+    if (-not (Test-Path $serviceExe)) { throw "Expected $serviceExe after publish." }
     $fileCount = (Get-ChildItem -Recurse $publishDir).Count
     Write-Host "  Publish OK ($fileCount files)" -ForegroundColor Green
 
