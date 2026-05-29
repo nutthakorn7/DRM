@@ -13,6 +13,12 @@ public static class ExternalShareEndpoints
         group.MapPost("/verification/start", StartVerificationAsync);
         group.MapPost("/verification/confirm", ConfirmVerificationAsync);
         group.MapPost("/viewer/session", OpenViewerSessionAsync);
+        // Web in-browser preview (increment 1): release the unwrapped file key
+        // to a verified, already-opened web session so the BROWSER can decrypt
+        // the .drmx (which it holds from the email attachment) and render it
+        // client-side. Deliberately scoped to View-only shares — see the
+        // handler for why.
+        group.MapPost("/viewer/content-key", ReleaseViewerContentKeyAsync);
 
         return endpoints;
     }
@@ -457,6 +463,146 @@ public static class ExternalShareEndpoints
 
         return null;
     }
+
+    /// <summary>
+    /// Web in-browser preview — release the unwrapped content key to a verified
+    /// web session so the recipient's browser can decrypt the .drmx locally.
+    ///
+    /// Scoped HARD to View-only shares. A browser cannot enforce
+    /// Print/Copy/Export-denied (it can always screenshot or save the rendered
+    /// content), so we only ever hand the key to the browser for shares whose
+    /// policy is exactly View — there is no stricter permission to misrepresent.
+    /// Any richer policy keeps the historical posture: the key is released only
+    /// to the OS-level Drm.Viewer.Windows where those restrictions are enforced.
+    ///
+    /// Requires the viewer session to already be OPENED (ViewerOpenedAtUtc set
+    /// by /viewer/session), so the max-uses open-count is always accounted by
+    /// that endpoint and can't be bypassed by calling content-key directly.
+    /// </summary>
+    private static async Task<IResult> ReleaseViewerContentKeyAsync(
+        OpenExternalShareViewerSessionRequest request,
+        AppDbContext dbContext,
+        IFileKeyProtector fileKeyProtector,
+        CancellationToken cancellationToken)
+    {
+        if (request.TenantId == Guid.Empty)
+        {
+            return Results.BadRequest(new ErrorResponse("invalid_tenant_id"));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.VerificationSessionToken))
+        {
+            return Results.BadRequest(new ErrorResponse("invalid_verification_session_token"));
+        }
+
+        var sessionTokenHash = ExternalShareToken.Hash(request.VerificationSessionToken.Trim());
+        var verification = await dbContext.ExternalShareVerifications
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == request.TenantId && candidate.SessionTokenHash == sessionTokenHash,
+                cancellationToken);
+
+        if (verification is null || verification.VerifiedAtUtc is null || verification.SessionExpiresAtUtc is null)
+        {
+            return Results.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (verification.SessionExpiresAtUtc <= now)
+        {
+            return Results.BadRequest(new ErrorResponse("verification_session_expired"));
+        }
+
+        var shareLink = await dbContext.ExternalShareLinks
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == verification.TenantId && candidate.ShareLinkId == verification.ShareLinkId,
+                cancellationToken);
+        if (shareLink is null)
+        {
+            return Results.NotFound();
+        }
+
+        var file = await dbContext.ProtectedFiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == shareLink.TenantId && candidate.Id == shareLink.FileId,
+                cancellationToken);
+        if (file is null)
+        {
+            return Results.NotFound();
+        }
+
+        var stateError = ValidateViewerSessionState(verification, shareLink, file, now);
+        if (stateError is not null)
+        {
+            return Results.BadRequest(stateError);
+        }
+
+        // Must have opened the metadata session first (so the open is counted).
+        if (verification.ViewerOpenedAtUtc is null)
+        {
+            return Results.BadRequest(new ErrorResponse("viewer_session_not_opened"));
+        }
+
+        // The honest-enforcement gate: in-browser preview is only offered when
+        // the share grants exactly View. Anything richer would put a
+        // "Print: denied" badge next to content the browser can trivially
+        // print/save — so those shares are desktop-viewer-only.
+        if (file.Permissions != Drm.Domain.Permission.View)
+        {
+            return Results.Json(
+                new ErrorResponse("preview_requires_view_only_policy"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var stored = await dbContext.FileKeys
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == shareLink.TenantId && candidate.FileId == shareLink.FileId,
+                cancellationToken);
+        if (stored is null)
+        {
+            // No wrapped key on the server (e.g. agent-side .drmx that was never
+            // registered with key material). Preview can't decrypt; the
+            // recipient falls back to the desktop viewer.
+            return Results.NotFound();
+        }
+
+        var fileKey = fileKeyProtector.Unwrap(
+            shareLink.TenantId,
+            shareLink.FileId,
+            new WrappedFileKey(
+                stored.WrappedKeyNonceBase64,
+                stored.WrappedKeyCiphertextBase64,
+                stored.WrappedKeyTagBase64));
+
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = shareLink.TenantId,
+            FileId = shareLink.FileId,
+            UserId = null,
+            EventType = "external_share_viewer",
+            ReasonCode = "external_share_content_key_released",
+            CreatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(new ExternalShareContentKeyResponse(
+            shareLink.TenantId,
+            shareLink.FileId,
+            file.ContentType,
+            Convert.ToBase64String(fileKey),
+            file.WatermarkTemplate,
+            "content_key_released"));
+    }
+
+    private sealed record ExternalShareContentKeyResponse(
+        Guid TenantId,
+        Guid FileId,
+        string ContentType,
+        string FileKeyBase64,
+        string WatermarkTemplate,
+        string ReasonCode);
 
     private static ErrorResponse? ValidateViewerSessionState(
         ExternalShareVerificationEntity verification,
