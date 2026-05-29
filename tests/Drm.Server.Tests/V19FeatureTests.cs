@@ -272,6 +272,38 @@ public sealed class V19FeatureTests : IDisposable
         body.Should().Contain("ip_not_allowed");
     }
 
+    [Fact]
+    public async Task IpAllowlist_denies_policy_decide_when_client_ip_not_in_list()
+    {
+        // PR #50 hardening: /api/policy/decide must honour the IP allowlist too,
+        // so policy/permission/lease state can't be queried from a
+        // non-allowlisted IP. Surfaced as a denied decision (allowed=false).
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        using var adminClient = AdminClient();
+        adminClient.DefaultRequestHeaders.Add("X-DRM-Tenant-Id", tenantId.ToString());
+        await adminClient.PostAsJsonAsync(
+            $"/api/admin/tenants/{tenantId}/ip-allowlist",
+            new { cidr = "203.0.113.0/24", label = "Remote office" }); // not loopback
+
+        using var client = factory.CreateClient();
+        using var res = await client.PostAsJsonAsync("/api/policy/decide", new
+        {
+            tenantId,
+            fileId,
+            userId,
+            deviceId = Guid.Empty,
+            requestedPermission = "View"
+        });
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await res.Content.ReadFromJsonAsync<PolicyDecisionRow>();
+        body!.Allowed.Should().BeFalse();
+        body.ReasonCode.Should().Be("ip_not_allowed");
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // 2. Device trust enforcement
     // ─────────────────────────────────────────────────────────────────────

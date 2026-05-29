@@ -298,6 +298,45 @@ public sealed class AgentApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Provisioned_device_rejects_replayed_signed_heartbeat()
+    {
+        // PR #50 hardening: a captured, valid signed heartbeat must not be
+        // replayable within the clock-skew window.
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedProvisionedDeviceAsync(tenantId, userId, deviceId, deviceSecret);
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.HeartbeatPayload(
+                tenantId, userId, deviceId, "online", "0.1.1", true, "CORP", "CORP\\alice"));
+
+        object Body() => new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.1.1",
+            domainJoined = true,
+            domainName = "CORP",
+            windowsUser = "CORP\\alice",
+            deviceSignature = signature
+        };
+
+        using var first = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", Body());
+        first.StatusCode.Should().Be(HttpStatusCode.OK, "the first signed heartbeat is fresh");
+
+        using var second = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", Body());
+        second.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await second.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_signature_replayed" });
+    }
+
+    [Fact]
     public async Task Provisioned_device_rejects_unsigned_heartbeat_even_without_posture()
     {
         using var client = factory.CreateClient();

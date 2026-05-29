@@ -32,6 +32,7 @@ public static class AgentEndpoints
     private static async Task<IResult> RegisterDeviceAsync(
         RegisterDeviceRequest request,
         AppDbContext dbContext,
+        IDeviceReplayGuard replayGuard,
         CancellationToken cancellationToken)
     {
         if (IsBlank(request.Hostname) || IsBlank(request.OperatingSystem) || IsBlank(request.AgentVersion))
@@ -67,7 +68,8 @@ public static class AgentEndpoints
                         request.DomainJoined,
                         request.DomainName,
                         request.WindowsUser),
-                    request.DeviceSignature) is { } signatureFailure)
+                    request.DeviceSignature,
+                    replayGuard) is { } signatureFailure)
             {
                 return signatureFailure;
             }
@@ -128,6 +130,7 @@ public static class AgentEndpoints
         Guid deviceId,
         HeartbeatRequest request,
         AppDbContext dbContext,
+        IDeviceReplayGuard replayGuard,
         CancellationToken cancellationToken)
     {
         if (IsBlank(request.Status) || IsBlank(request.AgentVersion))
@@ -164,7 +167,8 @@ public static class AgentEndpoints
                     request.DomainJoined,
                     request.DomainName,
                     request.WindowsUser),
-                request.DeviceSignature) is { } signatureFailure)
+                request.DeviceSignature,
+                replayGuard) is { } signatureFailure)
         {
             return signatureFailure;
         }
@@ -329,7 +333,8 @@ public static class AgentEndpoints
         AgentDeviceEntity device,
         Guid requestUserId,
         string canonicalPayload,
-        DeviceRequestSignature? signature)
+        DeviceRequestSignature? signature,
+        IDeviceReplayGuard replayGuard)
     {
         if (DeviceRequiresSignature(device) && device.UserId != requestUserId)
         {
@@ -345,15 +350,31 @@ public static class AgentEndpoints
                 statusCode: StatusCodes.Status403Forbidden);
         }
 
-        return DeviceRequestSigning.Verify(
+        if (!DeviceRequestSigning.Verify(
             device.DeviceSigningKeyHashBase64,
             canonicalPayload,
             signature,
-            DateTimeOffset.UtcNow)
-            ? null
-            : Results.Json(
+            DateTimeOffset.UtcNow))
+        {
+            return Results.Json(
                 new ErrorResponse("device_signature_invalid"),
                 statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        // PR #50 hardening: reject replays of an already-seen signed
+        // register/heartbeat within the clock-skew window.
+        if (!replayGuard.TryConsume(
+            device.TenantId,
+            device.DeviceId,
+            signature.Nonce,
+            DateTimeOffset.UtcNow))
+        {
+            return Results.Json(
+                new ErrorResponse("device_signature_replayed"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return null;
     }
 
     private static bool DeviceRequiresSignature(AgentDeviceEntity device)
