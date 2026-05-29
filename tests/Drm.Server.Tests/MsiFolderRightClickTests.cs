@@ -65,6 +65,25 @@ public sealed class MsiFolderRightClickTests
     }
 
     [Fact]
+    public void Wix_stores_device_secret_in_an_acled_key_not_world_readable()
+    {
+        // PR #51 hardening: the device signing secret must live in the ACL'd
+        // HKLM\SOFTWARE\zcrDRM\Secure key (SYSTEM + Administrators only), NOT
+        // in the root key whose default ACL grants Users:Read. Regression guard
+        // so a future edit can't silently move it back to a world-readable key.
+        ProductWxs.Should().Contain(@"Key=""SOFTWARE\zcrDRM\Secure""",
+            "the device secret must be provisioned into the dedicated ACL'd key");
+        ProductWxs.Should().Contain("util:PermissionEx",
+            "the secure key must carry an explicit DACL via util:PermissionEx");
+        ProductWxs.Should().Contain(@"User=""SYSTEM"" GenericAll=""yes""",
+            "the service account (LocalSystem) must retain full control to read + sign");
+        ProductWxs.Should().Contain(@"<ComponentRef Id=""DeviceSecretRegistry"" />",
+            "the ACL'd secret component must be referenced into the Main feature or it won't install");
+        ProductWxs.Should().Contain(@"xmlns:util=",
+            "the WiX Util extension namespace must be declared for util:PermissionEx");
+    }
+
+    [Fact]
     public void Wix_installs_and_starts_posture_service()
     {
         ProductWxs.Should().Contain(@"Source=""publish\service\Drm.Agent.Service.Windows.exe""",

@@ -35,7 +35,8 @@
     this and then runs msiexec /i and asserts the registry/files.
 -->
 
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <!--
       UpgradeCode MUST remain stable across versions — it's how
@@ -110,9 +111,32 @@
         <RegistryValue Name="TenantId" Type="string" Value="[TENANTID]" />
         <RegistryValue Name="UserId" Type="string" Value="[USERID]" />
         <RegistryValue Name="DeviceId" Type="string" Value="[DEVICEID]" />
-        <RegistryValue Name="DeviceSecret" Type="string" Value="[DEVICESECRET]" />
+        <!-- DeviceSecret moved to the ACL'd HKLM\SOFTWARE\zcrDRM\Secure key
+             below (PR #51 hardening) so non-admin Users cannot read it.
+             The rest of this key stays Users-readable because the tray app
+             reads ServerUrl from it in the logged-on user's context. -->
         <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" />
         <RegistryValue Name="Version" Type="string" Value="1.6.1.0" />
+      </RegistryKey>
+    </Component>
+
+    <!--
+        PR #51 hardening: the per-device signing secret lives in its own
+        ACL'd key so a non-admin local user cannot read it (the default
+        HKLM\SOFTWARE ACL grants Users:Read, which would otherwise let any
+        local user run `reg query` and forge device signatures offline).
+
+        util:PermissionEx sets a protected DACL of exactly LocalSystem +
+        Administrators (full control) — inheritance is broken, so the
+        inherited Users:Read ACE no longer applies. LocalSystem is the
+        account the zcrDRMAgent service runs as (it reads + signs);
+        Administrators covers the elevated installer doing install/uninstall.
+    -->
+    <Component Id="DeviceSecretRegistry" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\zcrDRM\Secure" ForceCreateOnInstall="yes">
+        <RegistryValue Name="DeviceSecret" Type="string" Value="[DEVICESECRET]" KeyPath="yes" />
+        <util:PermissionEx User="SYSTEM" GenericAll="yes" />
+        <util:PermissionEx User="Administrators" GenericAll="yes" />
       </RegistryKey>
     </Component>
 
@@ -227,6 +251,7 @@
     <Feature Id="Main" Title="zcrDRM Agent" Level="1">
       <ComponentGroupRef Id="AgentBinaries" />
       <ComponentRef Id="ServerConfigRegistry" />
+      <ComponentRef Id="DeviceSecretRegistry" />
       <ComponentRef Id="DrmxFileAssociation" />
       <ComponentRef Id="DrmContainerFileAssociation" />
       <ComponentRef Id="ProtectShellMenu" />

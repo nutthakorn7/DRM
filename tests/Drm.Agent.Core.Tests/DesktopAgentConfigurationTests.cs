@@ -45,6 +45,37 @@ public sealed class DesktopAgentConfigurationTests
     }
 
     [Fact]
+    public void DeviceSecret_is_read_from_the_secure_machine_key_when_provided()
+    {
+        // PR #51 hardening: the secret moved to an ACL'd \Secure subkey. When a
+        // secure-machine source is supplied it must win over the legacy root
+        // location (so a stale value left at the old key can't shadow it).
+        var config = DesktopAgentConfiguration.FromSources(
+            environment: _ => null,
+            currentUserRegistry: _ => null,
+            localMachineRegistry: name => name == "DeviceSecret" ? "legacy-root-secret" : null,
+            includeDeviceSecret: true,
+            secureLocalMachineRegistry: name => name == "DeviceSecret" ? "secure-key-secret" : null);
+
+        config.DeviceSecret.Should().Be("secure-key-secret");
+    }
+
+    [Fact]
+    public void DeviceSecret_falls_back_to_legacy_root_key_when_secure_key_is_empty()
+    {
+        // Devices provisioned by a pre-hardening MSI only have the secret at the
+        // legacy root location — they must keep working after upgrade.
+        var config = DesktopAgentConfiguration.FromSources(
+            environment: _ => null,
+            currentUserRegistry: _ => null,
+            localMachineRegistry: name => name == "DeviceSecret" ? "legacy-root-secret" : null,
+            includeDeviceSecret: true,
+            secureLocalMachineRegistry: _ => null);
+
+        config.DeviceSecret.Should().Be("legacy-root-secret");
+    }
+
+    [Fact]
     public void TryCreateIdentity_combines_machine_device_with_cached_user_identity()
     {
         var tenantId = Guid.NewGuid();

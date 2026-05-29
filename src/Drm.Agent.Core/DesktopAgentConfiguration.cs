@@ -13,6 +13,12 @@ public sealed record DesktopAgentConfiguration(
 {
     public const string RegistryRootKey = @"SOFTWARE\zcrDRM";
 
+    // PR #51 hardening: the device signing secret lives in an ACL'd child key
+    // (SYSTEM + Administrators only) so non-admin Users can't read it. The MSI
+    // writes it here; we read it from here, with a fallback to the legacy root
+    // location so devices provisioned by an older MSI keep working after upgrade.
+    public const string SecureRegistryKey = @"SOFTWARE\zcrDRM\Secure";
+
     public static DesktopAgentConfiguration Load(bool includeDeviceSecret = false)
     {
         if (OperatingSystem.IsWindows())
@@ -31,15 +37,17 @@ public sealed record DesktopAgentConfiguration(
     private static DesktopAgentConfiguration LoadWithWindowsRegistry(bool includeDeviceSecret)
         => FromSources(
             ReadEnvironmentValue,
-            name => ReadRegistryValue(RegistryHive.CurrentUser, name),
-            name => ReadRegistryValue(RegistryHive.LocalMachine, name),
-            includeDeviceSecret);
+            name => ReadRegistryValue(RegistryHive.CurrentUser, RegistryRootKey, name),
+            name => ReadRegistryValue(RegistryHive.LocalMachine, RegistryRootKey, name),
+            includeDeviceSecret,
+            name => ReadRegistryValue(RegistryHive.LocalMachine, SecureRegistryKey, name));
 
     public static DesktopAgentConfiguration FromSources(
         Func<string, string?> environment,
         Func<string, string?> currentUserRegistry,
         Func<string, string?> localMachineRegistry,
-        bool includeDeviceSecret = false)
+        bool includeDeviceSecret = false,
+        Func<string, string?>? secureLocalMachineRegistry = null)
     {
         var serverUrlText = FirstNonBlank(
             environment("DrmAgent__ServerUrl"),
@@ -53,11 +61,14 @@ public sealed record DesktopAgentConfiguration(
             currentUserRegistry("ClientApiKey"),
             localMachineRegistry("ClientApiKey")) ?? string.Empty;
 
+        // Prefer the ACL'd secure machine key; fall back to the legacy root
+        // location so devices provisioned by a pre-hardening MSI still load.
+        var secureMachineRegistry = secureLocalMachineRegistry ?? localMachineRegistry;
         var deviceSecret = includeDeviceSecret
             ? FirstNonBlank(
                 environment("DrmAgent__DeviceSecret"),
                 environment("DRM_AGENT_DEVICE_SECRET"),
-                currentUserRegistry("DeviceSecret"),
+                secureMachineRegistry("DeviceSecret"),
                 localMachineRegistry("DeviceSecret")) ?? string.Empty
             : string.Empty;
 
@@ -98,12 +109,12 @@ public sealed record DesktopAgentConfiguration(
         => Environment.GetEnvironmentVariable(name);
 
     [SupportedOSPlatform("windows")]
-    private static string? ReadRegistryValue(RegistryHive hive, string valueName)
+    private static string? ReadRegistryValue(RegistryHive hive, string subKey, string valueName)
     {
         try
         {
             using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
-            using var key = baseKey.OpenSubKey(RegistryRootKey, writable: false);
+            using var key = baseKey.OpenSubKey(subKey, writable: false);
             return key?.GetValue(valueName) as string;
         }
         catch (System.Security.SecurityException)

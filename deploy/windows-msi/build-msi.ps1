@@ -79,6 +79,13 @@ try {
         throw "WiX 5 not on PATH. Install with: dotnet tool install --global wix --version 5.0.2"
     }
 
+    # The Util extension provides util:PermissionEx, used by Product.wxs to
+    # ACL the DeviceSecret registry key (PR #51 hardening). Adding it is
+    # idempotent — a no-op if it is already present in the global cache.
+    Write-Host "Ensuring WiX Util extension is available..." -ForegroundColor Yellow
+    & wix extension add -g WixToolset.Util.wixext/5.0.2
+    if ($LASTEXITCODE -ne 0) { throw "Failed to add WiX Util extension." }
+
     # ------------------------------------------------------------------
     # 3. Clean previous publish output (avoid stale files in the MSI)
     # ------------------------------------------------------------------
@@ -158,7 +165,7 @@ try {
     # 7. Build the MSI
     # ------------------------------------------------------------------
     Write-Host "Building MSI with WiX..." -ForegroundColor Yellow
-    $wixArgs = @("build", "Product.wxs", "-arch", "x64", "-out", $OutputPath)
+    $wixArgs = @("build", "Product.wxs", "-arch", "x64", "-ext", "WixToolset.Util.wixext", "-out", $OutputPath)
     if ($Version) {
         # WiX 4 lets us override variables on the command line via -d
         $wixArgs += @("-d", "ProductVersion=$Version")
