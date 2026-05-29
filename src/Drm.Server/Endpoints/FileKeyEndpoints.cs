@@ -82,6 +82,7 @@ public static class FileKeyEndpoints
         AppDbContext dbContext,
         IFileKeyProtector fileKeyProtector,
         PolicyDecisionService policyDecisionService,
+        IDeviceReplayGuard replayGuard,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
@@ -95,6 +96,7 @@ public static class FileKeyEndpoints
             request,
             fileId,
             dbContext,
+            replayGuard,
             cancellationToken);
         if (signatureFailure is not null)
         {
@@ -183,6 +185,7 @@ public static class FileKeyEndpoints
         UnwrapFileKeyRequest request,
         Guid fileId,
         AppDbContext dbContext,
+        IDeviceReplayGuard replayGuard,
         CancellationToken cancellationToken)
     {
         var trustEnabled = await dbContext.TenantDeviceTrustConfigs
@@ -228,14 +231,31 @@ public static class FileKeyEndpoints
             request.DeviceId,
             request.RequestedPermission);
 
-        return DeviceRequestSigning.Verify(
+        if (!DeviceRequestSigning.Verify(
             device.DeviceSigningKeyHashBase64,
             payload,
             request.DeviceSignature,
-            DateTimeOffset.UtcNow)
-            ? null
-            : Results.Json(
+            DateTimeOffset.UtcNow))
+        {
+            return Results.Json(
                 new ErrorResponse("device_signature_invalid"),
                 statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        // PR #50 hardening: reject replays of an already-seen signed unwrap.
+        // The signature itself is valid here, but a captured request must not
+        // be usable a second time inside the clock-skew window.
+        if (!replayGuard.TryConsume(
+            request.TenantId,
+            request.DeviceId,
+            request.DeviceSignature.Nonce,
+            DateTimeOffset.UtcNow))
+        {
+            return Results.Json(
+                new ErrorResponse("device_signature_replayed"),
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return null;
     }
 }

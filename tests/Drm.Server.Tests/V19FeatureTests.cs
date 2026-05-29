@@ -679,6 +679,73 @@ public sealed class V19FeatureTests : IDisposable
     }
 
     [Fact]
+    public async Task DeviceTrust_rejects_replayed_signed_unwrap()
+    {
+        // PR #50 hardening: a captured, valid signed unwrap must not be usable
+        // a second time. The first request passes the signature + replay gate;
+        // the identical second request is rejected as a replay.
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            deviceSecret: deviceSecret);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+            {
+                TenantId = tenantId,
+                Enabled = true,
+                RequiredCheckinDays = 7,
+                RequireDomainJoined = false,
+                AllowedAdDomainsCsv = "",
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.UnwrapPayload(tenantId, fileId, userId, deviceId, "View"));
+
+        object UnwrapBody() => new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            requestedPermission = "View",
+            deviceSignature = signature
+        };
+
+        using var client = factory.CreateClient();
+
+        // First presentation: the signature is fresh, so it passes the device
+        // signature + replay gate. (It then fails to decrypt the placeholder
+        // wrapped key the seed installs — a fixture artifact, the same reason
+        // the other real-unwrap tests only assert deny paths — so we only
+        // assert here that it is NOT rejected as a replay.)
+        using var first = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", UnwrapBody());
+        var firstBody = await first.Content.ReadAsStringAsync();
+        firstBody.Should().NotContain("device_signature_replayed",
+            "the first presentation of a fresh signature must pass the replay gate");
+
+        // Second presentation of the byte-identical signed request: replay.
+        using var second = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", UnwrapBody());
+        second.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var secondBody = await second.Content.ReadAsStringAsync();
+        secondBody.Should().Contain("device_signature_replayed",
+            "a captured signed unwrap must not be replayable within the clock-skew window");
+    }
+
+    [Fact]
     public async Task DeviceTrust_denies_access_when_domain_join_required_without_allowed_domains()
     {
         var (tenantId, userId) = await SeedTenantUserAsync();

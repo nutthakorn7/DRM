@@ -26,6 +26,9 @@ builder.Services
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddScoped<BruteForceProtectionService>();
+// PR #50 hardening: replay protection for signed device requests. Singleton
+// because it holds the in-memory nonce ledger across requests.
+builder.Services.AddSingleton<IDeviceReplayGuard, InMemoryDeviceReplayGuard>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
 builder.Services.AddHttpClient("EntraGraph");
 builder.Services.AddScoped<IDirectorySyncService, EntraIdDirectorySyncService>();
