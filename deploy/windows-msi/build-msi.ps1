@@ -11,7 +11,7 @@
 
     The MSI bakes the production server URL (https://drm.zcr.ai) into
     HKLM\SOFTWARE\zcrDRM\ServerUrl and registers the .drmx file
-    association plus the "Protect with zcrDRM" right-click menu.
+    association plus the "Protect CAD file (internal)" right-click menu.
 
 .PARAMETER OutputPath
     Where to write the final MSI. Defaults to .\zcrdrm-agent.msi
