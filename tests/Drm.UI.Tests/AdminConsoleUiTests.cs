@@ -55,12 +55,32 @@ public sealed class AdminConsoleUiTests
         var initialSubnav = await page.Locator("#subTabNav .subtab-link").CountAsync();
         initialSubnav.Should().BeGreaterThan(0, "Overview tab should have at least one panel in the sub-nav");
 
-        // Switch to Identity. Sub-nav should rebuild with Identity panels (4: directory, users, groups, devices).
+        // Switching to Identity must rebuild the sub-nav to EXACTLY its own
+        // panels — one link per panel, with no stale links left over from the
+        // previous (Overview) tab. Derive the expectation from the DOM rather
+        // than hard-coding a count: this assertion previously hard-coded 4 and
+        // silently went stale when a 5th Identity panel (adminIdentity) was
+        // added, so the panel set itself is the source of truth here.
+        var expectedIdentityPanelIds = await page.EvaluateAsync<string[]>(
+            "() => [...document.querySelectorAll('section.panel[data-tab=\\'identity\\']')].map(p => p.id).sort()");
+        expectedIdentityPanelIds.Length.Should().BeGreaterThan(1,
+            "Identity should have multiple panels for the sub-nav to be meaningful");
+
         await page.Locator("[data-tab-link='identity']").ClickAsync();
+
+        // Wait for the sub-nav to SETTLE to exactly the Identity panel set —
+        // comparing the full id set (not just length > 0) means we can't read a
+        // half-rebuilt sub-nav that still holds Overview links.
         await page.WaitForFunctionAsync(
-            "() => document.body.dataset.activeTab === 'identity' && document.querySelectorAll('#subTabNav .subtab-link').length > 0");
-        var identitySubnav = await page.Locator("#subTabNav .subtab-link").CountAsync();
-        identitySubnav.Should().Be(4, "Identity has 4 panels (directory, users, groups, devices)");
+            @"(expected) => document.body.dataset.activeTab === 'identity'
+                && JSON.stringify([...document.querySelectorAll('#subTabNav .subtab-link')]
+                        .map(b => b.dataset.subtab).sort()) === JSON.stringify(expected)",
+            expectedIdentityPanelIds);
+
+        var identitySubtabIds = await page.EvaluateAsync<string[]>(
+            "() => [...document.querySelectorAll('#subTabNav .subtab-link')].map(b => b.dataset.subtab).sort()");
+        identitySubtabIds.Should().Equal(expectedIdentityPanelIds,
+            "the sub-nav must hold exactly one link per Identity panel — no leftovers from the previous tab, no missing panels");
 
         // Active sub-tab should match the active panel. No more than one panel should be visible at a time.
         var visiblePanelIds = await page.EvaluateAsync<string[]>(
