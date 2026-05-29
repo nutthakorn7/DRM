@@ -152,7 +152,12 @@ public sealed class ShellIntegrationScriptTests
     private static string LocateRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        // Stop at the repo root. In a normal clone `.git` is a directory; in a
+        // git WORKTREE it's a file (a gitdir pointer). Path.Exists matches both,
+        // so this resolves the *current* worktree's root instead of walking
+        // past it into a sibling checkout (which would read another branch's
+        // files and fail spuriously).
+        while (dir is not null && !Path.Exists(Path.Combine(dir.FullName, ".git")))
         {
             dir = dir.Parent;
         }
