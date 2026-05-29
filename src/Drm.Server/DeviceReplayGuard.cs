@@ -42,8 +42,26 @@ public sealed class InMemoryDeviceReplayGuard : IDeviceReplayGuard
     private static readonly TimeSpan RetentionWindow = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(1);
 
+    // Hard ceiling on the ledger so a compromised/insider device that floods
+    // many distinct-nonce signed requests can't grow memory without bound
+    // (only reachable after a valid signature, but still worth capping). When
+    // exceeded we evict the OLDEST entries — those are closest to expiry, so
+    // eviction barely widens the replay window, and the ±5-min timestamp check
+    // still guards anything evicted early.
+    private readonly int maxEntries;
+
     private readonly ConcurrentDictionary<string, DateTimeOffset> seen = new(StringComparer.Ordinal);
     private long lastSweepTicks;
+
+    public InMemoryDeviceReplayGuard(int maxEntries = 200_000)
+    {
+        if (maxEntries < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxEntries));
+        }
+
+        this.maxEntries = maxEntries;
+    }
 
     public bool TryConsume(Guid tenantId, Guid deviceId, string? nonce, DateTimeOffset nowUtc)
     {
@@ -57,7 +75,36 @@ public sealed class InMemoryDeviceReplayGuard : IDeviceReplayGuard
         var key = $"{tenantId:N}:{deviceId:N}:{nonce.Trim()}";
         // TryAdd is atomic: it returns false if the key is already present,
         // which is exactly our replay signal. No lock needed.
-        return seen.TryAdd(key, nowUtc);
+        var added = seen.TryAdd(key, nowUtc);
+
+        if (added && seen.Count > maxEntries)
+        {
+            EvictOldest();
+        }
+
+        return added;
+    }
+
+    private void EvictOldest()
+    {
+        // Drop down to 90% of the cap so this runs rarely (not on every insert
+        // while at the ceiling). Over-eviction under concurrency is harmless —
+        // it only trims a few extra near-expiry nonces.
+        var target = (int)(maxEntries * 0.9);
+        var overage = seen.Count - target;
+        if (overage <= 0)
+        {
+            return;
+        }
+
+        foreach (var key in seen
+            .OrderBy(entry => entry.Value)
+            .Take(overage)
+            .Select(entry => entry.Key)
+            .ToList())
+        {
+            seen.TryRemove(key, out _);
+        }
     }
 
     private void Sweep(DateTimeOffset nowUtc)

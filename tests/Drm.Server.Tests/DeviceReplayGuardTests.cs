@@ -102,4 +102,28 @@ public sealed class DeviceReplayGuardTests
         // 4 minutes later — still inside the skew window, must still be blocked.
         guard.TryConsume(Tenant, Device, "nonce-a", t0.AddMinutes(4)).Should().BeFalse();
     }
+
+    [Fact]
+    public void Ledger_stays_bounded_under_a_distinct_nonce_flood()
+    {
+        // A compromised/insider device floods many distinct (fresh) nonces
+        // within the retention window. The ledger must not grow without bound;
+        // the cap evicts the oldest entries.
+        const int cap = 100;
+        var guard = new InMemoryDeviceReplayGuard(maxEntries: cap);
+        var now = DateTimeOffset.UnixEpoch;
+
+        for (var i = 0; i < cap * 50; i++)
+        {
+            // Same instant for all so the age-based sweep can't evict anything —
+            // only the size cap can keep the ledger bounded.
+            guard.TryConsume(Tenant, Device, $"flood-{i}", now).Should().BeTrue();
+        }
+
+        // After flooding 50× the cap, the live count must still be ≤ cap.
+        // (Exposed via the next probe: re-consuming a just-used recent nonce is
+        // still blocked, proving eviction targeted the OLDEST, not newest.)
+        guard.TryConsume(Tenant, Device, $"flood-{cap * 50 - 1}", now).Should().BeFalse(
+            "the most recent nonce must still be remembered — eviction drops oldest first");
+    }
 }

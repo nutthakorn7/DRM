@@ -82,9 +82,14 @@ public sealed class DeviceSigningPipeServer(
             PipeAccessRights.FullControl,
             AccessControlType.Allow));
         // Interactive logged-on users (the viewer runs in the user's session).
+        // ReadWrite is all a client needs — SYNCHRONIZE is auto-added to every
+        // Allow ACE by PipeAccessRule, so connect succeeds. We deliberately do
+        // NOT grant CreateNewInstance: a client never creates instances, and
+        // granting it would let a non-admin user squat the pipe name and DoS
+        // the viewer. Only the service (SYSTEM) creates instances.
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
-            PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+            PipeAccessRights.ReadWrite,
             AccessControlType.Allow));
         return security;
     }
