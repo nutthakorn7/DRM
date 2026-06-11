@@ -30,6 +30,34 @@ public sealed class RecipientUxPolishTests
         Path.Combine(Root, "src/Drm.Agent.Core/EmailComposer.cs"));
     private static readonly string AgentEmailSurface = TrayMain + "\n" + EmailComposerCore;
 
+    private static readonly string DrmxPreviewJs = File.ReadAllText(
+        Path.Combine(Root, "src/Drm.Server/wwwroot/share/drmx-preview.js"));
+
+    [Fact]
+    public void Share_page_wires_inbrowser_preview_for_viewonly_shares()
+    {
+        // Increment 2: in-browser preview UI + the View-only gate + the
+        // client-side decrypt module are all present and wired.
+        ShareHtml.Should().Contain(@"id=""inbrowserPreview""",
+            "the preview section must exist (revealed by JS only for View-only shares)");
+        ShareHtml.Should().Contain(@"id=""drmxFileInput""",
+            "recipient needs a file input to load the .drmx from the email");
+        ShareHtml.Should().Contain(@"type=""module"" src=""/share/drmx-preview.js""",
+            "the decrypt module must be loaded on the page");
+
+        ShareJs.Should().Contain("maybeEnableInBrowserPreview",
+            "app.js must decide whether to reveal preview based on permissions");
+        ShareJs.Should().Contain("granted.size === 1 && granted.has(\"View\")",
+            "preview must be gated to exactly View-only — never shown when stricter perms can't be enforced in a browser");
+        ShareJs.Should().Contain("/api/share-links/viewer/content-key",
+            "preview must fetch the key from the gated content-key endpoint");
+
+        DrmxPreviewJs.Should().Contain("export async function decryptDrmx",
+            "the client decrypt entry point must exist");
+        DrmxPreviewJs.Should().Contain("additionalData: aad",
+            "AES-GCM must pass the reconstructed associated data or auth fails");
+    }
+
     [Fact]
     public void Share_page_has_next_steps_panel_with_drmx_and_drmcontainer_callouts()
     {

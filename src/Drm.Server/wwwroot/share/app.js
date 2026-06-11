@@ -1,5 +1,7 @@
 (() => {
   let verificationSessionToken = "";
+  let previewSessionToken = "";
+  let previewWired = false;
 
   const startForm = document.getElementById("verificationStartForm");
   const confirmForm = document.getElementById("verificationConfirmForm");
@@ -79,6 +81,9 @@
       verificationSessionToken
     });
 
+    // Keep the (reusable, session-window) token for the in-browser preview's
+    // content-key call before clearing the verification handle.
+    previewSessionToken = verificationSessionToken;
     verificationSessionToken = "";
 
     if (!response.ok) {
@@ -149,6 +154,91 @@
       const perm = badge.getAttribute("data-perm");
       badge.setAttribute("data-state", granted.has(perm) ? "allowed" : "denied");
     });
+
+    // Increment 2 — offer in-browser preview ONLY for View-only shares
+    // (granted is exactly {View}). Matches the server-side content-key gate.
+    maybeEnableInBrowserPreview(granted);
+  }
+
+  function maybeEnableInBrowserPreview(granted) {
+    const section = document.getElementById("inbrowserPreview");
+    if (!section) return;
+    const viewOnly = granted.size === 1 && granted.has("View");
+    section.hidden = !viewOnly;
+    if (viewOnly && !previewWired) {
+      previewWired = true;
+      document.getElementById("drmxFileInput").addEventListener("change", onDrmxSelected);
+    }
+  }
+
+  async function onDrmxSelected(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!window.DrmxPreview) {
+      setPreviewStatus("Preview module failed to load — use the desktop viewer.", "error");
+      return;
+    }
+    if (!previewSessionToken) {
+      setPreviewStatus("Session expired — verify the code again to preview.", "error");
+      return;
+    }
+
+    setPreviewStatus("Decrypting in your browser…", "");
+    let buffer;
+    try {
+      buffer = await file.arrayBuffer();
+    } catch {
+      setPreviewStatus("Could not read the selected file.", "error");
+      return;
+    }
+
+    const response = await postJson("/api/share-links/viewer/content-key", {
+      tenantId: valueOf("tenantId"),
+      verificationSessionToken: previewSessionToken
+    });
+    if (!response.ok) {
+      await renderPreviewError(response);
+      return;
+    }
+    const payload = await response.json();
+
+    let result;
+    try {
+      const key = window.DrmxPreview.base64ToBytes(payload.fileKeyBase64);
+      result = await window.DrmxPreview.decryptDrmx(buffer, key);
+    } catch (err) {
+      setPreviewStatus(err.message || "Decryption failed.", "error");
+      return;
+    }
+
+    const contentType = result.contentType || payload.contentType || "";
+    if (!/pdf/i.test(contentType)) {
+      setPreviewStatus(
+        "In-browser preview supports PDF files only — open this file in the desktop viewer.", "");
+      return;
+    }
+
+    const blob = new Blob([result.bytes], { type: "application/pdf" });
+    document.getElementById("inbrowserWatermark").textContent = payload.watermarkTemplate || "zcrDRM";
+    document.getElementById("previewIframe").src = URL.createObjectURL(blob);
+    document.getElementById("inbrowserFrame").hidden = false;
+    setPreviewStatus("Decrypted in your browser and rendered below.", "ok");
+  }
+
+  async function renderPreviewError(response) {
+    if (response.status === 404) {
+      setPreviewStatus("This share has no previewable content here — use the desktop viewer.", "error");
+      return;
+    }
+    const body = await response.json().catch(() => ({}));
+    setPreviewStatus(body.reasonCode || "Could not fetch the preview key.", "error");
+  }
+
+  function setPreviewStatus(message, tone) {
+    const el = document.getElementById("previewStatus");
+    if (!el) return;
+    el.textContent = message;
+    el.className = tone ? `status ${tone}` : "status";
   }
 
   function valueOf(id) {
