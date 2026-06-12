@@ -213,3 +213,19 @@ Add a component token when: re-theming this one control in isolation would be a
 real need (e.g., danger buttons → red palette without touching everything else).
 
 When in doubt, don't add a token. The current set is calibrated; resist drift.
+
+---
+
+## Breakpoints
+
+Two breakpoints, no more (CSS can't read custom properties inside `@media`,
+so these are policy, not tokens — enforced by review):
+
+| Breakpoint | Meaning | Used by |
+|---|---|---|
+| `760px` | **Content stacking** — single-column flows, topbar wraps to rows | `/share/`, `/me/`, `/admin/agent/` |
+| `820px` | **Workspace collapse** — admin rail goes icon-only, dense grids stack, docs TOC stacks | `/admin/`, `/admin/compatibility/` |
+
+Test viewport for mobile assertions: **375×812** (UI tests pin this).
+Don't introduce a third breakpoint for one component — pick the nearer of
+these two; if neither fits, the layout is probably fighting the grid.

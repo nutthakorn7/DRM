@@ -90,7 +90,9 @@
         </svg>
       </div>
       <p class="eyebrow">First time here</p>
-      <h1 id="welcomeTitle"><span class="brand-zcr">zcr</span><span class="brand-drm">DRM</span> — self-hosted DRM, ready in 5 minutes</h1>
+      <!-- h2, not h1: the page's single h1 is the topbar wordmark. The welcome
+           dialog heading was a second h1 (and out-sized it) — audit FINDING-009. -->
+      <h2 id="welcomeTitle"><span class="brand-zcr">zcr</span><span class="brand-drm">DRM</span> — self-hosted DRM, ready in 5 minutes</h2>
       <p class="welcome-lede">You're on <code class="brand-domain">drm.zcr.ai</code>. Generate a test tenant in one click — we'll wire up a Tenant ID, admin credential, and Admin user ID so you can protect a file before your coffee is cold.</p>
 
       <ul class="welcome-steps">
@@ -148,7 +150,7 @@
           </div>
         </div>
         <div class="page-header-right">
-          <div class="status-line" id="connectionState">Not connected</div>
+          <div class="status-line" id="connectionState" role="status" aria-live="polite">Not connected</div>
           <button type="button" class="settings-trigger" id="settingsTrigger" aria-label="Open settings drawer" aria-expanded="false" title="Server health &amp; license">
             <span aria-hidden="true">⚙</span>
           </button>
