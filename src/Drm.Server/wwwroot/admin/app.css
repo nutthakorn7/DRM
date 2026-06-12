@@ -405,9 +405,9 @@ select {
 }
 
 .rail-toggle {
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
+  flex: 0 0 var(--touch-target-sm);
+  width: var(--touch-target-sm);
+  height: var(--touch-target-sm);
   display: grid;
   place-items: center;
   background: transparent;

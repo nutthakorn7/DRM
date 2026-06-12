@@ -225,7 +225,7 @@ label {
 
 input {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--touch-target);
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
@@ -234,7 +234,7 @@ input {
 }
 
 button {
-  min-height: 42px;
+  min-height: var(--touch-target);
   border: 1px solid var(--accent);
   border-radius: 6px;
   background: var(--accent);

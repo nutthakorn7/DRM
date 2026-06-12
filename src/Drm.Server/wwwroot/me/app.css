@@ -312,6 +312,7 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 
 /* Stage 20 — small inline revoke button in the actions column. */
 .my-shares-table .revoke-btn {
+  min-height: var(--touch-target-sm);
   padding: 3px 10px;
   font-size: 0.75rem;
   background: transparent;
