@@ -44,7 +44,7 @@ input {
   height: 30px;
   background: var(--accent);
   color: #fff;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 15px;
 }
 
@@ -227,7 +227,7 @@ input {
   width: 100%;
   min-height: var(--touch-target);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
   padding: 10px 11px;
@@ -236,7 +236,7 @@ input {
 button {
   min-height: var(--touch-target);
   border: 1px solid var(--accent);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: #ffffff;
   cursor: pointer;
@@ -298,7 +298,7 @@ button:disabled {
   min-height: 420px;
   align-content: start;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   padding: 42px 38px;
   box-shadow: 0 24px 70px rgba(32, 36, 42, 0.14);
@@ -361,7 +361,7 @@ button:disabled {
   margin: 18px 0 12px;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #ffffff;
 }
 
@@ -381,7 +381,7 @@ button:disabled {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12.5px;
   font-weight: 600;
   border: 1px solid transparent;
@@ -418,7 +418,7 @@ button:disabled {
   margin: 24px 0 12px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #f9fafb;
 }
 
@@ -443,7 +443,7 @@ button:disabled {
 .next-steps-list code {
   background: #eef2f7;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 12.5px;
 }
