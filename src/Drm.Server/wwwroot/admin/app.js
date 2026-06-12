@@ -2292,7 +2292,7 @@ function setSharedKeyBanner(visible) {
     banner = document.createElement("div");
     banner.id = "sharedKeyDeprecationBanner";
     banner.style.cssText =
-      "background:#7c2d12;color:#fff;padding:10px 16px;font-size:13px;display:flex;align-items:center;gap:10px;";
+      "background:var(--warning-ink);color:#fff;padding:10px 16px;font-size:13px;display:flex;align-items:center;gap:10px;";
     banner.innerHTML =
       '<strong>Deprecation warning:</strong> This session is authenticated with the shared API key (X-DRM-Admin-Key). ' +
       'Migrate to per-admin tokens (X-DRM-Admin-Token) before upgrading to a future release that removes shared-key support.';
@@ -2839,7 +2839,7 @@ function drawSparkline(svgId, values, color = "#6366f1") {
   if (!svg) return;
   svg.innerHTML = "";
   if (!values || values.length < 2) {
-    svg.innerHTML = `<text x="110" y="28" text-anchor="middle" fill="#9ca3af" font-size="11">No data</text>`;
+    svg.innerHTML = `<text x="110" y="28" text-anchor="middle" fill="var(--muted)" font-size="11">No data</text>`;
     return;
   }
   const W = 220, H = 48, pad = 4;
@@ -3361,7 +3361,7 @@ async function refreshIpAllowlist() {
       <td><code>${r.cidr}</code></td>
       <td>${r.label || "—"}</td>
       <td>${new Date(r.createdAtUtc).toLocaleDateString()}</td>
-      <td><button type="button" data-rule-id="${r.ruleId}" class="deleteIpRuleBtn" style="background:var(--danger,#e53e3e);color:#fff;padding:2px 8px;font-size:12px">Delete</button></td>
+      <td><button type="button" data-rule-id="${r.ruleId}" class="deleteIpRuleBtn" style="background:var(--error);color:#fff;padding:2px 8px;font-size:12px">Delete</button></td>
     </tr>`).join("");
   tbody.querySelectorAll(".deleteIpRuleBtn").forEach(btn => {
     btn.addEventListener("click", async () => {
