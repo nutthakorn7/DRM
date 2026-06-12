@@ -1632,6 +1632,7 @@ function showPolicyPushToast(message) {
   if (existing) existing.remove();
   const toast = document.createElement("div");
   toast.className = "policy-push-toast";
+  toast.setAttribute("role", "status");
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 6000);
