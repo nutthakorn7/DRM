@@ -2446,7 +2446,7 @@ async function refreshTenants() {
         : `${usedSeats} / ∞`;
       const seatPct = maxSeats != null ? Math.min(100, Math.round((usedSeats / maxSeats) * 100)) : 0;
       const seatBar = maxSeats != null
-        ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? '#ef4444' : '#22c55e'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
+        ? `<div style="background:var(--line);border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? 'var(--error)' : 'var(--ok)'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
         : '';
       const toggleLabel = t.status === 0 ? "Suspend" : "Activate";
       const toggleStatus = t.status === 0 ? 1 : 0;
@@ -2699,7 +2699,7 @@ async function refreshUsage() {
       const seats = r.maxSeats != null ? `${r.usedSeats} / ${r.maxSeats}` : `${r.usedSeats} / ∞`;
       const seatPct = r.maxSeats != null ? Math.min(100, Math.round((r.usedSeats / r.maxSeats) * 100)) : 0;
       const seatBar = r.maxSeats != null
-        ? `<div style="background:#e5e7eb;border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? '#ef4444' : seatPct >= 80 ? '#f59e0b' : '#22c55e'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
+        ? `<div style="background:var(--line);border-radius:4px;height:6px;margin-top:4px"><div style="background:${seatPct >= 90 ? 'var(--error)' : seatPct >= 80 ? 'var(--warning-ink)' : 'var(--ok)'};width:${seatPct}%;height:100%;border-radius:4px"></div></div>`
         : '';
       return `<tr>
         <td><strong>${esc(r.displayName)}</strong><br><small><code>${esc(r.name)}</code></small></td>

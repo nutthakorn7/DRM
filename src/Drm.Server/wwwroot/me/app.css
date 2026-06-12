@@ -208,14 +208,14 @@ textarea:focus,
   outline: none;
   box-shadow: var(--focus-ring);
 }
-button.primary:disabled { background: #9ca3af; cursor: not-allowed; }
+button.primary:disabled { background: var(--muted); cursor: not-allowed; }
 button.primary.big { padding: 16px; font-size: 1.05rem; }
 
 .result {
   margin-top: 28px;
   padding: 20px;
-  background: #ecfdf5;
-  border: 1px solid #10b981;
+  background: var(--ok-bg);
+  border: 1px solid var(--ok);
   border-radius: 8px;
 }
 
@@ -252,9 +252,9 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 .error-box {
   margin-top: 16px;
   padding: 10px 14px;
-  background: #fee2e2;
+  background: var(--error-bg);
   color: var(--error);
-  border: 1px solid #fca5a5;
+  border: 1px solid color-mix(in srgb, var(--error) 40%, white);
   border-radius: 6px;
   font-size: 0.9rem;
 }
@@ -305,24 +305,24 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
   font-size: 0.75rem;
   font-weight: 600;
 }
-.my-shares-table .status-active   { background: #D1FAE5; color: #047857; }
-.my-shares-table .status-revoked  { background: #FEE2E2; color: #B91C1C; }
-.my-shares-table .status-expired  { background: #FEF3C7; color: #92400E; }
-.my-shares-table .status-used-up  { background: #E0E7FF; color: #3730A3; }
+.my-shares-table .status-active   { background: var(--ok-bg); color: var(--ok); }
+.my-shares-table .status-revoked  { background: var(--error-bg); color: var(--error); }
+.my-shares-table .status-expired  { background: var(--warning-bg); color: var(--warning-ink); }
+.my-shares-table .status-used-up  { background: var(--page); color: var(--muted); }
 
 /* Stage 20 — small inline revoke button in the actions column. */
 .my-shares-table .revoke-btn {
   padding: 3px 10px;
   font-size: 0.75rem;
   background: transparent;
-  color: #B91C1C;
-  border: 1px solid #FCA5A5;
+  color: var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 40%, white);
   border-radius: 4px;
   cursor: pointer;
   font-weight: 600;
 }
 .my-shares-table .revoke-btn:hover:not(:disabled) {
-  background: #FEE2E2;
+  background: var(--error-bg);
 }
 .my-shares-table .revoke-btn:disabled {
   opacity: 0.6;

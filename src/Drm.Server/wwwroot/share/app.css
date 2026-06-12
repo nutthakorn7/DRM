@@ -389,15 +389,15 @@ button:disabled {
 }
 
 .perm-badge[data-state="allowed"] {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #6ee7b7;
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, white);
 }
 
 .perm-badge[data-state="denied"] {
-  background: #f3f4f6;
-  color: #9ca3af;
-  border-color: #e5e7eb;
+  background: var(--page);
+  color: var(--muted);
+  border-color: var(--line);
   text-decoration: line-through;
 }
 
