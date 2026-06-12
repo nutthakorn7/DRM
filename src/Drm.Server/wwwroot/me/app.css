@@ -26,16 +26,16 @@ body {
   gap: 10px;
 }
 
+/* Brand-seal padlock — same 24x24 glyph as /share/ and /admin/. DESIGN.md
+   retired the 🔒 emoji; this surface was the last one still wearing it. */
 .topbar .brand::before {
-  content: "🔒";
+  content: "";
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.5" fill="white"/></svg>') center / 18px 18px no-repeat;
   border-radius: 8px;
-  font-size: 15px;
 }
 
 .topbar .brand strong {
@@ -152,7 +152,7 @@ h1 { margin: 0 0 6px 0; font-size: 1.8rem; }
   padding: 36px 24px;
   border: 2px dashed var(--line);
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--page);
   text-align: center;
   cursor: pointer;
   transition: background 120ms, border-color 120ms;
@@ -161,8 +161,8 @@ h1 { margin: 0 0 6px 0; font-size: 1.8rem; }
 .drop-zone:hover,
 .drop-zone:focus,
 .drop-zone.is-over {
-  background: #f0f7ff;
-  border-color: #60a5fa;
+  background: var(--accent-soft);
+  border-color: var(--accent);
   outline: none;
 }
 
@@ -208,14 +208,14 @@ textarea:focus,
   outline: none;
   box-shadow: var(--focus-ring);
 }
-button.primary:disabled { background: #9ca3af; cursor: not-allowed; }
+button.primary:disabled { background: var(--muted); cursor: not-allowed; }
 button.primary.big { padding: 16px; font-size: 1.05rem; }
 
 .result {
   margin-top: 28px;
   padding: 20px;
-  background: #ecfdf5;
-  border: 1px solid #10b981;
+  background: var(--ok-bg);
+  border: 1px solid var(--ok);
   border-radius: 8px;
 }
 
@@ -252,9 +252,9 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 .error-box {
   margin-top: 16px;
   padding: 10px 14px;
-  background: #fee2e2;
+  background: var(--error-bg);
   color: var(--error);
-  border: 1px solid #fca5a5;
+  border: 1px solid color-mix(in srgb, var(--error) 40%, white);
   border-radius: 6px;
   font-size: 0.9rem;
 }
@@ -264,8 +264,8 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 .my-shares {
   margin-top: 32px;
   padding: 18px 22px;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 10px;
 }
 .my-shares-header {
@@ -278,7 +278,7 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 .my-shares h2 {
   margin: 0;
   font-size: 1rem;
-  color: #1f2937;
+  color: var(--ink);
 }
 .my-shares-table {
   width: 100%;
@@ -288,14 +288,14 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
 .my-shares-table th {
   text-align: left;
   font-weight: 600;
-  color: #4B5563;
+  color: var(--muted);
   padding: 8px 6px;
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid var(--line);
 }
 .my-shares-table td {
   padding: 8px 6px;
-  border-bottom: 1px solid #F3F4F6;
-  color: #1f2937;
+  border-bottom: 1px solid var(--page);
+  color: var(--ink);
   vertical-align: middle;
 }
 .my-shares-table .status {
@@ -305,26 +305,54 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
   font-size: 0.75rem;
   font-weight: 600;
 }
-.my-shares-table .status-active   { background: #D1FAE5; color: #047857; }
-.my-shares-table .status-revoked  { background: #FEE2E2; color: #B91C1C; }
-.my-shares-table .status-expired  { background: #FEF3C7; color: #92400E; }
-.my-shares-table .status-used-up  { background: #E0E7FF; color: #3730A3; }
+.my-shares-table .status-active   { background: var(--ok-bg); color: var(--ok); }
+.my-shares-table .status-revoked  { background: var(--error-bg); color: var(--error); }
+.my-shares-table .status-expired  { background: var(--warning-bg); color: var(--warning-ink); }
+.my-shares-table .status-used-up  { background: var(--page); color: var(--muted); }
 
 /* Stage 20 — small inline revoke button in the actions column. */
 .my-shares-table .revoke-btn {
+  min-height: var(--touch-target-sm);
   padding: 3px 10px;
   font-size: 0.75rem;
   background: transparent;
-  color: #B91C1C;
-  border: 1px solid #FCA5A5;
+  color: var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 40%, white);
   border-radius: 4px;
   cursor: pointer;
   font-weight: 600;
 }
 .my-shares-table .revoke-btn:hover:not(:disabled) {
-  background: #FEE2E2;
+  background: var(--error-bg);
 }
 .my-shares-table .revoke-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Narrow viewports — same 760px breakpoint as /share/. Without this the
+   topbar nav wrapped into a ragged second column at 375px (no overflow,
+   just graceless). Brand row and nav each take a full row instead. */
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 10px 16px;
+  }
+  .topbar nav {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0 4px;
+  }
+  .topbar nav a,
+  .topbar nav .topbar-link {
+    margin-left: 0;
+    margin-right: 12px;
+    padding: 8px 4px;
+  }
+  .hero {
+    margin: 16px auto;
+    padding: 24px 20px;
+  }
 }

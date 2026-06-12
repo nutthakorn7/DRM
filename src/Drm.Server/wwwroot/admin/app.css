@@ -405,9 +405,9 @@ select {
 }
 
 .rail-toggle {
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
+  flex: 0 0 var(--touch-target-sm);
+  width: var(--touch-target-sm);
+  height: var(--touch-target-sm);
   display: grid;
   place-items: center;
   background: transparent;
@@ -556,7 +556,7 @@ nav a.active {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f59e0b;
+  background: var(--warning-ink);
   flex-shrink: 0;
 }
 
@@ -1287,8 +1287,8 @@ body[data-active-tab="overview"] .brand-hero {
 }
 
 .getting-started.is-complete {
-  border-left-color: #10b981;
-  background: linear-gradient(180deg, #ecfdf5 0%, var(--surface) 60%);
+  border-left-color: var(--ok);
+  background: linear-gradient(180deg, var(--ok-bg) 0%, var(--surface) 60%);
 }
 
 .checklist {
@@ -1322,8 +1322,8 @@ body[data-active-tab="overview"] .brand-hero {
 }
 
 .checklist-item.is-done .check {
-  background: #10b981;
-  border-color: #10b981;
+  background: var(--ok);
+  border-color: var(--ok);
   color: white;
 }
 
@@ -1408,12 +1408,12 @@ body[data-active-tab="overview"] .brand-hero {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #9ca3af;
+  background: var(--muted);
 }
 
-.status-tile.is-ok .dot   { background: #10b981; }
-.status-tile.is-warn .dot { background: #f59e0b; }
-.status-tile.is-err .dot  { background: #ef4444; }
+.status-tile.is-ok .dot   { background: var(--ok); }
+.status-tile.is-warn .dot { background: var(--warning-ink); }
+.status-tile.is-err .dot  { background: var(--error); }
 
 .status-tile strong {
   margin-top: 6px;
@@ -1518,9 +1518,9 @@ body[data-active-tab="overview"] .brand-hero {
   right: 16px;
   z-index: 1000;
   padding: 12px 16px;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fcd34d;
+  background: var(--warning-bg);
+  color: var(--warning-ink);
+  border: 1px solid color-mix(in srgb, var(--warning-ink) 30%, white);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   font-size: 0.9rem;
@@ -1712,13 +1712,13 @@ pre {
 
 /* ── Alert badges ────────────────────────────────────────────────────────────── */
 
-.badge-warn  { color: #92400e; background: #fef3c7; }
-.badge-info  { color: #1e40af; background: #dbeafe; }
-.badge-ok    { color: #065f46; background: #d1fae5; }
-.badge-error { color: #991b1b; background: #fee2e2; }
+.badge-warn  { color: var(--warning-ink); background: var(--warning-bg); }
+.badge-info  { color: var(--accent-dark); background: var(--accent-soft); }
+.badge-ok    { color: var(--ok); background: var(--ok-bg); }
+.badge-error { color: var(--error); background: var(--error-bg); }
 
-.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
-.danger:hover { background: #dc2626; border-color: #dc2626; }
+.danger { background: var(--error); color: #fff; border-color: var(--error); }
+.danger:hover { background: color-mix(in srgb, var(--error) 85%, black); border-color: color-mix(in srgb, var(--error) 85%, black); }
 
 /* ── <dialog> shell ──────────────────────────────────────────────────────────── */
 
@@ -1933,9 +1933,9 @@ dialog::backdrop {
   white-space: nowrap;
 }
 
-.activity-tone-good   { background: #d1fae5; color: #065f46; }
-.activity-tone-info   { background: #e0e7ff; color: #3730a3; }
-.activity-tone-danger { background: #fee2e2; color: #991b1b; }
+.activity-tone-good   { background: var(--ok-bg); color: var(--ok); }
+.activity-tone-info   { background: var(--accent-soft); color: var(--accent-dark); }
+.activity-tone-danger { background: var(--error-bg); color: var(--error); }
 
 .activity-reason {
   color: #374151;
