@@ -1,9 +1,4 @@
 /* Color + type tokens now live in /static/tokens.css. */
-:root {
-  /* /share/ uses --soft for the locked-preview backdrop; keep the legacy
-     alias so existing rules still resolve. */
-  --soft: var(--accent-soft);
-}
 
 * {
   box-sizing: border-box;
@@ -287,7 +282,7 @@ button:disabled {
   padding: 42px;
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.46)),
-    var(--soft);
+    var(--accent-soft);
 }
 
 .document-visual {

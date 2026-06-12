@@ -232,7 +232,7 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
 }
 
