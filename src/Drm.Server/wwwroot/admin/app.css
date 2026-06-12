@@ -91,8 +91,8 @@ select {
   height: 30px;
 }
 
-.welcome-card h1 .brand-zcr { color: var(--accent); }
-.welcome-card h1 .brand-drm { color: var(--ink); }
+.welcome-card h2 .brand-zcr { color: var(--accent); }
+.welcome-card h2 .brand-drm { color: var(--ink); }
 
 /* Canonical product URL — mono chip used in brand-text and welcome lede */
 .brand-domain {
@@ -106,7 +106,7 @@ select {
   letter-spacing: -0.01em;
 }
 
-.welcome-card h1 {
+.welcome-card h2 {
   font-size: 24px;
   margin: 4px 0 10px;
   color: var(--ink);
