@@ -329,3 +329,30 @@ button.primary.big { padding: 16px; font-size: 1.05rem; }
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Narrow viewports — same 760px breakpoint as /share/. Without this the
+   topbar nav wrapped into a ragged second column at 375px (no overflow,
+   just graceless). Brand row and nav each take a full row instead. */
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 10px 16px;
+  }
+  .topbar nav {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0 4px;
+  }
+  .topbar nav a,
+  .topbar nav .topbar-link {
+    margin-left: 0;
+    margin-right: 12px;
+    padding: 8px 4px;
+  }
+  .hero {
+    margin: 16px auto;
+    padding: 24px 20px;
+  }
+}
