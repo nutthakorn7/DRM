@@ -4,7 +4,7 @@
 
 body {
   margin: 0;
-  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-feature-settings: "ss01" on, "ss03" on, "cv02" on;
   background: var(--page);
   color: var(--ink);

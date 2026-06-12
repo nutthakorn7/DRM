@@ -14,7 +14,7 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background: var(--page);
-  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-feature-settings: "ss01" on, "ss03" on, "cv02" on;
 }
 
@@ -444,7 +444,7 @@ button:disabled {
   background: #eef2f7;
   padding: 1px 6px;
   border-radius: 4px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
 }
 

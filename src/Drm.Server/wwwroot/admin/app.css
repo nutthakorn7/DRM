@@ -31,12 +31,12 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background: var(--page);
-  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-feature-settings: "ss01" on, "ss03" on, "cv02" on;
 }
 
 code, pre, kbd, samp {
-  font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 button,
@@ -94,9 +94,9 @@ select {
 .welcome-card h1 .brand-zcr { color: var(--accent); }
 .welcome-card h1 .brand-drm { color: var(--ink); }
 
-/* Canonical product URL — IBM Plex Mono chip used in brand-text and welcome lede */
+/* Canonical product URL — mono chip used in brand-text and welcome lede */
 .brand-domain {
-  font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.95em;
   font-weight: 500;
   color: var(--accent-dark, var(--accent));
@@ -1938,8 +1938,8 @@ dialog::backdrop {
 .activity-tone-danger { background: var(--error-bg); color: var(--error); }
 
 .activity-reason {
-  color: #374151;
-  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  font-family: var(--font-mono);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
