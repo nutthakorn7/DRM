@@ -126,6 +126,59 @@ public sealed class AdminDevicesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_re_enable_a_disabled_device_and_enable_is_tenant_scoped_and_audited()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var adminUserId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        using var register = await RegisterDeviceAsync(client, tenantId, userId, deviceId, "WIN-BACK");
+        register.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using (var disable = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/disable", new
+        {
+            tenantId,
+            adminUserId,
+            reason = "lost_device"
+        }))
+            disable.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Scoped on {tenantId, deviceId}: a different tenant can't re-enable it.
+        using (var wrongTenant = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/enable", new
+        {
+            tenantId = Guid.NewGuid(),
+            adminUserId
+        }))
+            wrongTenant.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var enable = await client.PostAsJsonAsync($"/api/admin/devices/{deviceId}/enable", new
+        {
+            tenantId,
+            adminUserId
+        });
+        enable.StatusCode.Should().Be(HttpStatusCode.OK);
+        var enabled = await enable.Content.ReadFromJsonAsync<DeviceResponse>();
+        enabled.Should().NotBeNull();
+        enabled!.Status.Should().NotBe("disabled");
+        enabled.DisabledAtUtc.Should().BeNull();
+        enabled.DisabledReason.Should().BeNull();
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var device = await dbContext.AgentDevices.AsNoTracking().SingleAsync();
+        device.Status.Should().NotBe("disabled");
+        device.DisabledAtUtc.Should().BeNull();
+        device.DisabledReason.Should().BeNull();
+
+        var audit = await dbContext.AuditEvents.AsNoTracking()
+            .SingleAsync(auditEvent => auditEvent.EventType == "device_enabled");
+        audit.TenantId.Should().Be(tenantId);
+        audit.UserId.Should().Be(adminUserId);
+    }
+
+    [Fact]
     public async Task Admin_device_health_summarizes_online_stale_never_seen_and_disabled_devices()
     {
         using var client = factory.CreateClient();
