@@ -821,6 +821,18 @@ document.querySelector("#refreshWatermarkTemplates").addEventListener("click", (
   refreshWatermarkTemplates();
 });
 
+// null = create mode; a templateId = editing that template (PUT instead of POST).
+let policyTemplateEditId = null;
+
+function resetPolicyTemplateForm() {
+  policyTemplateEditId = null;
+  document.querySelector("#templateId").readOnly = false;
+  const submitBtn = document.querySelector("#createPolicyTemplateForm button[type=submit]");
+  if (submitBtn) submitBtn.textContent = "Create template";
+}
+
+document.querySelector("#createPolicyTemplateForm").addEventListener("reset", resetPolicyTemplateForm);
+
 document.querySelector("#createPolicyTemplateForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const offlineLeaseValue = document.querySelector("#templateOfflineLease").value.trim();
@@ -843,12 +855,20 @@ document.querySelector("#createPolicyTemplateForm").addEventListener("submit", a
     maxOpens: maxOpensValue ? Number(maxOpensValue) : null
   };
 
-  await apiFetch("/api/admin/policy-templates", {
-    method: "POST",
-    body: JSON.stringify(body)
-  });
+  if (policyTemplateEditId) {
+    await apiFetch(`/api/admin/policy-templates/${encodeURIComponent(policyTemplateEditId)}`, {
+      method: "PUT",
+      body: JSON.stringify(body)
+    });
+    setStatus("Policy template updated", "ok");
+  } else {
+    await apiFetch("/api/admin/policy-templates", {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+  }
 
-  event.target.reset();
+  event.target.reset(); // fires the reset handler → clears edit mode
   await refreshPolicyTemplates();
   window.dispatchEvent(new CustomEvent("drm:onboarded", { detail: { step: "policy" } }));
 });
@@ -1235,6 +1255,21 @@ document.querySelector("#addTagForm").addEventListener("submit", async (event) =
   await refreshTagChips();
 });
 
+document.querySelector("#removeTagBtn").addEventListener("click", async () => {
+  const fileId = document.querySelector("#tagFileId").value.trim();
+  const tag = document.querySelector("#tagValue").value.trim();
+  if (!fileId || !tag) {
+    setStatus("File ID and tag required to remove", "error");
+    return;
+  }
+  await apiFetch(
+    `/api/admin/files/${encodeURIComponent(fileId)}/tags/${encodeURIComponent(tag)}?tenantId=${encodeURIComponent(requireTenantId())}`,
+    { method: "DELETE" });
+  document.querySelector("#tagValue").value = "";
+  setStatus(`Tag "${tag}" removed from ${fileId.slice(0, 8)}…`, "ok");
+  await refreshTagChips();
+});
+
 document.querySelector("#refreshTags").addEventListener("click", refreshTagChips);
 
 async function refreshTagChips() {
@@ -1444,12 +1479,15 @@ shareLinksBody.addEventListener("click", async (event) => {
 });
 
 devicesBody.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-disable-device-id]");
-  if (!button) {
+  const disableBtn = event.target.closest("[data-disable-device-id]");
+  if (disableBtn) {
+    await disableDevice(disableBtn.dataset.disableDeviceId);
     return;
   }
-
-  await disableDevice(button.dataset.disableDeviceId);
+  const enableBtn = event.target.closest("[data-enable-device-id]");
+  if (enableBtn) {
+    await enableDevice(enableBtn.dataset.enableDeviceId);
+  }
 });
 
 async function refreshUsers() {
@@ -1785,6 +1823,21 @@ async function disableDevice(deviceId) {
   setStatus("Device disabled", "ok");
 }
 
+async function enableDevice(deviceId) {
+  const body = {
+    tenantId: requireTenantId(),
+    adminUserId: requireAdminUserId()
+  };
+
+  await apiFetch(`/api/admin/devices/${encodeURIComponent(deviceId)}/enable`, {
+    method: "POST",
+    body: JSON.stringify(body)
+  });
+
+  await refreshDevices();
+  setStatus("Device re-enabled", "ok");
+}
+
 function adminAuthHeader(credential) {
   return credential.startsWith("drm_admin_")
     ? { "X-DRM-Admin-Token": credential }
@@ -1912,7 +1965,9 @@ function renderDevices(devices) {
       <td>${escapeHtml(device.agentVersion)}</td>
       <td>${escapeHtml(device.status)}</td>
       <td>${escapeHtml(formatDate(device.lastHeartbeatAtUtc))}</td>
-      <td>${isDeviceDisabled(device) ? "" : `<button class="danger" type="button" data-disable-device-id="${escapeHtml(device.deviceId)}">Disable</button>`}</td>
+      <td>${isDeviceDisabled(device)
+        ? `<button type="button" data-enable-device-id="${escapeHtml(device.deviceId)}">Enable</button>`
+        : `<button class="danger" type="button" data-disable-device-id="${escapeHtml(device.deviceId)}">Disable</button>`}</td>
     </tr>
   `).join("");
 }
@@ -1948,7 +2003,7 @@ function renderDeviceHealth(health) {
 
 function renderPolicyTemplates(templates) {
   if (!templates.length) {
-    policyTemplatesBody.innerHTML = emptyStateRow(7, {
+    policyTemplatesBody.innerHTML = emptyStateRow(8, {
       icon: "📋",
       title: "No policy templates yet",
       hint: "Templates bundle permissions, watermark, offline-lease, and a per-user open limit into a reusable preset. Create one above so users can apply it when protecting files.",
@@ -1965,9 +2020,48 @@ function renderPolicyTemplates(templates) {
       <td>${escapeHtml(`${template.offlineLeaseMinutes} min`)}</td>
       <td>${template.maxOpens ? escapeHtml(`${template.maxOpens} / user`) : '<span class="muted">Unlimited</span>'}</td>
       <td>${template.allowPrint ? "Yes" : "No"}</td>
+      <td><button type="button" data-edit-policy-template-id="${escapeHtml(template.templateId)}">Edit</button></td>
     </tr>
   `).join("");
 }
+
+// Loads a template into the create form and flips it to update (PUT) mode.
+// The form's combine/split logic is reversed here so the round-trip is exact:
+// RunMacros / TransferOwnership go back to their checkboxes, the rest to the
+// base permissions field.
+async function editPolicyTemplate(templateId) {
+  const template = await apiFetch(
+    `/api/admin/policy-templates/${encodeURIComponent(templateId)}?tenantId=${encodeURIComponent(requireTenantId())}`);
+  if (!template) return;
+
+  const perms = (template.permissions || "").split(",").map((p) => p.trim()).filter(Boolean);
+  const hasMacros = perms.includes("RunMacros");
+  const hasTransfer = perms.includes("TransferOwnership");
+  const basePerms = perms.filter((p) => p !== "RunMacros" && p !== "TransferOwnership").join(", ");
+
+  document.querySelector("#templateId").value = template.templateId;
+  document.querySelector("#templateId").readOnly = true;
+  document.querySelector("#templateName").value = template.name;
+  document.querySelector("#templatePermissions").value = basePerms;
+  document.querySelector("#templateAllowMacros").checked = hasMacros;
+  document.querySelector("#templateAllowTransferOwnership").checked = hasTransfer;
+  document.querySelector("#templateWatermark").value = template.watermarkTemplate;
+  document.querySelector("#templateOfflineLease").value = String(template.offlineLeaseMinutes);
+  document.querySelector("#templateAllowPrint").checked = template.allowPrint;
+  document.querySelector("#templateMaxOpens").value = template.maxOpens ? String(template.maxOpens) : "";
+
+  policyTemplateEditId = templateId;
+  const submitBtn = document.querySelector("#createPolicyTemplateForm button[type=submit]");
+  if (submitBtn) submitBtn.textContent = "Update template";
+  setStatus(`Editing template ${templateId.slice(0, 8)}… — submit to save, or Reset to cancel`, "ok");
+  document.querySelector("#createPolicyTemplateForm").scrollIntoView({ block: "center" });
+}
+
+policyTemplatesBody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-policy-template-id]");
+  if (!button) return;
+  editPolicyTemplate(button.dataset.editPolicyTemplateId);
+});
 
 function renderWatermarkTemplates(templates) {
   if (!templates.length) {
@@ -2016,7 +2110,7 @@ function renderSimulation(decision) {
 
 function renderSiemWebhooks(webhooks) {
   if (!webhooks.length) {
-    siemWebhooksBody.innerHTML = '<tr><td colspan="4" class="empty">No SIEM webhooks in this tenant.</td></tr>';
+    siemWebhooksBody.innerHTML = '<tr><td colspan="5" class="empty">No SIEM webhooks in this tenant.</td></tr>';
     setIntegrationStatus("siem", false);
     return;
   }
@@ -2027,10 +2121,26 @@ function renderSiemWebhooks(webhooks) {
       <td>${escapeHtml(webhook.url)}</td>
       <td>${renderEnabledBadge(webhook.enabled)}</td>
       <td>${escapeHtml(formatDate(webhook.createdAtUtc))}</td>
+      <td><button class="danger" type="button" data-delete-siem-webhook-id="${escapeHtml(webhook.webhookId)}">Delete</button></td>
     </tr>
   `).join("");
   setIntegrationStatus("siem", webhooks.some((w) => w.enabled));
 }
+
+async function deleteSiemWebhook(webhookId) {
+  if (!confirm("Delete this SIEM webhook? Events will stop being forwarded to it.")) return;
+  await apiFetch(
+    `/api/admin/siem-webhooks/${encodeURIComponent(webhookId)}?tenantId=${encodeURIComponent(requireTenantId())}`,
+    { method: "DELETE" });
+  setStatus("SIEM webhook deleted", "ok");
+  await refreshSiemWebhooks();
+}
+
+siemWebhooksBody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-delete-siem-webhook-id]");
+  if (!button) return;
+  deleteSiemWebhook(button.dataset.deleteSiemWebhookId);
+});
 
 function renderAuditEvents(events) {
   if (!events.length) {
@@ -2889,13 +2999,15 @@ document.getElementById("metricsPeriod")?.addEventListener("change", refreshMetr
 let _editingRuleId = null;
 
 async function refreshAlertRules() {
-  const [rulesRes, firedRes] = await Promise.all([
+  // apiFetch resolves to the parsed JSON body (or null on 204/empty), NOT a
+  // Response — the rest of this file uses it that way. The old code tested
+  // rulesRes.ok / called .json(), so the guard was always true and these
+  // tables never rendered.
+  const [rules, fired] = await Promise.all([
     apiFetch("/api/admin/alert-rules"),
     apiFetch("/api/admin/alerts-fired?limit=50"),
   ]);
-  if (!rulesRes.ok || !firedRes.ok) return;
-  const rules = await rulesRes.json();
-  const fired = await firedRes.json();
+  if (!rules || !fired) return;
 
   const tbody = document.querySelector("#alertRulesTable tbody");
   if (tbody) {
@@ -2941,9 +3053,8 @@ function openCreateAlert() {
 }
 
 async function openEditAlert(ruleId) {
-  const res = await apiFetch("/api/admin/alert-rules");
-  if (!res.ok) return;
-  const rules = await res.json();
+  const rules = await apiFetch("/api/admin/alert-rules");
+  if (!rules) return;
   const rule = rules.find(r => r.ruleId === ruleId);
   if (!rule) return;
   _editingRuleId = ruleId;
