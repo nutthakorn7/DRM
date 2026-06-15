@@ -314,6 +314,17 @@ public static class AdminFilesEndpoints
 
         var now = DateTimeOffset.UtcNow;
         file.Revoked = true;
+
+        // Crypto-shred: destroy the wrapped file key atomically with the revoke flag
+        // (each file's key is unique, so removing the wrapped row makes the .drmx
+        // unrecoverable in the live system). Null-safe for re-revoke.
+        var wrappedKey = await dbContext.FileKeys
+            .SingleOrDefaultAsync(k => k.TenantId == file.TenantId && k.FileId == file.Id, cancellationToken);
+        if (wrappedKey is not null)
+        {
+            dbContext.FileKeys.Remove(wrappedKey);
+        }
+
         var auditEvent = new AuditEventEntity
         {
             TenantId = file.TenantId,

@@ -272,6 +272,19 @@ public static class FilesEndpoints
         }
 
         file.Revoked = true;
+
+        // Crypto-shred: destroy the wrapped file key in the same transaction as the
+        // revoke flag. Each file has its own random key, so deleting the wrapped row
+        // makes the .drmx unrecoverable in the live system even with the master key.
+        // Null-safe for re-revoke. (Tracked Remove, not ExecuteDelete, so flag +
+        // key removal + audit commit atomically.)
+        var wrappedKey = await dbContext.FileKeys
+            .SingleOrDefaultAsync(k => k.TenantId == file.TenantId && k.FileId == file.Id, cancellationToken);
+        if (wrappedKey is not null)
+        {
+            dbContext.FileKeys.Remove(wrappedKey);
+        }
+
         var auditEvent = new AuditEventEntity
         {
             TenantId = file.TenantId,
