@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project loosely follows semantic versioning. Phase identifiers (5AL, 5AM, ...) come from the FinalCode parity roadmap in `docs/superpowers/plans/`.
 
+## [Unreleased]
+
+Recipient in-browser preview, a CI gate for the browser test suite, two design-system audits, and a CRUD-normalization audit (consistency fixes + two compliance decisions). Shipped as PRs #54–#60 on 2026-06-12.
+
+### Added
+
+- **In-browser document preview for View-only shares (#54).** Verified recipients of a View-only share can now read the `.drmx` in the browser — no desktop viewer needed. New `POST /api/share-links/viewer/content-key` releases the unwrapped AES key only when the session is verified+opened and the share is *exactly* `View` (anything richer is desktop-viewer-only, since a browser can't enforce print/copy/export). Decryption is fully client-side (`wwwroot/share/drmx-preview.js`, Web Crypto AES-GCM) — the ciphertext never touches the server, preserving the "file never touches our servers" model. The load-bearing detail: the JS reconstructs the .NET 100-ns tick timestamp for the GCM associated data byte-for-byte, verified in a real Chromium against a C#-written container.
+- **CI now runs the Playwright UI suite (#56).** New `ui-tests-linux` job runs `Drm.UI.Tests` (admin console, `/share/` viewer, in-browser decrypt round-trip) against real Chromium on every push/PR. The suite previously only ran on the dev machine, so a `wwwroot` regression could land with CI green. Pre-builds the server in Debug and caches the browser to stay inside the fixture's 45 s health-check window.
+- **Policy-template editing (#59).** New `PUT /api/admin/policy-templates/{id}` + a per-row Edit affordance in the admin console — policy templates were create-and-read-only while watermark templates already had update. Hard delete intentionally omitted (matches watermark templates; no FK cascade would orphan referencing files).
+- **SIEM webhook delete (#59).** New `DELETE /api/admin/siem-webhooks/{id}` + UI button. SIEM webhooks were create-and-list-only while the structurally identical billing webhooks had full CRUD.
+- **Agent device re-enable (#59).** New `POST /api/admin/devices/{id}/enable` + UI button — disabling a device was one-way from the console.
+- **File-tag removal in the UI (#59).** The `DELETE …/tags/{tag}` route already existed; the admin console never exposed it. Added a Remove button.
+
+### Fixed
+
+- **Alert-rules admin panel never rendered (#59).** `refreshAlertRules`/`openEditAlert` tested `response.ok` and called `.json()`, but `apiFetch` resolves to the parsed body (like the rest of `app.js`) — so the guard always bailed and the alert-rules + alerts-fired tables stayed empty and Edit silently no-opped. Now uses the body directly.
+- **Identity sub-nav test was stale, not flaky (#55).** `Tabs_switch_active_panel_and_subnav_rebuilds` hard-coded a 4-panel expectation; the Identity tab grew a 5th panel (`adminIdentity`). The assertion now derives the expected panel set from the DOM.
+- **Design-system adoption (#57, #58).** Two rounds against `DESIGN.md`: `/me/` brought back onto the teal/Plex token system (off-brand blue hover, retired 🔒 emoji logo, raw Tailwind grays), one status-color system across all surfaces (success green had rendered as four different hexes), touch targets raised to the documented 44/36 px floors, a shared 760/820 px breakpoint policy written into `DESIGN.md`, font-stack/radii tokens, `aria-live` on the dynamic admin/`/me/` surfaces, and a single `h1` per page. Design score B → ~A-.
+
+### Security
+
+- **`revoke` now crypto-shreds the wrapped key (#60).** Revoking a file (both `/api/files/{id}/revoke` and the admin path) deletes the wrapped `FileKey` in the same transaction as the `Revoked` flag — previously it was flag-only and the key lived on. Each file's key is unique, so removing the row makes the `.drmx` unrecoverable in the live system even with the master key. Data retention applies the same shred and now cascades to a purged file's grant/tag/access-count/collection-item rows (no FK cascade exists, so it had been orphaning them). *Caveat for compliance claims: this destroys the key in the live system; a wrapped-key blob already in a backup is recoverable until that backup ages out.*
+
+### Changed
+
+- **Audit retention depersonalizes instead of deleting (#60).** The retention worker no longer deletes `AuditEvents` (which broke `/audit/chain/verify` on every run — the verifier seeds the chain genesis from the first surviving event). It now nulls the personal columns (`UserId`/`FileId`/`ActorAdminId`) and clears `ReasonCode`. Because the HMAC chain hashes only `Id`/`TenantId`/`EventType`/`CreatedAtUtc`, the tamper-evident chain still verifies — so PDPA data-minimization and "tamper-proof audit" now both hold.
+
 ## [1.7.0] — 2026-05-21
 
 **Sender easy-to-use sweep — eight stages (13-20) take Quick Send from "encrypts and shows a URL" to "one-click, file attached, recipient verified, sender self-serve."**
