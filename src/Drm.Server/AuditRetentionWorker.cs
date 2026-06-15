@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Drm.Server;
 
 /// <summary>
-/// Nightly background job that deletes audit events older than <see cref="AuditSettings.RetentionDays"/>.
-/// Set RetentionDays to 0 to disable purging.
+/// Nightly background job that DEPERSONALIZES audit events older than
+/// <see cref="AuditSettings.RetentionDays"/> (nulls the personal fields, keeps the
+/// row + hash-chain entry — see <see cref="AuditRetentionService"/>).
+/// Set RetentionDays to 0 to disable.
 /// </summary>
 public sealed class AuditRetentionWorker(
     IServiceScopeFactory scopeFactory,
@@ -37,11 +39,12 @@ public sealed class AuditRetentionWorker(
             var cutoff = DateTimeOffset.UtcNow.AddDays(-settings.RetentionDays);
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var deleted = await db.AuditEvents
-                .Where(e => e.CreatedAtUtc < cutoff)
-                .ExecuteDeleteAsync(cancellationToken);
-            if (deleted > 0)
-                logger.LogInformation("Audit retention: purged {Count} events older than {Days}d", deleted, settings.RetentionDays);
+            // Depersonalize, don't delete: removes the personal data (PDPA) while
+            // keeping the row + its chain entry so /audit/chain/verify still passes.
+            // Deleting events here broke chain verification on every run.
+            var scrubbed = await AuditRetentionService.DepersonalizeAsync(db, cutoff, cancellationToken);
+            if (scrubbed > 0)
+                logger.LogInformation("Audit retention: depersonalized {Count} events older than {Days}d (chain preserved)", scrubbed, settings.RetentionDays);
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
