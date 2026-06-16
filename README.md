@@ -217,7 +217,7 @@ This viewer path displays returned permissions but does not yet fully enforce co
 
 ## Phase 4A Management Install Baseline
 
-**Production install (supported path):** the Docker stack under `deploy/management/docker/` — app + Postgres + Caddy (auto-TLS), one command:
+**Production install (supported path):** the Docker stack under `deploy/management/docker/` — app + Postgres + Caddy (auto-TLS), one command. Full step-by-step walkthrough: **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 ```bash
 cd deploy/management/docker

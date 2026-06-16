@@ -1,5 +1,8 @@
 # Docker Deploy — DRM Management Server
 
+> 📖 **New here? Start with the step-by-step [Install Guide](../../../docs/INSTALL.md)** —
+> it walks the whole thing in plain language. This page is the reference detail.
+
 Production-grade Docker Compose deploy. Single-host, three services:
 
 - **drm-server** — the .NET 10 app, built from the repo `Dockerfile`
