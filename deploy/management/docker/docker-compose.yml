@@ -5,16 +5,17 @@
 #   - postgres:   the metadata database (Postgres 16)
 #   - caddy:      reverse proxy + auto-TLS via Let's Encrypt
 #
-# Usage:
-#   cp .env.example .env && edit .env (set DOMAIN + generate secrets)
-#   docker compose up -d
-#   docker compose logs -f drm-server
+# Usage (don't drive this compose by hand — the scripts give a clear done-signal):
+#   First install:    sudo DOMAIN=drm.example.com ./install.sh
+#   Bring up/upgrade: ./deploy.sh        # builds, waits for healthy, verifies, prints ✅/❌, EXITS
+#   From a dev box:   ./ship.sh root@your-server   # ship current repo + deploy, one command
 #
-# Upgrade:
-#   git pull && docker compose build drm-server && docker compose up -d drm-server
+# Avoid `docker compose logs -f` as a "did it finish?" check — `-f` tails forever
+# and never signals done. deploy.sh uses `up -d --wait` (the health gate) and exits.
 #
 # Rollback to a prior image tag:
 #   DRM_IMAGE_TAG=v1.0.1 docker compose up -d drm-server
+#   (deploy.sh also tags drm-server:rollback-<ts> before each upgrade and prints the undo command.)
 #
 # `version:` is intentionally omitted — Compose v2 ignores it and warns when present.
 
