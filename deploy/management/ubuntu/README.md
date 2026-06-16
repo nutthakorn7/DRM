@@ -1,4 +1,14 @@
-# Ubuntu Deploy — DRM Management Server
+# Ubuntu Deploy — DRM Management Server  ⚠️ DEPRECATED
+
+> **This native (systemd + host Postgres/Caddy) path is retired.** Production runs
+> the Docker stack, and `install.sh` here now just forwards to the Docker installer.
+> Use that instead:
+> ```bash
+> cd ../docker
+> sudo DOMAIN=drm.example.com ./install.sh
+> ```
+> See [`../docker/README.md`](../docker/README.md). The notes below are kept only
+> for historical reference and for the migration plan in the Docker README.
 
 End-to-end install on Ubuntu 22.04+ / Debian 12+ with PostgreSQL, Caddy (auto-TLS via Let's Encrypt), and systemd.
 

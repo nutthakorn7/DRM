@@ -217,9 +217,17 @@ This viewer path displays returned permissions but does not yet fully enforce co
 
 ## Phase 4A Management Install Baseline
 
-On-prem management server install assets are under `deploy/management/`. The baseline includes an example production config, `start-management.sh`, and operator notes for publishing, setting `DRM_KEY_WRAPPING_MASTER_KEY_BASE64`, choosing `DRM_DATA_DIR`, and checking `/healthz`.
+**Production install (supported path):** the Docker stack under `deploy/management/docker/` — app + Postgres + Caddy (auto-TLS), one command:
 
-This is a runnable management install baseline, not final production hardening. Real deployment still needs TLS, API authentication, service supervision, backups, audit retention, key rotation, and host monitoring.
+```bash
+cd deploy/management/docker
+sudo DOMAIN=drm.example.com ./install.sh      # first time → builds, waits for healthy, prints ✅ DEPLOY OK
+./ship.sh root@your-server                    # later upgrades, from your dev machine (or ./deploy.sh on the box)
+```
+
+These scripts exit with a clear ✅/❌ (no `docker compose logs -f` guessing), back up Postgres and tag a rollback image before each upgrade. See [`deploy/management/docker/README.md`](deploy/management/docker/README.md).
+
+The older `start-management.sh` (SQLite, no TLS) under `deploy/management/` is for **local/dev runs only**; the native systemd path under `deploy/management/ubuntu/` is **deprecated** and forwards to the Docker installer.
 
 ## Phase 4B Admin API Key Auth
 
