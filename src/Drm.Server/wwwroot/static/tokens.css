@@ -160,6 +160,7 @@
   --ok:         var(--color-success-500);
   --ok-bg:      var(--color-success-50);
   --error:      var(--color-danger-500);
+  --error-bg:   #fdecec; /* danger-50 — pairs with --error the way --ok-bg pairs with --ok */
   --warning-bg: var(--color-warning-50);
   --warning-ink: var(--color-warning-700);
 

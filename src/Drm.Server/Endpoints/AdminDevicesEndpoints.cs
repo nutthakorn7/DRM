@@ -13,6 +13,7 @@ public static class AdminDevicesEndpoints
         group.MapGet("/health", GetDeviceHealthAsync);
         group.MapPost("/provision", ProvisionDeviceAsync);
         group.MapPost("/{deviceId:guid}/disable", DisableDeviceAsync);
+        group.MapPost("/{deviceId:guid}/enable", EnableDeviceAsync);
 
         return endpoints;
     }
@@ -211,6 +212,53 @@ public static class AdminDevicesEndpoints
             now));
     }
 
+    private static async Task<IResult> EnableDeviceAsync(
+        Guid deviceId,
+        EnableDeviceRequest request,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
+            return fail!;
+        if (!httpContext.MatchesHeader(request.TenantId))
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+
+        var device = await dbContext.AgentDevices
+            .SingleOrDefaultAsync(candidate =>
+                candidate.TenantId == request.TenantId &&
+                candidate.DeviceId == deviceId,
+                cancellationToken);
+
+        if (device is null)
+        {
+            return Results.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        // Mirror of disable: clear the disabled markers and restore the device to
+        // the same active status a fresh agent registration writes ("registered"),
+        // so IsDisabled() (DisabledAtUtc != null || Status == "disabled") is false.
+        device.Status = "registered";
+        device.DisabledAtUtc = null;
+        device.DisabledReason = null;
+        device.UpdatedAtUtc = now;
+
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = request.TenantId,
+            UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
+            EventType = "device_enabled",
+            ReasonCode = "device_re_enabled",
+            CreatedAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(DeviceResponse.From(device));
+    }
+
     private sealed record DeviceResponse(
         Guid TenantId,
         Guid DeviceId,
@@ -257,6 +305,8 @@ public static class AdminDevicesEndpoints
         Guid DeviceId,
         string DeviceSecret,
         DateTimeOffset ProvisionedAtUtc);
+
+    private sealed record EnableDeviceRequest(Guid TenantId, Guid AdminUserId);
 
     private sealed record DeviceHealthResponse(
         Guid TenantId,

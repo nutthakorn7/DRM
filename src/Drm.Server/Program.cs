@@ -9,6 +9,7 @@ _ = builder.Configuration.GetValue<ServerMode>("Drm:Mode");
 var connectionString = builder.Configuration.GetConnectionString("DrmDb")
     ?? "Data Source=drm-server.db";
 
+var auditChainKey = builder.Configuration["Drm:Security:AuditChainKey"] ?? string.Empty;
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
@@ -19,6 +20,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     {
         options.UseSqlite(connectionString);
     }
+
+    // Every audit-event insert gets a tamper-evident hash-chain row (GET /audit/chain/verify).
+    options.AddInterceptors(new AuditChainInterceptor(auditChainKey));
 });
 builder.Services
     .AddHttpClient<ISiemEventSink, HttpSiemEventSink>()
@@ -1167,6 +1171,12 @@ using (var scope = app.Services.CreateScope())
     }
 
     AdminIdentitySeed.Run(dbContext);
+
+    // Seed hash-chain rows for any audit events written before the chain interceptor existed,
+    // so /api/admin/audit/chain/verify is valid end-to-end. Idempotent: a no-op once 1:1.
+    var backfilledChainRows = AuditChainService.BackfillAsync(dbContext, auditChainKey).GetAwaiter().GetResult();
+    if (backfilledChainRows > 0)
+        app.Logger.LogInformation("Audit chain backfill: created {Count} chain rows for pre-existing events.", backfilledChainRows);
 }
 
 app.UseAdminIdentityAuthentication();

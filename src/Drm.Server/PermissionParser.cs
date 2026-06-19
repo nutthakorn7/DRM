@@ -10,7 +10,9 @@ internal static class PermissionParser
         | Permission.Copy
         | Permission.ExportOriginal
         | Permission.Edit
-        | Permission.DeleteProtectedCopy;
+        | Permission.DeleteProtectedCopy
+        | Permission.RunMacros
+        | Permission.TransferOwnership;
 
     public static bool TryParse(string value, out Permission permissions)
     {

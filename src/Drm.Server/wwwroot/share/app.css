@@ -1,9 +1,4 @@
 /* Color + type tokens now live in /static/tokens.css. */
-:root {
-  /* /share/ uses --soft for the locked-preview backdrop; keep the legacy
-     alias so existing rules still resolve. */
-  --soft: var(--accent-soft);
-}
 
 * {
   box-sizing: border-box;
@@ -14,7 +9,7 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background: var(--page);
-  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-feature-settings: "ss01" on, "ss03" on, "cv02" on;
 }
 
@@ -44,7 +39,7 @@ input {
   height: 30px;
   background: var(--accent);
   color: #fff;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 15px;
 }
 
@@ -225,18 +220,18 @@ label {
 
 input {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--touch-target);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
   padding: 10px 11px;
 }
 
 button {
-  min-height: 42px;
+  min-height: var(--touch-target);
   border: 1px solid var(--accent);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: #ffffff;
   cursor: pointer;
@@ -287,7 +282,7 @@ button:disabled {
   padding: 42px;
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.46)),
-    var(--soft);
+    var(--accent-soft);
 }
 
 .document-visual {
@@ -298,7 +293,7 @@ button:disabled {
   min-height: 420px;
   align-content: start;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   padding: 42px 38px;
   box-shadow: 0 24px 70px rgba(32, 36, 42, 0.14);
@@ -361,7 +356,7 @@ button:disabled {
   margin: 18px 0 12px;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #ffffff;
 }
 
@@ -381,7 +376,7 @@ button:disabled {
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12.5px;
   font-weight: 600;
   border: 1px solid transparent;
@@ -389,15 +384,15 @@ button:disabled {
 }
 
 .perm-badge[data-state="allowed"] {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #6ee7b7;
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, white);
 }
 
 .perm-badge[data-state="denied"] {
-  background: #f3f4f6;
-  color: #9ca3af;
-  border-color: #e5e7eb;
+  background: var(--page);
+  color: var(--muted);
+  border-color: var(--line);
   text-decoration: line-through;
 }
 
@@ -418,7 +413,7 @@ button:disabled {
   margin: 24px 0 12px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #f9fafb;
 }
 
@@ -443,8 +438,8 @@ button:disabled {
 .next-steps-list code {
   background: #eef2f7;
   padding: 1px 6px;
-  border-radius: 4px;
-  font-family: 'IBM Plex Mono', monospace;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
   font-size: 12.5px;
 }
 
