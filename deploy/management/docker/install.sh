@@ -36,6 +36,7 @@ if [ ! -f .env ]; then
     -e "s|^DRM_ADMIN_API_KEY=.*|DRM_ADMIN_API_KEY=$(openssl rand -hex 32)|" \
     -e "s|^DRM_CLIENT_API_KEY=.*|DRM_CLIENT_API_KEY=$(openssl rand -hex 32)|" \
     -e "s|^DRM_TRAILER_SECRET=.*|DRM_TRAILER_SECRET=$(openssl rand -hex 32)|" \
+    -e "s|^DRM_AUDIT_CHAIN_KEY=.*|DRM_AUDIT_CHAIN_KEY=$(openssl rand -hex 32)|" \
     -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=')|" \
     .env.example > .env
   echo
