@@ -214,8 +214,32 @@
         <button type="button" disabled>Print disabled</button>
         <button type="button" disabled>Export disabled</button>
       </div>
+
+      <!-- In-browser preview (increment 2). Revealed by app.js ONLY when the
+           share is View-only — a browser can't enforce print/copy/export, so
+           preview is offered solely where there's nothing stricter to honor.
+           The .drmx (from the email) is decrypted entirely client-side; the
+           ciphertext never leaves the recipient's machine. -->
+      <section class="inbrowser-preview" id="inbrowserPreview" hidden aria-label="In-browser preview">
+        <h2>Read it here (View-only)</h2>
+        <p class="badge-hint">
+          This file is View-only, so you can read it in your browser — no desktop
+          viewer needed. Load the <code>.drmx</code> you received in the email:
+        </p>
+        <input type="file" id="drmxFileInput" accept=".drmx" aria-label="Select the .drmx file">
+        <p class="status" id="previewStatus" role="status" aria-live="polite"></p>
+        <div class="inbrowser-frame" id="inbrowserFrame" hidden>
+          <div class="watermark-stamp" id="inbrowserWatermark" aria-hidden="true"></div>
+          <iframe id="previewIframe" title="Decrypted document preview" referrerpolicy="no-referrer"></iframe>
+        </div>
+        <p class="badge-hint">
+          Convenient, but in-browser preview can't block screenshots or saving —
+          for OS-enforced protection, open the file in the desktop viewer.
+        </p>
+      </section>
     </section>
   </main>
+  <script type="module" src="/share/drmx-preview.js"></script>
   <script src="/share/app.js"></script>
 </body>
 </html>

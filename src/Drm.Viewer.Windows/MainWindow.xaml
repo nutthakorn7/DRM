@@ -22,42 +22,25 @@
         <Border Grid.Row="0" Background="#F9FAFB" Padding="12">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="100" />
+                <ColumnDefinition Width="80" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="80" />
-                <ColumnDefinition Width="160" />
-                <ColumnDefinition Width="80" />
-                <ColumnDefinition Width="160" />
                 <ColumnDefinition Width="80" />
                 <ColumnDefinition Width="90" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="32" />
-                <RowDefinition Height="10" />
-                <RowDefinition Height="32" />
-                <RowDefinition Height="10" />
-                <RowDefinition Height="32" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Server URL" VerticalAlignment="Center" Foreground="#374151" />
-            <TextBox x:Name="ServerUrlBox" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="7"
-                     VerticalContentAlignment="Center" Text="http://localhost:5188" />
+            <TextBox x:Name="ServerUrlBox" Visibility="Collapsed" Width="0" Height="0" Text="http://localhost:5188" />
+            <PasswordBox x:Name="ClientApiKeyBox" Visibility="Collapsed" Width="0" Height="0" />
+            <TextBox x:Name="UserIdBox" Visibility="Collapsed" Width="0" Height="0" />
+            <TextBox x:Name="DeviceIdBox" Visibility="Collapsed" Width="0" Height="0" />
 
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Client Key" VerticalAlignment="Center" Foreground="#374151" />
-            <PasswordBox x:Name="ClientApiKeyBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="7"
-                         VerticalContentAlignment="Center" />
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="File" VerticalAlignment="Center" Foreground="#374151" />
+            <TextBox x:Name="ProtectedPathBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,0" VerticalContentAlignment="Center" />
 
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="User ID" VerticalAlignment="Center" Foreground="#374151" />
-            <TextBox x:Name="UserIdBox" Grid.Row="4" Grid.Column="1" Margin="0,0,12,0" VerticalContentAlignment="Center" />
-
-            <TextBlock Grid.Row="4" Grid.Column="2" Text="Device ID" VerticalAlignment="Center" Foreground="#374151" />
-            <TextBox x:Name="DeviceIdBox" Grid.Row="4" Grid.Column="3" Margin="0,0,12,0" VerticalContentAlignment="Center" />
-
-            <TextBlock Grid.Row="4" Grid.Column="4" Text="File" VerticalAlignment="Center" Foreground="#374151" />
-            <TextBox x:Name="ProtectedPathBox" Grid.Row="4" Grid.Column="5" Margin="0,0,8,0" VerticalContentAlignment="Center" />
-
-            <Button Grid.Row="4" Grid.Column="6" Width="72" Height="28" Content="Browse" Click="BrowseButton_Click" />
-            <Button x:Name="OpenButton" Grid.Row="4" Grid.Column="7" Width="80" Height="28" Content="Open" Click="OpenButton_Click" />
+            <Button Grid.Row="0" Grid.Column="2" Width="72" Height="28" Content="Browse" Click="BrowseButton_Click" />
+            <Button x:Name="OpenButton" Grid.Row="0" Grid.Column="3" Width="80" Height="28" Content="Open" Click="OpenButton_Click" />
         </Grid>
         </Border>
         <Border Grid.Row="0" VerticalAlignment="Bottom" HorizontalAlignment="Stretch"

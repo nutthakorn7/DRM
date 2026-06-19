@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -607,6 +608,115 @@ public sealed class ExternalShareApiTests : IDisposable
             link.UsedCount.Should().Be(1);
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Web in-browser preview (increment 1): /viewer/content-key
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Content_key_released_for_viewonly_share_roundtrips_the_file_key()
+    {
+        var started = await CreateStartedVerificationAsync(); // registers a View-only file
+        var fileKey = RandomNumberGenerator.GetBytes(32);
+        using var wrap = await started.SetupClient.PostAsJsonAsync(
+            $"/api/files/{started.FileId}/keys/wrap",
+            new { tenantId = started.TenantId, fileKeyBase64 = Convert.ToBase64String(fileKey) });
+        wrap.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var token = await ConfirmAndOpenAsync(started);
+
+        using var keyResp = await ReleaseContentKeyAsync(started.GuestClient, started.TenantId, token);
+        keyResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await keyResp.Content.ReadFromJsonAsync<ContentKeyRow>();
+        Convert.FromBase64String(body!.FileKeyBase64).Should().Equal(fileKey,
+            "the browser must receive the same key it needs to decrypt the .drmx from the email");
+        body.ContentType.Should().Be("application/pdf");
+        body.ReasonCode.Should().Be("content_key_released");
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await dbContext.AuditEvents.AsNoTracking().ToListAsync())
+            .Should().Contain(a => a.ReasonCode == "external_share_content_key_released" && a.FileId == started.FileId);
+    }
+
+    [Fact]
+    public async Task Content_key_denied_when_share_grants_more_than_view()
+    {
+        // Honest-enforcement gate: a browser can't enforce Print/Copy/Export
+        // denied, so preview is refused for anything richer than View-only.
+        var started = await CreateStartedVerificationAsync();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var file = await dbContext.ProtectedFiles.SingleAsync(f => f.TenantId == started.TenantId && f.Id == started.FileId);
+            file.Permissions = Drm.Domain.Permission.View | Drm.Domain.Permission.Print;
+            await dbContext.SaveChangesAsync();
+        }
+
+        var token = await ConfirmAndOpenAsync(started);
+        using var keyResp = await ReleaseContentKeyAsync(started.GuestClient, started.TenantId, token);
+
+        keyResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await keyResp.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new ErrorResponse("preview_requires_view_only_policy"));
+    }
+
+    [Fact]
+    public async Task Content_key_requires_viewer_session_to_be_opened_first()
+    {
+        // Calling content-key directly (skipping /viewer/session) must fail, so
+        // the max-uses open-count can't be bypassed.
+        var started = await CreateStartedVerificationAsync();
+        using var confirm = await ConfirmVerificationAsync(started.GuestClient, started.TenantId, started.VerificationId, started.Code);
+        var confirmed = await confirm.Content.ReadFromJsonAsync<ExternalShareVerificationConfirmResponse>();
+
+        using var keyResp = await ReleaseContentKeyAsync(started.GuestClient, started.TenantId, confirmed!.VerificationSessionToken);
+
+        keyResp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var error = await keyResp.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new ErrorResponse("viewer_session_not_opened"));
+    }
+
+    [Fact]
+    public async Task Content_key_not_found_when_no_wrapped_key_on_server()
+    {
+        // Agent-side .drmx whose key was never registered server-side: preview
+        // can't decrypt; recipient falls back to the desktop viewer.
+        var started = await CreateStartedVerificationAsync();
+        var token = await ConfirmAndOpenAsync(started);
+
+        using var keyResp = await ReleaseContentKeyAsync(started.GuestClient, started.TenantId, token);
+        keyResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Content_key_rejects_invalid_session_token()
+    {
+        var started = await CreateStartedVerificationAsync();
+        using var keyResp = await ReleaseContentKeyAsync(started.GuestClient, started.TenantId, "wrong-token");
+        keyResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    private async Task<string> ConfirmAndOpenAsync(StartedVerification started)
+    {
+        using var confirm = await ConfirmVerificationAsync(started.GuestClient, started.TenantId, started.VerificationId, started.Code);
+        confirm.StatusCode.Should().Be(HttpStatusCode.OK);
+        var confirmed = await confirm.Content.ReadFromJsonAsync<ExternalShareVerificationConfirmResponse>();
+        using var open = await OpenViewerSessionAsync(started.GuestClient, started.TenantId, confirmed!.VerificationSessionToken);
+        open.StatusCode.Should().Be(HttpStatusCode.OK);
+        return confirmed.VerificationSessionToken;
+    }
+
+    private static Task<HttpResponseMessage> ReleaseContentKeyAsync(
+        HttpClient client, Guid tenantId, string verificationSessionToken)
+        => client.PostAsJsonAsync("/api/share-links/viewer/content-key", new
+        {
+            tenantId,
+            verificationSessionToken
+        });
+
+    private sealed record ContentKeyRow(
+        Guid TenantId, Guid FileId, string ContentType, string FileKeyBase64, string WatermarkTemplate, string ReasonCode);
 
     [Fact]
     public async Task Guest_viewer_session_rejects_invalid_or_inactive_verified_session()

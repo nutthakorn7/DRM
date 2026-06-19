@@ -123,6 +123,38 @@ public sealed class AdminPolicyTemplatesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_create_and_update_template_with_macros_and_transfer_ownership()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        // Regression: RunMacros / TransferOwnership are real flags (the Windows viewer reads them at
+        // MainWindow.xaml.cs:738), but PermissionParser's mask omitted them — so ticking either of the
+        // two checkboxes returned 400 on create AND on the new PUT. Both must now accept them.
+        using (var create = await CreatePolicyTemplateAsync(
+            client, tenantId, templateId, "Power", "View, RunMacros, TransferOwnership"))
+        {
+            create.StatusCode.Should().Be(HttpStatusCode.Created);
+            var created = await create.Content.ReadFromJsonAsync<PolicyTemplateResponse>();
+            created!.Permissions.Should().Be("View, RunMacros, TransferOwnership");
+        }
+
+        using var update = await client.PutAsJsonAsync($"/api/admin/policy-templates/{templateId}", new
+        {
+            tenantId,
+            name = "Power",
+            permissions = "View, RunMacros",
+            watermarkTemplate = "user:{userId}",
+            offlineLeaseMinutes = 60,
+            allowPrint = false,
+        });
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await update.Content.ReadFromJsonAsync<PolicyTemplateResponse>();
+        updated!.Permissions.Should().Be("View, RunMacros");
+    }
+
+    [Fact]
     public async Task Admin_create_policy_template_rejects_invalid_admin_state()
     {
         using var client = factory.CreateClient();
@@ -266,6 +298,65 @@ public sealed class AdminPolicyTemplatesApiTests : IDisposable
                 File.Delete(candidate);
             }
         }
+    }
+
+    [Fact]
+    public async Task Admin_can_update_a_policy_template()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        using (var create = await CreatePolicyTemplateAsync(client, tenantId, templateId, "Original",
+            permissions: "View", offlineLeaseMinutes: 60, allowPrint: false))
+            create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var update = await client.PutAsJsonAsync($"/api/admin/policy-templates/{templateId}", new
+        {
+            tenantId,
+            name = "Renamed",
+            permissions = "View, Print",
+            watermarkTemplate = "tenant:{tenantId}",
+            offlineLeaseMinutes = 120,
+            allowPrint = true,
+            maxOpens = 5,
+        });
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var updated = await update.Content.ReadFromJsonAsync<PolicyTemplateResponse>();
+        updated.Should().BeEquivalentTo(new
+        {
+            TenantId = tenantId,
+            TemplateId = templateId,
+            Name = "Renamed",
+            Permissions = "View, Print",
+            WatermarkTemplate = "tenant:{tenantId}",
+            OfflineLeaseMinutes = 120,
+            AllowPrint = true,
+        });
+
+        // Persisted (read back via list).
+        var templates = await client.GetFromJsonAsync<List<PolicyTemplateResponse>>(
+            $"/api/admin/policy-templates?tenantId={tenantId}");
+        templates!.Single().Name.Should().Be("Renamed");
+    }
+
+    [Fact]
+    public async Task Admin_update_missing_policy_template_returns_not_found()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var update = await client.PutAsJsonAsync($"/api/admin/policy-templates/{Guid.NewGuid()}", new
+        {
+            tenantId,
+            name = "Nope",
+            permissions = "View",
+            watermarkTemplate = "user:{userId}",
+            offlineLeaseMinutes = 30,
+            allowPrint = false,
+        });
+        update.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     private static Task<HttpResponseMessage> CreatePolicyTemplateAsync(

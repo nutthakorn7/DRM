@@ -223,6 +223,33 @@ public sealed class AdminSiemWebhookTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_delete_a_siem_webhook_and_delete_is_tenant_scoped()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var webhookId = Guid.NewGuid();
+
+        using (var create = await CreateWebhookAsync(client, tenantId, webhookId, "https://1.1.1.1/events", enabled: true))
+            create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // Scoped on {tenantId, webhookId}: a different tenant can't delete it.
+        using (var wrongTenant = await client.DeleteAsync($"/api/admin/siem-webhooks/{webhookId}?tenantId={otherTenantId}"))
+            wrongTenant.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using (var delete = await client.DeleteAsync($"/api/admin/siem-webhooks/{webhookId}?tenantId={tenantId}"))
+            delete.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var remaining = await client.GetFromJsonAsync<List<SiemWebhookResponse>>(
+            $"/api/admin/siem-webhooks?tenantId={tenantId}");
+        remaining.Should().BeEmpty();
+
+        // Idempotency: deleting an already-gone webhook is a clean 404.
+        using var deleteAgain = await client.DeleteAsync($"/api/admin/siem-webhooks/{webhookId}?tenantId={tenantId}");
+        deleteAgain.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Admin_create_siem_webhook_returns_conflict_for_duplicate_webhook_id_in_same_tenant()
     {
         using var client = factory.CreateClient();

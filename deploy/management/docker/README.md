@@ -1,16 +1,27 @@
 # Docker Deploy — DRM Management Server
 
+> 📖 **New here? Start with the step-by-step [Install Guide](../../../docs/INSTALL.md)** —
+> it walks the whole thing in plain language. This page is the reference detail.
+
 Production-grade Docker Compose deploy. Single-host, three services:
 
 - **drm-server** — the .NET 10 app, built from the repo `Dockerfile`
 - **postgres** — metadata database (Postgres 16-alpine)
 - **caddy** — reverse proxy with auto-TLS via Let's Encrypt
 
-Use this when you want fast, reproducible upgrades:
-`docker compose build && docker compose up -d` swaps to the new build in
-seconds, and rolling back is `DRM_IMAGE_TAG=v1.0.1 docker compose up -d`.
+This is the **one supported deploy path**. Three scripts wrap it so you never
+have to guess whether a deploy finished:
 
-For the bare-metal systemd path (no Docker), see `../ubuntu/README.md`.
+- **`install.sh`** — first time on a fresh box: installs Docker, generates `.env`
+  with fresh secrets, brings the stack up. `sudo DOMAIN=… ./install.sh`.
+- **`deploy.sh`** — build + start/upgrade. Backs up Postgres, tags a rollback
+  image, runs `docker compose up -d --wait` (the health gate), verifies, and
+  prints **✅ DEPLOY OK** or **❌ FAILED** then exits. Never tails logs.
+- **`ship.sh`** — from your dev machine: ship the current repo to the server and
+  run `deploy.sh` there, in one command. `./ship.sh root@your-server`.
+
+> The bare-metal systemd installer (`../ubuntu/install.sh`) is **deprecated** and
+> now just forwards here — production runs the Docker stack.
 
 ## Prerequisites
 
@@ -23,57 +34,48 @@ For the bare-metal systemd path (no Docker), see `../ubuntu/README.md`.
 ## Fresh install
 
 ```bash
-# 1. Clone or copy the repo to the host
+# 1. Get the repo onto the host (any way you like)
 ssh root@your-server
-git clone <repo-url> /opt/drm-source
-cd /opt/drm-source/deploy/management/docker
+git clone <repo-url> /opt/drm        # or rsync / scp the tree
+cd /opt/drm/deploy/management/docker
 
-# 2. Generate secrets + fill .env
-cp .env.example .env
-{
-  echo "DOMAIN=drm.example.com"
-  echo "DRM_MASTER_KEY_BASE64=$(openssl rand -base64 32)"
-  echo "DRM_ADMIN_API_KEY=$(openssl rand -hex 32)"
-  echo "DRM_CLIENT_API_KEY=$(openssl rand -hex 32)"
-  echo "DRM_TRAILER_SECRET=$(openssl rand -hex 32)"
-  echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)"
-} > .env
-# Then `nano .env` and set DOMAIN to your actual hostname.
-
-# 3. Build + start
-docker compose build
-docker compose up -d
-
-# 4. Watch logs until you see the seed step finish
-docker compose logs -f drm-server
-
-# 5. Verify
-curl https://drm.example.com/healthz                # through Caddy + TLS
-docker compose exec drm-server wget -qO- http://localhost:8080/healthz   # bypass Caddy
+# 2. One command: installs Docker if needed, generates .env with fresh
+#    secrets, brings the stack up, and prints ✅ DEPLOY OK when healthy.
+sudo DOMAIN=drm.example.com ./install.sh
 ```
 
-The admin console is at `https://<DOMAIN>/admin/`. The admin API key is in
-`.env` as `DRM_ADMIN_API_KEY`.
+That's it — `install.sh` exits with a clear ✅/❌; there is **nothing to watch**.
+The admin console is at `https://<DOMAIN>/admin/`; the admin API key is in the
+generated `.env` as `DRM_ADMIN_API_KEY`.
 
-**Back up `.env` to a secret manager NOW.** Losing
-`DRM_MASTER_KEY_BASE64` means losing access to all encrypted tenant
-wrapping keys.
+**Back up `.env` (esp. `DRM_MASTER_KEY_BASE64`) to a secret manager NOW** —
+losing the master key means losing access to all encrypted tenant wrapping keys.
+
+If you'd rather drive it manually, `./install.sh` just generates `.env` then
+calls `./deploy.sh`; you can run those two steps yourself.
 
 ## Upgrading
 
+From your **dev machine**, one command ships the current repo and deploys it
+(the server needs no git):
+
 ```bash
-cd /opt/drm-source
-git pull
-cd deploy/management/docker
-docker compose build drm-server
-docker compose up -d drm-server
-docker compose logs -f drm-server
-curl https://drm.example.com/healthz
+./ship.sh root@your-server               # ships HEAD; add a ref to pin: ./ship.sh root@host origin/master
 ```
 
-Database migrations run on container start (EnsureCreated + idempotent
-raw SQL). The v1.1 admin-identity tables seed themselves on first boot
-under v1.1.
+Or **on the server**, after the new code is in place:
+
+```bash
+cd /opt/drm && ./deploy/management/docker/deploy.sh
+```
+
+Either way you get one of **✅ DEPLOY OK** / **❌ FAILED** and the process exits —
+no `logs -f` guessing. `deploy.sh` takes a Postgres backup and tags a
+`drm-server:rollback-<ts>` image first, and prints the one-line undo command.
+
+Schema upgrades run on container start (`EnsureCreated` + idempotent raw-SQL
+`CREATE TABLE / ADD COLUMN IF NOT EXISTS`); watch for them in
+`docker compose logs --tail 80 drm-server` if a deploy ever fails.
 
 ## Rolling back
 

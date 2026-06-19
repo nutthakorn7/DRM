@@ -1,3 +1,4 @@
+using Drm.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drm.Server.Endpoints;
@@ -10,7 +11,9 @@ public static class AdminDevicesEndpoints
 
         group.MapGet("/", ListDevicesAsync);
         group.MapGet("/health", GetDeviceHealthAsync);
+        group.MapPost("/provision", ProvisionDeviceAsync);
         group.MapPost("/{deviceId:guid}/disable", DisableDeviceAsync);
+        group.MapPost("/{deviceId:guid}/enable", EnableDeviceAsync);
 
         return endpoints;
     }
@@ -141,6 +144,121 @@ public static class AdminDevicesEndpoints
         return Results.Ok(DeviceResponse.From(device));
     }
 
+    private static async Task<IResult> ProvisionDeviceAsync(
+        ProvisionDeviceRequest request,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
+            return fail!;
+        if (!httpContext.MatchesHeader(request.TenantId))
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+        if (request.UserId == Guid.Empty)
+            return Results.BadRequest(new ErrorResponse("invalid_user_id"));
+
+        var deviceId = request.DeviceId is null || request.DeviceId == Guid.Empty
+            ? Guid.NewGuid()
+            : request.DeviceId.Value;
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+        var now = DateTimeOffset.UtcNow;
+        var device = await dbContext.AgentDevices
+            .SingleOrDefaultAsync(candidate =>
+                candidate.TenantId == request.TenantId &&
+                candidate.DeviceId == deviceId,
+                cancellationToken);
+
+        if (device is null)
+        {
+            device = new AgentDeviceEntity
+            {
+                TenantId = request.TenantId,
+                DeviceId = deviceId,
+                RegisteredAtUtc = now
+            };
+            dbContext.AgentDevices.Add(device);
+        }
+        else if (IsDisabled(device))
+        {
+            return Results.Json(new ErrorResponse("device_disabled"), statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        device.UserId = request.UserId;
+        device.Hostname = NormalizeOrExisting(request.Hostname, device.Hostname);
+        device.OperatingSystem = NormalizeOrExisting(request.OperatingSystem, device.OperatingSystem);
+        device.AgentVersion = NormalizeOrExisting(request.AgentVersion, device.AgentVersion);
+        device.Status = "provisioned";
+        device.UpdatedAtUtc = now;
+        device.DeviceSigningKeyHashBase64 = DeviceRequestSigning.DeriveSigningKeyHashBase64(deviceSecret);
+        device.DeviceSigningKeyUpdatedAtUtc = now;
+
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = request.TenantId,
+            UserId = request.UserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
+            EventType = "device_provisioned",
+            ReasonCode = "provisioned",
+            CreatedAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(new ProvisionDeviceResponse(
+            request.TenantId,
+            request.UserId,
+            deviceId,
+            deviceSecret,
+            now));
+    }
+
+    private static async Task<IResult> EnableDeviceAsync(
+        Guid deviceId,
+        EnableDeviceRequest request,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.UsersWrite, request.TenantId, out var fail))
+            return fail!;
+        if (!httpContext.MatchesHeader(request.TenantId))
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+
+        var device = await dbContext.AgentDevices
+            .SingleOrDefaultAsync(candidate =>
+                candidate.TenantId == request.TenantId &&
+                candidate.DeviceId == deviceId,
+                cancellationToken);
+
+        if (device is null)
+        {
+            return Results.NotFound();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        // Mirror of disable: clear the disabled markers and restore the device to
+        // the same active status a fresh agent registration writes ("registered"),
+        // so IsDisabled() (DisabledAtUtc != null || Status == "disabled") is false.
+        device.Status = "registered";
+        device.DisabledAtUtc = null;
+        device.DisabledReason = null;
+        device.UpdatedAtUtc = now;
+
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = request.TenantId,
+            UserId = request.AdminUserId,
+            ActorAdminId = AdminAudit.ActorId(httpContext),
+            EventType = "device_enabled",
+            ReasonCode = "device_re_enabled",
+            CreatedAtUtc = now
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(DeviceResponse.From(device));
+    }
+
     private sealed record DeviceResponse(
         Guid TenantId,
         Guid DeviceId,
@@ -173,6 +291,23 @@ public static class AdminDevicesEndpoints
 
     private sealed record DisableDeviceRequest(Guid TenantId, Guid AdminUserId, string Reason);
 
+    private sealed record ProvisionDeviceRequest(
+        Guid TenantId,
+        Guid UserId,
+        Guid? DeviceId,
+        string? Hostname,
+        string? OperatingSystem,
+        string? AgentVersion);
+
+    private sealed record ProvisionDeviceResponse(
+        Guid TenantId,
+        Guid UserId,
+        Guid DeviceId,
+        string DeviceSecret,
+        DateTimeOffset ProvisionedAtUtc);
+
+    private sealed record EnableDeviceRequest(Guid TenantId, Guid AdminUserId);
+
     private sealed record DeviceHealthResponse(
         Guid TenantId,
         int Total,
@@ -188,4 +323,9 @@ public static class AdminDevicesEndpoints
 
     private static bool IsDisabled(AgentDeviceEntity device)
         => device.DisabledAtUtc is not null || device.Status == "disabled";
+
+    private static string NormalizeOrExisting(string? value, string existing)
+        => string.IsNullOrWhiteSpace(value)
+            ? existing
+            : value.Trim();
 }

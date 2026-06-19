@@ -281,24 +281,24 @@ function maybeShowRolePicker() {
   overlay.className = "role-picker-overlay";
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:24px";
   const card = document.createElement("div");
-  card.style.cssText = "background:#fff;padding:28px;border-radius:12px;max-width:680px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.3)";
+  card.style.cssText = "background:var(--surface);padding:28px;border-radius:12px;max-width:680px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.3)";
   card.innerHTML = `
     <h2 style="margin:0 0 6px 0;font-size:1.4rem">Which best describes you?</h2>
-    <p style="margin:0 0 18px 0;color:#6b7280">This personalises the UI hints on this device. Your actual permissions are set by your IT admin and won't change here.</p>
+    <p style="margin:0 0 18px 0;color:var(--muted)">This personalises the UI hints on this device. Your actual permissions are set by your IT admin and won't change here.</p>
     <div class="role-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
-    <button type="button" class="skip" style="margin-top:14px;padding:6px 12px;background:transparent;border:none;color:#6b7280;cursor:pointer">Skip for now</button>`;
+    <button type="button" class="skip" style="margin-top:14px;padding:6px 12px;background:transparent;border:none;color:var(--muted);cursor:pointer">Skip for now</button>`;
   const grid = card.querySelector(".role-grid");
   for (const role of ROLE_DETAILS) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.dataset.role = role.id;
-    btn.style.cssText = "text-align:left;padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit";
+    btn.style.cssText = "text-align:left;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);cursor:pointer;font-family:inherit";
     btn.innerHTML = `
       <div style="font-size:24px;line-height:1">${role.icon}</div>
-      <div style="margin-top:6px;font-weight:600;color:#111827">${role.title}</div>
-      <div style="margin-top:4px;font-size:0.85rem;color:#6b7280;line-height:1.4">${role.blurb}</div>`;
-    btn.onmouseover = () => { btn.style.borderColor = "#275d72"; btn.style.background = "#eef5f7"; };
-    btn.onmouseout = () => { btn.style.borderColor = "#e5e7eb"; btn.style.background = "#fff"; };
+      <div style="margin-top:6px;font-weight:600;color:var(--ink)">${role.title}</div>
+      <div style="margin-top:4px;font-size:0.85rem;color:var(--muted);line-height:1.4">${role.blurb}</div>`;
+    btn.onmouseover = () => { btn.style.borderColor = "var(--accent)"; btn.style.background = "var(--accent-soft)"; };
+    btn.onmouseout = () => { btn.style.borderColor = "var(--line)"; btn.style.background = "var(--surface)"; };
     btn.onclick = () => {
       localStorage.setItem(ROLE_PICKER_KEY, role.id);
       personaBadge.textContent = role.id + " (self-declared)";
@@ -331,7 +331,7 @@ function maybeShowTour() {
   overlay.className = "tour-overlay";
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;display:flex;align-items:center;justify-content:center;pointer-events:auto;";
   const card = document.createElement("div");
-  card.style.cssText = "background:#fff;padding:18px 22px;border-radius:10px;max-width:340px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.25);";
+  card.style.cssText = "background:var(--surface);padding:18px 22px;border-radius:10px;max-width:340px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.25);";
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
@@ -344,9 +344,9 @@ function maybeShowTour() {
     const stop = stops[idx];
     const anchor = document.querySelector(stop.selector);
     card.innerHTML = `
-      <p style="margin:0 0 12px 0;font-size:0.95rem;color:#111827">${stop.text}</p>
-      <button type="button" class="primary" style="padding:8px 18px;border-radius:6px;background:#275d72;color:#fff;border:none;font-weight:600;cursor:pointer">${idx === stops.length - 1 ? "Finish" : "Next"}</button>
-      <button type="button" class="skip" style="margin-left:8px;padding:8px 12px;background:transparent;border:none;color:#6b7280;cursor:pointer">Skip</button>`;
+      <p style="margin:0 0 12px 0;font-size:0.95rem;color:var(--ink)">${stop.text}</p>
+      <button type="button" class="primary" style="padding:8px 18px;border-radius:6px;background:var(--accent);color:#fff;border:none;font-weight:600;cursor:pointer">${idx === stops.length - 1 ? "Finish" : "Next"}</button>
+      <button type="button" class="skip" style="margin-left:8px;padding:8px 12px;background:transparent;border:none;color:var(--muted);cursor:pointer">Skip</button>`;
     if (anchor) anchor.scrollIntoView({ block: "center" });
     card.querySelector(".primary").onclick = () => { idx++; render(); };
     card.querySelector(".skip").onclick = () => {

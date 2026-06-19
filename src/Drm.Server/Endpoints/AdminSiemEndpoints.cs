@@ -13,6 +13,7 @@ public static class AdminSiemEndpoints
 
         group.MapPost("/", CreateWebhookAsync);
         group.MapGet("/", ListWebhooksAsync);
+        group.MapDelete("/{webhookId:guid}", DeleteWebhookAsync);
 
         return endpoints;
     }
@@ -98,6 +99,31 @@ public static class AdminSiemEndpoints
         return dbContext.SiemWebhooks
             .AsNoTracking()
             .AnyAsync(webhook => webhook.TenantId == tenantId && webhook.WebhookId == webhookId, cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteWebhookAsync(
+        Guid webhookId,
+        Guid tenantId,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.SettingsWrite, tenantId, out var fail))
+            return fail!;
+        if (!httpContext.MatchesHeader(tenantId))
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+
+        var webhook = await dbContext.SiemWebhooks
+            .FirstOrDefaultAsync(w => w.TenantId == tenantId && w.WebhookId == webhookId, cancellationToken);
+
+        if (webhook is null)
+            return Results.NotFound();
+
+        dbContext.SiemWebhooks.Remove(webhook);
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(tenantId, null, "siem_webhook_deleted", httpContext));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.NoContent();
     }
 
     private static async Task<ErrorResponse?> ValidateCreateRequestAsync(

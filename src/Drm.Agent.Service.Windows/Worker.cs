@@ -28,6 +28,7 @@ public class Worker(
                     Environment.MachineName,
                     Environment.OSVersion.VersionString,
                     currentOptions.AgentVersion,
+                    WindowsDomainPosture.Capture(),
                     stoppingToken);
                 await commandProcessor.ProcessPendingAsync(currentOptions.ToIdentity(), stoppingToken);
 

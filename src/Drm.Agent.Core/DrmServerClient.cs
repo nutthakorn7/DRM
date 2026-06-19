@@ -12,7 +12,8 @@ public sealed record ProtectedFileRegistration(
     DateTimeOffset ExpiresAtUtc,
     Permission Permissions,
     Guid? PolicyTemplateId,
-    IReadOnlyList<ProtectionRecipient> Recipients);
+    IReadOnlyList<ProtectionRecipient> Recipients,
+    string? OriginalFileName = null);
 
 public sealed record ProtectionRecipient(string SubjectType, Guid SubjectId);
 
@@ -52,11 +53,28 @@ public interface IDrmServerClient : IAgentAuditUploader
         string agentVersion,
         CancellationToken cancellationToken);
 
+    Task<AgentDeviceRegistration> RegisterDeviceAsync(
+        AgentIdentity identity,
+        string hostname,
+        string operatingSystem,
+        string agentVersion,
+        AgentDevicePosture posture,
+        CancellationToken cancellationToken)
+        => RegisterDeviceAsync(identity, hostname, operatingSystem, agentVersion, cancellationToken);
+
     Task<AgentHeartbeat> RecordHeartbeatAsync(
         AgentIdentity identity,
         string status,
         string agentVersion,
         CancellationToken cancellationToken);
+
+    Task<AgentHeartbeat> RecordHeartbeatAsync(
+        AgentIdentity identity,
+        string status,
+        string agentVersion,
+        AgentDevicePosture posture,
+        CancellationToken cancellationToken)
+        => RecordHeartbeatAsync(identity, status, agentVersion, cancellationToken);
 
     Task<IReadOnlyList<AgentCommand>> GetPendingCommandsAsync(
         AgentIdentity identity,
@@ -127,10 +145,18 @@ public sealed class DrmServerClient : IDrmServerClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient httpClient;
+    private readonly string? deviceSecret;
+    private readonly IDeviceRequestSigner? deviceRequestSigner;
 
-    public DrmServerClient(HttpClient httpClient, string? clientApiKey = null)
+    public DrmServerClient(
+        HttpClient httpClient,
+        string? clientApiKey = null,
+        string? deviceSecret = null,
+        IDeviceRequestSigner? deviceRequestSigner = null)
     {
         this.httpClient = httpClient;
+        this.deviceSecret = string.IsNullOrWhiteSpace(deviceSecret) ? null : deviceSecret.Trim();
+        this.deviceRequestSigner = deviceRequestSigner;
         if (!string.IsNullOrWhiteSpace(clientApiKey))
         {
             httpClient.DefaultRequestHeaders.Remove(ClientApiKeyHeaderName);
@@ -175,7 +201,8 @@ public sealed class DrmServerClient : IDrmServerClient
                 registration.Permissions.ToString(),
                 null,
                 registration.PolicyTemplateId,
-                registration.Recipients),
+                registration.Recipients,
+                registration.OriginalFileName),
             JsonOptions,
             cancellationToken);
 
@@ -221,6 +248,42 @@ public sealed class DrmServerClient : IDrmServerClient
         string operatingSystem,
         string agentVersion,
         CancellationToken cancellationToken)
+        => await RegisterDeviceCoreAsync(
+            identity,
+            hostname,
+            operatingSystem,
+            agentVersion,
+            domainJoined: null,
+            domainName: null,
+            windowsUser: null,
+            cancellationToken);
+
+    public async Task<AgentDeviceRegistration> RegisterDeviceAsync(
+        AgentIdentity identity,
+        string hostname,
+        string operatingSystem,
+        string agentVersion,
+        AgentDevicePosture posture,
+        CancellationToken cancellationToken)
+        => await RegisterDeviceCoreAsync(
+            identity,
+            hostname,
+            operatingSystem,
+            agentVersion,
+            posture.DomainJoined,
+            posture.DomainName,
+            posture.WindowsUser,
+            cancellationToken);
+
+    private async Task<AgentDeviceRegistration> RegisterDeviceCoreAsync(
+        AgentIdentity identity,
+        string hostname,
+        string operatingSystem,
+        string agentVersion,
+        bool? domainJoined,
+        string? domainName,
+        string? windowsUser,
+        CancellationToken cancellationToken)
     {
         var response = await httpClient.PostAsJsonAsync(
             "/api/agent/devices/register",
@@ -230,7 +293,22 @@ public sealed class DrmServerClient : IDrmServerClient
                 identity.DeviceId,
                 hostname,
                 operatingSystem,
-                agentVersion),
+                agentVersion,
+                domainJoined,
+                domainName,
+                windowsUser,
+                SignDeviceRequest(
+                    identity,
+                    DeviceRequestSigning.RegisterDevicePayload(
+                        identity.TenantId,
+                        identity.UserId,
+                        identity.DeviceId,
+                        hostname,
+                        operatingSystem,
+                        agentVersion,
+                        domainJoined,
+                        domainName,
+                        windowsUser))),
             JsonOptions,
             cancellationToken);
 
@@ -245,6 +323,38 @@ public sealed class DrmServerClient : IDrmServerClient
         string status,
         string agentVersion,
         CancellationToken cancellationToken)
+        => await RecordHeartbeatCoreAsync(
+            identity,
+            status,
+            agentVersion,
+            domainJoined: null,
+            domainName: null,
+            windowsUser: null,
+            cancellationToken);
+
+    public async Task<AgentHeartbeat> RecordHeartbeatAsync(
+        AgentIdentity identity,
+        string status,
+        string agentVersion,
+        AgentDevicePosture posture,
+        CancellationToken cancellationToken)
+        => await RecordHeartbeatCoreAsync(
+            identity,
+            status,
+            agentVersion,
+            posture.DomainJoined,
+            posture.DomainName,
+            posture.WindowsUser,
+            cancellationToken);
+
+    private async Task<AgentHeartbeat> RecordHeartbeatCoreAsync(
+        AgentIdentity identity,
+        string status,
+        string agentVersion,
+        bool? domainJoined,
+        string? domainName,
+        string? windowsUser,
+        CancellationToken cancellationToken)
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/agent/devices/{identity.DeviceId}/heartbeat",
@@ -252,7 +362,21 @@ public sealed class DrmServerClient : IDrmServerClient
                 identity.TenantId,
                 identity.UserId,
                 status,
-                agentVersion),
+                agentVersion,
+                domainJoined,
+                domainName,
+                windowsUser,
+                SignDeviceRequest(
+                    identity,
+                    DeviceRequestSigning.HeartbeatPayload(
+                        identity.TenantId,
+                        identity.UserId,
+                        identity.DeviceId,
+                        status,
+                        agentVersion,
+                        domainJoined,
+                        domainName,
+                        windowsUser))),
             JsonOptions,
             cancellationToken);
 
@@ -328,7 +452,18 @@ public sealed class DrmServerClient : IDrmServerClient
     {
         var response = await httpClient.PostAsJsonAsync(
             $"/api/files/{fileId}/keys/unwrap",
-            new UnwrapFileKeyRequest(tenantId, userId, deviceId, requestedPermission),
+            new UnwrapFileKeyRequest(
+                tenantId,
+                userId,
+                deviceId,
+                requestedPermission,
+                await SignUnwrapRequestAsync(
+                    tenantId,
+                    fileId,
+                    userId,
+                    deviceId,
+                    requestedPermission,
+                    cancellationToken)),
             JsonOptions,
             cancellationToken);
 
@@ -342,6 +477,45 @@ public sealed class DrmServerClient : IDrmServerClient
             ParsePermissionsOrNone(unwrapped.AllowedPermissions),
             unwrapped.WatermarkTemplate,
             unwrapped.OfflineLeaseExpiresAtUtc);
+    }
+
+    private DeviceRequestSignature? SignDeviceRequest(AgentIdentity identity, string canonicalPayload)
+        => SignDeviceRequest(
+            string.IsNullOrWhiteSpace(identity.DeviceSecret) ? deviceSecret : identity.DeviceSecret,
+            canonicalPayload);
+
+    private static DeviceRequestSignature? SignDeviceRequest(string? secret, string canonicalPayload)
+        => string.IsNullOrWhiteSpace(secret)
+            ? null
+            : DeviceRequestSigning.Sign(secret, canonicalPayload);
+
+    private async Task<DeviceRequestSignature?> SignUnwrapRequestAsync(
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        Guid deviceId,
+        string requestedPermission,
+        CancellationToken cancellationToken)
+    {
+        if (deviceRequestSigner is not null)
+        {
+            return await deviceRequestSigner.SignUnwrapAsync(
+                tenantId,
+                fileId,
+                userId,
+                deviceId,
+                requestedPermission,
+                cancellationToken);
+        }
+
+        return SignDeviceRequest(
+            deviceSecret,
+            DeviceRequestSigning.UnwrapPayload(
+                tenantId,
+                fileId,
+                userId,
+                deviceId,
+                requestedPermission));
     }
 
     private static Permission ParsePermissionsOrNone(string? permissions)
@@ -402,7 +576,8 @@ public sealed class DrmServerClient : IDrmServerClient
         string Permissions,
         string? WatermarkTemplate,
         Guid? PolicyTemplateId,
-        IReadOnlyList<ProtectionRecipient> Recipients);
+        IReadOnlyList<ProtectionRecipient> Recipients,
+        string? OriginalFileName);
 
     private sealed record DecidePolicyRequest(
         Guid TenantId,
@@ -418,13 +593,21 @@ public sealed class DrmServerClient : IDrmServerClient
         Guid DeviceId,
         string Hostname,
         string OperatingSystem,
-        string AgentVersion);
+        string AgentVersion,
+        bool? DomainJoined,
+        string? DomainName,
+        string? WindowsUser,
+        DeviceRequestSignature? DeviceSignature);
 
     private sealed record HeartbeatRequest(
         Guid TenantId,
         Guid UserId,
         string Status,
-        string AgentVersion);
+        string AgentVersion,
+        bool? DomainJoined,
+        string? DomainName,
+        string? WindowsUser,
+        DeviceRequestSignature? DeviceSignature);
 
     private sealed record CompleteCommandRequest(Guid TenantId, string Status, string ReasonCode);
 
@@ -434,7 +617,8 @@ public sealed class DrmServerClient : IDrmServerClient
         Guid TenantId,
         Guid UserId,
         Guid DeviceId,
-        string RequestedPermission);
+        string RequestedPermission,
+        DeviceRequestSignature? DeviceSignature);
 
     private sealed record UnwrapFileKeyResponse(
         Guid TenantId,

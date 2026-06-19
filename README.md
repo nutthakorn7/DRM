@@ -15,7 +15,22 @@ the network.
 - **Audit** — tamper-proof chain, SIEM webhook stream, PDPA / ISO 27001 / SOC 2 export
 - **Revoke** — kill files from anywhere; remote delete protected copies on disconnect
 
-Production: <https://drm.zcr.ai>
+Production: <https://drm.zcr.ai> · ⚠ currently running pre-v1.7.0 build (Stages 18 + 20 server-side not yet deployed — see [#47](https://github.com/nutthakorn7/DRM/issues/47))
+
+## Demo prep
+
+Running a customer demo? The complete demo collateral lives in [`docs/demo/`](docs/demo/):
+
+| Role | Start here |
+|---|---|
+| **Presenter** (sales / owner) | [`docs/demo/03-demo-script.md`](docs/demo/03-demo-script.md) → [`docs/demo/04-customer-questions.md`](docs/demo/04-customer-questions.md) → [`docs/demo/10-ciso-answer-script.md`](docs/demo/10-ciso-answer-script.md) |
+| **Engineer** (demo-laptop prep) | [`docs/demo/09-prod-seeded-credentials.md`](docs/demo/09-prod-seeded-credentials.md) → [`docs/demo/08-engineer-windows-msi-setup.md`](docs/demo/08-engineer-windows-msi-setup.md) → [`docs/demo/11-engineer-full-smoke-test.md`](docs/demo/11-engineer-full-smoke-test.md) |
+| **Both** (15 min before customer) | [`docs/demo/05-preflight-checklist.md`](docs/demo/05-preflight-checklist.md) |
+| **If something breaks on stage** | [`docs/demo/06-fallback-plan.md`](docs/demo/06-fallback-plan.md) |
+
+See [`docs/demo/README.md`](docs/demo/README.md) for the full numbered index — the table above shows the typical entry points; files like `01-engineer-prep.md` (seed from scratch) and `02-the-3-links.md` (surface overview) are referenced from those entry points and don't usually need to be opened directly.
+
+Latest release with public MSI download: [**v1.7.0**](https://github.com/nutthakorn7/DRM/releases/tag/v1.7.0) — direct link to the Windows agent installer is on that page (no GitHub login required).
 
 ## Foundation MVP
 
@@ -202,9 +217,17 @@ This viewer path displays returned permissions but does not yet fully enforce co
 
 ## Phase 4A Management Install Baseline
 
-On-prem management server install assets are under `deploy/management/`. The baseline includes an example production config, `start-management.sh`, and operator notes for publishing, setting `DRM_KEY_WRAPPING_MASTER_KEY_BASE64`, choosing `DRM_DATA_DIR`, and checking `/healthz`.
+**Production install (supported path):** the Docker stack under `deploy/management/docker/` — app + Postgres + Caddy (auto-TLS), one command. Full step-by-step walkthrough: **[docs/INSTALL.md](docs/INSTALL.md)**.
 
-This is a runnable management install baseline, not final production hardening. Real deployment still needs TLS, API authentication, service supervision, backups, audit retention, key rotation, and host monitoring.
+```bash
+cd deploy/management/docker
+sudo DOMAIN=drm.example.com ./install.sh      # first time → builds, waits for healthy, prints ✅ DEPLOY OK
+./ship.sh root@your-server                    # later upgrades, from your dev machine (or ./deploy.sh on the box)
+```
+
+These scripts exit with a clear ✅/❌ (no `docker compose logs -f` guessing), back up Postgres and tag a rollback image before each upgrade. See [`deploy/management/docker/README.md`](deploy/management/docker/README.md).
+
+The older `start-management.sh` (SQLite, no TLS) under `deploy/management/` is for **local/dev runs only**; the native systemd path under `deploy/management/ubuntu/` is **deprecated** and forwards to the Docker installer.
 
 ## Phase 4B Admin API Key Auth
 

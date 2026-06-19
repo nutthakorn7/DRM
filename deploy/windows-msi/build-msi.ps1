@@ -3,14 +3,15 @@
     Build the zcrDRM Agent MSI from this directory.
 
 .DESCRIPTION
-    Publishes Drm.Agent.Tray.Windows and Drm.Viewer.Windows as
+    Publishes Drm.Agent.Tray.Windows, Drm.Viewer.Windows, and
+    Drm.Agent.Service.Windows as
     self-contained .NET 10 win-x64 binaries, merges them into one
     install folder, then invokes the WiX 4 toolset to produce
     zcrdrm-agent.msi.
 
     The MSI bakes the production server URL (https://drm.zcr.ai) into
     HKLM\SOFTWARE\zcrDRM\ServerUrl and registers the .drmx file
-    association plus the "Protect with zcrDRM" right-click menu.
+    association plus the "Protect CAD file (internal)" right-click menu.
 
 .PARAMETER OutputPath
     Where to write the final MSI. Defaults to .\zcrdrm-agent.msi
@@ -53,9 +54,11 @@ try {
     # levels up. Resolve it via path arithmetic rather than `git
     # rev-parse` so the script works in a tarball / non-git checkout.
     $repoRoot = (Resolve-Path "$scriptDir\..\..").Path
-    $trayProject   = Join-Path $repoRoot "src\Drm.Agent.Tray.Windows\Drm.Agent.Tray.Windows.csproj"
-    $viewerProject = Join-Path $repoRoot "src\Drm.Viewer.Windows\Drm.Viewer.Windows.csproj"
-    $publishDir    = Join-Path $scriptDir "publish\agent"
+    $trayProject    = Join-Path $repoRoot "src\Drm.Agent.Tray.Windows\Drm.Agent.Tray.Windows.csproj"
+    $viewerProject  = Join-Path $repoRoot "src\Drm.Viewer.Windows\Drm.Viewer.Windows.csproj"
+    $serviceProject = Join-Path $repoRoot "src\Drm.Agent.Service.Windows\Drm.Agent.Service.Windows.csproj"
+    $publishDir     = Join-Path $scriptDir "publish\agent"
+    $servicePayloadDir = Join-Path $scriptDir "publish\service"
 
     Write-Host ""
     Write-Host "==== zcrDRM Agent MSI build ====" -ForegroundColor Cyan
@@ -76,12 +79,22 @@ try {
         throw "WiX 5 not on PATH. Install with: dotnet tool install --global wix --version 5.0.2"
     }
 
+    # The Util extension provides util:PermissionEx, used by Product.wxs to
+    # ACL the DeviceSecret registry key (PR #51 hardening). Adding it is
+    # idempotent — a no-op if it is already present in the global cache.
+    Write-Host "Ensuring WiX Util extension is available..." -ForegroundColor Yellow
+    & wix extension add -g WixToolset.Util.wixext/5.0.2
+    if ($LASTEXITCODE -ne 0) { throw "Failed to add WiX Util extension." }
+
     # ------------------------------------------------------------------
     # 3. Clean previous publish output (avoid stale files in the MSI)
     # ------------------------------------------------------------------
     if (Test-Path $publishDir) {
         Write-Host "Cleaning previous publish output..." -ForegroundColor Yellow
         Remove-Item -Recurse -Force $publishDir
+    }
+    if (Test-Path $servicePayloadDir) {
+        Remove-Item -Recurse -Force $servicePayloadDir
     }
 
     # ------------------------------------------------------------------
@@ -114,16 +127,37 @@ try {
         --output $publishDir
     if ($LASTEXITCODE -ne 0) { throw "Viewer publish failed." }
 
+    Write-Host "Publishing Drm.Agent.Service.Windows (self-contained, win-x64)..." -ForegroundColor Yellow
+    dotnet publish $serviceProject `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained true `
+        -p:PublishSingleFile=false `
+        -p:PublishReadyToRun=false `
+        --output $publishDir
+    if ($LASTEXITCODE -ne 0) { throw "Service publish failed." }
+
     # ------------------------------------------------------------------
     # 6. Sanity-check the publish output contains the EXE files the
     #    MSI is going to reference. Catches "publish succeeded but
     #    nothing landed in the folder" early — that failure mode is
     #    confusing to debug at MSI-build time.
     # ------------------------------------------------------------------
-    $trayExe   = Join-Path $publishDir "Drm.Agent.Tray.Windows.exe"
-    $viewerExe = Join-Path $publishDir "Drm.Viewer.Windows.exe"
-    if (-not (Test-Path $trayExe))   { throw "Expected $trayExe after publish." }
-    if (-not (Test-Path $viewerExe)) { throw "Expected $viewerExe after publish." }
+    $trayExe    = Join-Path $publishDir "Drm.Agent.Tray.Windows.exe"
+    $viewerExe  = Join-Path $publishDir "Drm.Viewer.Windows.exe"
+    $serviceExe = Join-Path $publishDir "Drm.Agent.Service.Windows.exe"
+    if (-not (Test-Path $trayExe))    { throw "Expected $trayExe after publish." }
+    if (-not (Test-Path $viewerExe))  { throw "Expected $viewerExe after publish." }
+    if (-not (Test-Path $serviceExe)) { throw "Expected $serviceExe after publish." }
+
+    # WiX must place ServiceInstall in the same component as the service
+    # executable. Move only the EXE out of the bulk-harvested folder so
+    # Product.wxs can own it explicitly while the service's DLL/deps/
+    # runtimeconfig remain in INSTALLFOLDER with the rest of the payload.
+    New-Item -ItemType Directory -Force -Path $servicePayloadDir | Out-Null
+    Copy-Item -Force $serviceExe (Join-Path $servicePayloadDir "Drm.Agent.Service.Windows.exe")
+    Remove-Item -Force $serviceExe
+
     $fileCount = (Get-ChildItem -Recurse $publishDir).Count
     Write-Host "  Publish OK ($fileCount files)" -ForegroundColor Green
 
@@ -131,7 +165,7 @@ try {
     # 7. Build the MSI
     # ------------------------------------------------------------------
     Write-Host "Building MSI with WiX..." -ForegroundColor Yellow
-    $wixArgs = @("build", "Product.wxs", "-arch", "x64", "-out", $OutputPath)
+    $wixArgs = @("build", "Product.wxs", "-arch", "x64", "-ext", "WixToolset.Util.wixext", "-out", $OutputPath)
     if ($Version) {
         # WiX 4 lets us override variables on the command line via -d
         $wixArgs += @("-d", "ProductVersion=$Version")

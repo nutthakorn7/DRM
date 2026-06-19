@@ -1,6 +1,11 @@
 namespace Drm.Agent.Core;
 
-public sealed record AgentIdentity(Guid TenantId, Guid UserId, Guid DeviceId);
+public sealed record AgentIdentity(Guid TenantId, Guid UserId, Guid DeviceId, string? DeviceSecret = null);
+
+public sealed record AgentDevicePosture(bool DomainJoined, string DomainName, string WindowsUser)
+{
+    public static AgentDevicePosture Unknown { get; } = new(false, "", "");
+}
 
 /// <summary>
 /// Shape returned by GET /api/agent/discover?email=... — what the tray

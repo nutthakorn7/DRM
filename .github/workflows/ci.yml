@@ -72,6 +72,53 @@ jobs:
       - name: Test — Integration
         run: dotnet test tests/Drm.Integration.Tests/Drm.Integration.Tests.csproj -c Release --logger "console;verbosity=normal"
 
+  ui-tests-linux:
+    name: UI tests (Linux — Playwright/Chromium)
+    # Drm.UI.Tests drives a REAL Chromium against a REAL Drm.Server process —
+    # it is the only automated proof that the admin console, /share/ viewer,
+    # and in-browser .drmx decryption actually work in a browser. Until this
+    # job existed the suite only ever ran on the dev machine, so a regression
+    # in wwwroot JS/HTML could land on master with CI fully green.
+    # Runs as its own job (not a step in build-and-test-linux) so a browser
+    # flake never masks a unit-test failure and the suites run in parallel.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore tests/Drm.UI.Tests/Drm.UI.Tests.csproj
+
+      - name: Build test project (Release)
+        run: dotnet build tests/Drm.UI.Tests/Drm.UI.Tests.csproj --no-restore -c Release
+
+      - name: Pre-build server (Debug)
+        # DrmServerFixture starts the server with `dotnet run` (Debug config)
+        # and waits only 45 s for /healthz. A cold restore+build inside that
+        # window is the one thing that would make this job flaky, so warm the
+        # Debug build here where it doesn't count against the deadline.
+        run: dotnet build src/Drm.Server/Drm.Server.csproj -c Debug
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tests/Drm.UI.Tests/Drm.UI.Tests.csproj') }}
+
+      - name: Install Playwright Chromium + OS deps
+        # PlaywrightFixture self-installs the browser at run time, but it
+        # skips OS-level dependencies; --with-deps here covers both (and is
+        # a fast no-op for the browser itself on a cache hit).
+        run: pwsh tests/Drm.UI.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Test — UI (Playwright)
+        run: dotnet test tests/Drm.UI.Tests/Drm.UI.Tests.csproj --no-restore -c Release --logger "console;verbosity=normal"
+
   build-windows:
     name: Build (Windows — WPF projects)
     runs-on: windows-latest
@@ -183,7 +230,7 @@ jobs:
           }
           Write-Host "  OK open command points at the viewer"
 
-      - name: Verify registry — Protect-with-zcrDRM shell menu
+      - name: Verify registry — internal CAD shell menu
         shell: pwsh
         # `HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect` contains a literal
         # `*` (the all-files registration key). PowerShell's -Path
@@ -192,18 +239,20 @@ jobs:
         run: |
           $menuKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect" -ErrorAction Stop
           $muiVerb = $menuKey.GetValue("MUIVerb")
-          if ($muiVerb -ne "Protect with zcrDRM") {
-            throw "Expected MUIVerb = 'Protect with zcrDRM', got '$muiVerb'"
+          if ($muiVerb -ne "Protect CAD file (internal)") {
+            throw "Expected MUIVerb = 'Protect CAD file (internal)', got '$muiVerb'"
           }
           Write-Host "  OK *\\shell\\zcrDRMProtect MUIVerb = $muiVerb"
-          foreach ($sub in @("01quicksend","02protect","03transparent")) {
-            $subKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectSubmenu\shell\$sub\command" -ErrorAction Stop
-            $cmd = $subKey.GetValue("")
-            if ($cmd -notlike "*Drm.Agent.Tray.Windows.exe*") {
-              throw "Sub-verb $sub command does not point at the tray exe: $cmd"
-            }
-            Write-Host "  OK submenu $sub -> tray exe"
+          $commandKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect\command" -ErrorAction Stop
+          $cmd = $commandKey.GetValue("")
+          if ($cmd -notlike "*Drm.Agent.Tray.Windows.exe*--quick-protect*") {
+            throw "Expected internal CAD command to point at tray --quick-protect, got '$cmd'"
           }
+          Write-Host "  OK internal CAD command -> tray --quick-protect"
+          if (Test-Path -LiteralPath "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectSubmenu") {
+            throw "Legacy external-share submenu should not be installed for internal CAD mode."
+          }
+          Write-Host "  OK legacy external-share submenu absent"
 
       # NOTE: tray auto-start (HKLM\...\Run\zcrDRM Agent) is intentionally
       # NOT in Stage 2 — the tray exe has no --background flag yet (see

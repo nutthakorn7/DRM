@@ -66,7 +66,10 @@ public sealed class I18nGlossaryAssetsTests
     private static string LocateRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".git")))
+        // `.git` is a directory in a normal clone but a file in a git worktree;
+        // Path.Exists matches both so we stop at the current worktree root
+        // rather than walking into a sibling checkout.
+        while (dir is not null && !Path.Exists(Path.Combine(dir.FullName, ".git")))
         {
             dir = dir.Parent;
         }

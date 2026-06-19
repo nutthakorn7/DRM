@@ -10,6 +10,46 @@ namespace Drm.Agent.Tray.Windows;
 
 public partial class MainWindow : Window
 {
+    private readonly DesktopAgentConfiguration desktopConfiguration;
+
+    private static readonly string[] CadExtensionList =
+    {
+        ".dwg",
+        ".dxf",
+        ".dwt",
+        ".dws",
+        ".step",
+        ".stp",
+        ".iges",
+        ".igs",
+        ".sldprt",
+        ".sldasm",
+        ".slddrw",
+        ".x_t",
+        ".x_b",
+        ".prt",
+        ".asm",
+        ".catpart",
+        ".catproduct",
+        ".jt",
+        ".ifc",
+        ".sat",
+        ".stl"
+    };
+
+    private static readonly HashSet<string> CadExtensions = new(CadExtensionList, StringComparer.OrdinalIgnoreCase);
+
+    private static bool TransparentProtectEnabled => false;
+
+    private static bool IsSupportedCadFile(string path)
+        => CadExtensions.Contains(Path.GetExtension(path));
+
+    private static string BuildCadOpenFileDialogFilter()
+    {
+        var patterns = string.Join(";", CadExtensionList.Select(extension => $"*{extension}"));
+        return $"CAD files ({patterns})|{patterns}|All files (*.*)|*.*";
+    }
+
     /// <summary>
     /// Legacy parameterless constructor — kept so the previous
     /// StartupUri-driven launch path (and any unit-test code that
@@ -17,7 +57,7 @@ public partial class MainWindow : Window
     /// been switched to the (serverUrl, cached) overload so it can
     /// pre-fill from the discover-endpoint result.
     /// </summary>
-    public MainWindow() : this(serverUrl: null, cachedIdentity: null)
+    public MainWindow() : this(serverUrl: null, cachedIdentity: null, desktopConfiguration: null)
     {
     }
 
@@ -28,52 +68,18 @@ public partial class MainWindow : Window
     /// argument may be null — the corresponding field then stays
     /// blank and the user fills it in manually.
     /// </summary>
-    public MainWindow(Uri? serverUrl, AgentIdentityCacheEntry? cachedIdentity)
+    public MainWindow(
+        Uri? serverUrl,
+        AgentIdentityCacheEntry? cachedIdentity,
+        DesktopAgentConfiguration? desktopConfiguration = null)
     {
         InitializeComponent();
+        this.desktopConfiguration = desktopConfiguration ?? DesktopAgentConfiguration.Load();
         PrefillSourcePathFromCommandLine();
-        PrefillIdentityFromCache(serverUrl, cachedIdentity);
+        PrefillIdentityFromCache(serverUrl, cachedIdentity, this.desktopConfiguration);
         SourcePathBox.TextChanged += (_, _) => UpdateDropZoneHint();
         UpdateDropZoneHint();
         _ = LoadRecentRecipientsAsync();
-        UpdateMailClientWarningVisibility();
-    }
-
-    /// <summary>
-    /// Stage 17 — probe Windows for a registered mailto: protocol
-    /// handler. When none is registered (fresh Windows / customer
-    /// stripped the box / corporate policy) Quick Send's composer
-    /// silently fails to open. Surface a yellow banner at launch so
-    /// the sender knows BEFORE pressing Send.
-    /// </summary>
-    private void UpdateMailClientWarningVisibility()
-    {
-        if (MailClientWarningBanner is null) return;
-        MailClientWarningBanner.Visibility = IsAnyMailtoHandlerRegistered()
-            ? System.Windows.Visibility.Collapsed
-            : System.Windows.Visibility.Visible;
-    }
-
-    private static bool IsAnyMailtoHandlerRegistered()
-    {
-        // Non-Windows dev surfaces (Mac dev box / Linux CI) always
-        // report "ok" — they can't drive the registry and the warning
-        // only makes sense for the actual Windows MSI build.
-        if (!OperatingSystem.IsWindows()) return true;
-
-        try
-        {
-            using var key = Registry.ClassesRoot.OpenSubKey(@"mailto\shell\open\command", writable: false);
-            var command = key?.GetValue(null) as string;
-            return !string.IsNullOrWhiteSpace(command);
-        }
-        catch
-        {
-            // Registry permission errors shouldn't make the banner
-            // appear — that would falsely scare users. Default to
-            // "no warning" when we can't tell.
-            return true;
-        }
     }
 
     // Stage 15 — shared store + helper. Both Quick Send and Folder Share
@@ -135,12 +141,31 @@ public partial class MainWindow : Window
     /// On subsequent launches the boxes are already filled from the
     /// cache, so nothing surprising happens.
     /// </summary>
-    private void PrefillIdentityFromCache(Uri? serverUrl, AgentIdentityCacheEntry? cached)
+    private void PrefillIdentityFromCache(
+        Uri? serverUrl,
+        AgentIdentityCacheEntry? cached,
+        DesktopAgentConfiguration desktopConfiguration)
     {
-        if (serverUrl is not null && ServerUrlBox is not null
+        var configuredServerUrl = desktopConfiguration.ServerUrl ?? serverUrl;
+        if (configuredServerUrl is not null && ServerUrlBox is not null
             && string.IsNullOrWhiteSpace(ServerUrlBox.Text))
         {
-            ServerUrlBox.Text = serverUrl.ToString();
+            ServerUrlBox.Text = configuredServerUrl.ToString();
+        }
+
+        if (!string.IsNullOrWhiteSpace(desktopConfiguration.ClientApiKey) && ClientApiKeyBox is not null)
+        {
+            ClientApiKeyBox.Password = desktopConfiguration.ClientApiKey;
+        }
+
+        if (desktopConfiguration.TenantId is { } configuredTenantId && TenantIdBox is not null)
+        {
+            TenantIdBox.Text = configuredTenantId.ToString();
+        }
+
+        if (desktopConfiguration.UserId is { } configuredUserId && UserIdBox is not null)
+        {
+            UserIdBox.Text = configuredUserId.ToString();
         }
 
         if (cached is null)
@@ -152,7 +177,7 @@ public partial class MainWindow : Window
         // over the one we cached previously — registry takes
         // precedence so a sysadmin who re-pointed the MSI registry
         // key gets honoured.
-        if (serverUrl is null && ServerUrlBox is not null
+        if (configuredServerUrl is null && ServerUrlBox is not null
             && string.IsNullOrWhiteSpace(ServerUrlBox.Text))
         {
             ServerUrlBox.Text = cached.ServerUrl.ToString();
@@ -265,10 +290,10 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "All files (*.*)|*.*",
+            Filter = BuildCadOpenFileDialogFilter(),
             CheckFileExists = true,
             Multiselect = false,
-            Title = "Select file to protect"
+            Title = "Select CAD file to protect"
         };
 
         if (dialog.ShowDialog(this) == true)
@@ -288,14 +313,23 @@ public partial class MainWindow : Window
             var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
             var userId = ParseRequiredGuid(UserIdBox.Text, "User ID");
             var policyTemplateId = ParseOptionalGuid(PolicyTemplateIdBox.Text, "Policy template ID");
-            var recipients = ParseRecipients(RecipientUserIdsBox.Text, RecipientGroupIdsBox.Text);
             var sourcePath = SourcePathBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(sourcePath))
             {
-                throw new InvalidOperationException("Select a file before protecting.");
+                throw new InvalidOperationException("Select a CAD file before protecting.");
+            }
+
+            if (!IsSupportedCadFile(sourcePath))
+            {
+                throw new InvalidOperationException("Internal protection only accepts CAD files.");
             }
 
             var clientApiKey = ClientApiKeyBox.Password.Trim();
+            if (string.IsNullOrWhiteSpace(clientApiKey))
+            {
+                throw new InvalidOperationException("Client API key is not configured on this machine.");
+            }
+
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
             var serverClient = new DrmServerClient(httpClient, clientApiKey);
             var inventory = new JsonProtectedFileInventory(ResolveDataPath("protected-inventory.json"));
@@ -307,11 +341,11 @@ public partial class MainWindow : Window
                 new UserId(userId),
                 sourcePath,
                 EnvelopeCrypto.GenerateKey(),
-                new ProtectFilePolicyOptions(Permission.View | Permission.Print, policyTemplateId, recipients),
+                new ProtectFilePolicyOptions(Permission.View, policyTemplateId, Recipients: []),
                 DeleteOriginalBox.IsChecked == true,
                 CancellationToken.None);
 
-            SetStatus($"Protected: {result.DestinationPath}");
+            SetStatus($"Protected internally: {result.DestinationPath}");
         }
         catch (Exception exception)
         {
@@ -424,6 +458,12 @@ public partial class MainWindow : Window
         if (sourceFile is null)
         {
             SetStatus("Drop a file (folders are not supported).");
+            return;
+        }
+
+        if (!TransparentProtectEnabled)
+        {
+            SetStatus("Transparent protect is disabled for internal CAD mode.");
             return;
         }
 
@@ -556,15 +596,6 @@ public partial class MainWindow : Window
         await PackContainerFromFolderAsync(folder);
     }
 
-    /// <summary>
-    /// Folder right-click "Protect folder with zcrDRM" handler (Stage 8 /
-    /// Phase 5AS-folder-rclick): the WiX <c>Directory\shell\zcrDRMProtectFolder</c>
-    /// entry passes the selected directory via <c>--protect-folder</c>.
-    /// We pre-fill the Container drop-zone hint with the picked folder and
-    /// stash the path so the "Seal folder" button (or another drop) can
-    /// kick off the actual packing without forcing the user to drag the
-    /// same folder back in.
-    /// </summary>
     private string? pendingProtectFolder;
 
     private void BeginProtectFolderFromCommandLine(string folder)
@@ -1034,10 +1065,10 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "All files (*.*)|*.*",
+            Filter = BuildCadOpenFileDialogFilter(),
             CheckFileExists = true,
             Multiselect = false,
-            Title = "Select file to send"
+            Title = "Select CAD file to protect"
         };
         if (dialog.ShowDialog(this) == true)
         {
@@ -1051,153 +1082,52 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(quickPickedFile))
         {
-            QuickResultText.Text = "Drop a file or click Browse first.";
+            QuickResultText.Text = "Drop a CAD file or click Browse CAD first.";
             return;
         }
-        // Stage 19: bulk send — accept comma/semicolon-separated recipients
-        // so the same encrypted file goes to N people in one click. Each
-        // recipient gets their own share-link with their own access token,
-        // their own verification flow, and shows up as its own audit row
-        // and its own row in /me/ My Shares. Crucially: each recipient
-        // never sees other recipients' tokens (we open N separate composers,
-        // not one composer with N URLs in the body).
-        var recipients = BulkRecipientParser.Parse(QuickRecipientBox.Text);
-        if (recipients.Count == 0)
+        if (!IsSupportedCadFile(quickPickedFile))
         {
-            QuickResultText.Text = "Enter at least one recipient email.";
+            QuickResultText.Text = "This internal flow only protects CAD files.";
             return;
         }
 
         QuickSendButton.IsEnabled = false;
-        QuickResultText.Text = recipients.Count == 1
-            ? "Protecting…"
-            : $"Protecting {Path.GetFileName(quickPickedFile)} for {recipients.Count} recipients…";
+        QuickResultText.Text = "Encrypting CAD file...";
         try
         {
             var serverUrl = ParseServerUrl();
             var tenantId = ParseRequiredGuid(TenantIdBox.Text, "Tenant ID");
             var userId = ParseRequiredGuid(UserIdBox.Text, "User ID");
-            var adminKey = ClientApiKeyBox.Password.Trim();
+            var clientApiKey = ClientApiKeyBox.Password.Trim();
+            if (string.IsNullOrWhiteSpace(clientApiKey))
+            {
+                throw new InvalidOperationException("Client API key is not configured on this machine.");
+            }
 
-            // Stage 13: build Permission bitfield from the picker. View
-            // is always granted (recipient cannot open an encrypted file
-            // without it); the optional checkboxes layer Print/Copy/Edit/
-            // ExportOriginal on top.
-            var permissions = Permission.View;
-            if (QuickAllowPrintBox?.IsChecked == true)          permissions |= Permission.Print;
-            if (QuickAllowCopyBox?.IsChecked == true)           permissions |= Permission.Copy;
-            if (QuickAllowEditBox?.IsChecked == true)           permissions |= Permission.Edit;
-            if (QuickAllowExportOriginalBox?.IsChecked == true) permissions |= Permission.ExportOriginal;
-
-            var expiresInHours = ParseQuickExpiryHours();
-            var expiresAtUtc = DateTimeOffset.UtcNow.AddHours(expiresInHours);
-
-            // Stage 13: encrypt locally and register the file via the same
-            // workflow ProtectButton uses. This writes <source>.drmx next
-            // to the source file, registers fileId on the server, and
-            // wraps the per-file key. Then we mint an external share-link
-            // for `recipient` against that fileId — same path as the
-            // admin console's per-file share button.
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
-            var serverClient = new DrmServerClient(httpClient, adminKey);
+            var serverClient = new DrmServerClient(httpClient, clientApiKey);
             var inventory = new JsonProtectedFileInventory(ResolveDataPath("protected-inventory.json"));
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
             var workflow = new ProtectFileWorkflow(serverClient, inventory, keyStore);
 
-            var protectResult = await workflow.ProtectAsync(
+            var result = await workflow.ProtectAsync(
                 new TenantId(tenantId),
                 new UserId(userId),
                 quickPickedFile,
                 EnvelopeCrypto.GenerateKey(),
-                new ProtectFilePolicyOptions(permissions, PolicyTemplateId: null, Recipients: []),
+                new ProtectFilePolicyOptions(Permission.View, PolicyTemplateId: null, Recipients: []),
                 deleteOriginalAfterProtection: false,
-                CancellationToken.None,
-                fileExpiresAtUtc: expiresAtUtc);
+                CancellationToken.None);
 
-            using var adminHttpClient = new HttpClient { BaseAddress = serverUrl };
-            adminHttpClient.DefaultRequestHeaders.TryAddWithoutValidation(
-                "X-DRM-Admin-Key", adminKey);
-
-            var drmxPath = Path.GetFullPath(protectResult.DestinationPath);
-            var drmxName = Path.GetFileName(drmxPath);
-
-            // Stage 19: mint one share-link per recipient against the SAME
-            // fileId, then open one composer per recipient. The encryption
-            // happened once above; only the share-link + email steps
-            // multiply. Each per-recipient leg is independent so a single
-            // failed recipient doesn't abort the rest.
-            var sendResults = new List<BulkSendOutcome>(recipients.Count);
-            for (var index = 0; index < recipients.Count; index++)
-            {
-                var bulkRecipient = recipients[index];
-                QuickResultText.Text = recipients.Count == 1
-                    ? "Creating share link…"
-                    : $"Creating share link {index + 1}/{recipients.Count} ({bulkRecipient})…";
-
-                var shareLinkBody = new
-                {
-                    tenantId,
-                    adminUserId = userId,
-                    guestEmail = bulkRecipient,
-                    expiresAtUtc,
-                    maxUses = 1,
-                };
-                using var shareLinkContent = new StringContent(
-                    System.Text.Json.JsonSerializer.Serialize(shareLinkBody),
-                    System.Text.Encoding.UTF8, "application/json");
-                using var shareLinkResponse = await adminHttpClient.PostAsync(
-                    $"/api/admin/files/{protectResult.FileId}/share-links", shareLinkContent);
-                if (!shareLinkResponse.IsSuccessStatusCode)
-                {
-                    sendResults.Add(new BulkSendOutcome(
-                        bulkRecipient,
-                        Success: false,
-                        ComposerOpened: false,
-                        AttachmentInlined: false,
-                        FailureReason: $"HTTP {(int)shareLinkResponse.StatusCode}"));
-                    continue;
-                }
-                var shareLinkJson = await shareLinkResponse.Content.ReadAsStringAsync();
-                using var doc = System.Text.Json.JsonDocument.Parse(shareLinkJson);
-                var shareUrl = doc.RootElement.GetProperty("shareUrl").GetString() ?? "";
-
-                // Each recipient gets ONLY their own share URL — never see
-                // anyone else's token. That's why we open a composer per
-                // recipient instead of one composer with N URLs in the body.
-                QuickResultText.Text = recipients.Count == 1
-                    ? "Opening email composer…"
-                    : $"Opening composer {index + 1}/{recipients.Count} for {bulkRecipient}…";
-                var composeResult = ComposeShareEmail(
-                    bulkRecipient,
-                    $"Encrypted file: {drmxName}",
-                    bodyFor: inlined => BuildFileShareEmailBody(shareUrl, drmxName, drmxPath, inlined),
-                    attachmentPath: drmxPath);
-
-                sendResults.Add(new BulkSendOutcome(
-                    bulkRecipient,
-                    Success: true,
-                    composeResult.ComposerOpened,
-                    composeResult.AttachmentInlined,
-                    FailureReason: null));
-
-                // Last-known share URL goes on the clipboard so a sender
-                // who needs to paste manually still has the most recent
-                // one to hand.
-                System.Windows.Clipboard.SetText(shareUrl);
-                await RememberRecipientAsync(bulkRecipient);
-            }
-
-            QuickResultText.Text = BuildBulkResultMessage(drmxName, sendResults);
-            // Stage 16: clear the file picker so the sender can drop the
-            // next file without first un-selecting. Recipient stays in
-            // the box — same-recipient-different-file is the common
-            // multi-send pattern.
+            QuickResultText.Text =
+                $"Protected internally: {Path.GetFileName(result.DestinationPath)}. " +
+                "Opening requires an AD-joined trusted device.";
             quickPickedFile = null;
             QuickDropFile.Text = string.Empty;
         }
         catch (Exception ex)
         {
-            QuickResultText.Text = $"Send failed: {ex.Message}";
+            QuickResultText.Text = $"Protect failed: {ex.Message}";
         }
         finally
         {
@@ -1452,15 +1382,8 @@ public partial class MainWindow : Window
     private void PrefillSourcePathFromCommandLine()
     {
         var args = Environment.GetCommandLineArgs();
-        var sourcePath = TryGetCommandLineValue("--protect", args);
-        if (!string.IsNullOrWhiteSpace(sourcePath))
-        {
-            SourcePathBox.Text = sourcePath;
-        }
 
-        // Phase 5AS-shell: the Windows Explorer right-click entries
-        // ("DRM → Protect…" / "DRM → Transparent protect" /
-        // "DRM → Quick send") pass the dropped file via these flags.
+        // The Windows Explorer right-click entry passes the selected CAD file here.
         var quickProtectPath = TryGetCommandLineValue("--quick-protect", args);
         if (!string.IsNullOrWhiteSpace(quickProtectPath) && File.Exists(quickProtectPath))
         {
@@ -1471,34 +1394,6 @@ public partial class MainWindow : Window
             }
         }
 
-        var transparentProtectPath = TryGetCommandLineValue("--transparent-protect", args);
-        if (!string.IsNullOrWhiteSpace(transparentProtectPath) && File.Exists(transparentProtectPath))
-        {
-            SourcePathBox.Text = transparentProtectPath;
-            // Also pre-load the transparent drop hint so the operator sees
-            // which file the shell handed over.
-            if (TransparentDropHint != null)
-            {
-                TransparentDropHint.Text = $"Ready: {Path.GetFileName(transparentProtectPath)} — fill server info and click Protect.";
-            }
-        }
-
-        var quickSendRecipient = TryGetCommandLineValue("--quick-send-to", args);
-        if (!string.IsNullOrWhiteSpace(quickSendRecipient) && QuickRecipientBox != null)
-        {
-            QuickRecipientBox.Text = quickSendRecipient;
-        }
-
-        // Phase 5AS-folder-rclick (Stage 8): the WiX
-        // HKCR\Directory\shell\zcrDRMProtectFolder entry shells the tray
-        // with this flag pointing at the selected folder. Pre-fill the
-        // Container drop-zone instead of forcing the user to drag the
-        // same folder in.
-        var protectFolderPath = TryGetCommandLineValue("--protect-folder", args);
-        if (!string.IsNullOrWhiteSpace(protectFolderPath) && Directory.Exists(protectFolderPath))
-        {
-            BeginProtectFolderFromCommandLine(protectFolderPath);
-        }
     }
 
     private static string? TryGetCommandLineValue(string optionName, string[] args)

@@ -1,6 +1,16 @@
 # Management Server Install Baseline
 
-This directory contains the on-prem management server baseline for the DRM API.
+> **Installing for real? Use the Docker stack — it's the one supported deploy path.**
+> ```bash
+> cd deploy/management/docker
+> sudo DOMAIN=drm.example.com ./install.sh   # first time → prints ✅ DEPLOY OK
+> ```
+> Upgrades: `./ship.sh root@your-server` (from your dev machine) or `./deploy.sh`
+> (on the server). See [`docker/README.md`](docker/README.md). The native systemd
+> path (`ubuntu/`) is **deprecated** — its `install.sh` now forwards to the Docker one.
+
+The rest of this page is the **local / dev run** (SQLite, no TLS, no containers) —
+handy for hacking on the server on your laptop, **not** for production.
 
 ## Publish
 

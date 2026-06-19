@@ -40,11 +40,17 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<string> watermarkTiles = new();
     private readonly DispatcherTimer watermarkRefreshTimer;
     private readonly Random watermarkJitterRng = new();
+    private readonly DesktopAgentConfiguration desktopConfiguration;
+    private readonly AgentIdentityCacheEntry? cachedIdentity;
+    private bool autoOpenFromCommandLine;
     private const int WatermarkTileCount = 16;
 
     public MainWindow()
     {
         InitializeComponent();
+        desktopConfiguration = DesktopAgentConfiguration.Load();
+        cachedIdentity = ReadCachedIdentity();
+        PrefillDesktopConfiguration();
         // Block external screen capture (Snipping Tool, OBS, screen share)
         // before the window paints. The helper defers if the HWND isn't
         // ready yet and applies on SourceInitialized.
@@ -60,11 +66,62 @@ public partial class MainWindow : Window
         watermarkRefreshTimer.Start();
         RefreshWatermarkTiles();
         StatusText.Text = "No document loaded.";
-        PrefillProtectedPathFromCommandLine();
+        autoOpenFromCommandLine = PrefillProtectedPathFromCommandLine();
         ApplyPermissionState();
-        if (ShouldShowFirstRunOverlay())
+        Loaded += MainWindow_Loaded;
+        if (!autoOpenFromCommandLine && ShouldShowFirstRunOverlay())
         {
             HelpOverlayRoot.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (autoOpenFromCommandLine && HasConfiguredOpenIdentity())
+        {
+            await OpenSelectedProtectedFileAsync();
+        }
+    }
+
+    private static AgentIdentityCacheEntry? ReadCachedIdentity()
+    {
+        return ViewerIdentityCache.TryReadDefault();
+    }
+
+    private void PrefillDesktopConfiguration()
+    {
+        var serverUrl = desktopConfiguration.ServerUrl ?? cachedIdentity?.ServerUrl;
+        if (serverUrl is not null)
+        {
+            ServerUrlBox.Text = serverUrl.ToString();
+        }
+
+        if (!string.IsNullOrWhiteSpace(desktopConfiguration.ClientApiKey))
+        {
+            ClientApiKeyBox.Password = desktopConfiguration.ClientApiKey;
+        }
+
+        var tenantUser = desktopConfiguration.TryCreateIdentity(cachedIdentity);
+        if (tenantUser is not null)
+        {
+            UserIdBox.Text = tenantUser.UserId.ToString();
+            DeviceIdBox.Text = tenantUser.DeviceId.ToString();
+        }
+        else
+        {
+            if (desktopConfiguration.UserId is { } configuredUserId)
+            {
+                UserIdBox.Text = configuredUserId.ToString();
+            }
+            else if (cachedIdentity is not null)
+            {
+                UserIdBox.Text = cachedIdentity.UserId.ToString();
+            }
+
+            if (desktopConfiguration.DeviceId is { } configuredDeviceId)
+            {
+                DeviceIdBox.Text = configuredDeviceId.ToString();
+            }
         }
     }
 
@@ -285,6 +342,9 @@ public partial class MainWindow : Window
     }
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e)
+        => await OpenSelectedProtectedFileAsync();
+
+    private async Task OpenSelectedProtectedFileAsync()
     {
         OpenButton.IsEnabled = false;
         StatusText.Text = "Opening protected file...";
@@ -301,8 +361,16 @@ public partial class MainWindow : Window
             }
 
             var clientApiKey = ClientApiKeyBox.Password.Trim();
+            if (string.IsNullOrWhiteSpace(clientApiKey))
+            {
+                throw new InvalidOperationException("Client API key is not configured on this machine.");
+            }
+
             using var httpClient = new HttpClient { BaseAddress = serverUrl };
-            var serverClient = new DrmServerClient(httpClient, clientApiKey);
+            var serverClient = new DrmServerClient(
+                httpClient,
+                clientApiKey,
+                deviceRequestSigner: new LocalDeviceRequestSigner());
             var keyStore = new JsonFileKeyStore(ResolveDataPath("file-keys.json"));
             var decisionCache = new JsonPolicyDecisionCache(ResolveDataPath("policy-decisions.json"));
             var opened = await new OpenProtectedFileWorkflow(serverClient, keyStore, decisionCache)
@@ -338,6 +406,17 @@ public partial class MainWindow : Window
         {
             OpenButton.IsEnabled = true;
         }
+    }
+
+    private bool HasConfiguredOpenIdentity()
+    {
+        return Uri.TryCreate(ServerUrlBox.Text.Trim(), UriKind.Absolute, out _) &&
+            !string.IsNullOrWhiteSpace(ClientApiKeyBox.Password) &&
+            Guid.TryParse(UserIdBox.Text.Trim(), out var userId) &&
+            userId != Guid.Empty &&
+            Guid.TryParse(DeviceIdBox.Text.Trim(), out var deviceId) &&
+            deviceId != Guid.Empty &&
+            !string.IsNullOrWhiteSpace(ProtectedPathBox.Text);
     }
 
     public void LoadPdfFromTemporaryFile(string path, string watermark, Permission permissions)
@@ -507,7 +586,7 @@ public partial class MainWindow : Window
             var adminKey = ClientApiKeyBox.Password.Trim();
             if (string.IsNullOrEmpty(adminKey))
             {
-                StatusText.Text = "DRM Explorer needs your client / admin key — fill the Client Key field first.";
+                StatusText.Text = "DRM Explorer needs the machine client key to be configured.";
                 return;
             }
             var explorer = new DrmExplorerWindow(serverUrl, tenantIdValue, adminKey)
@@ -779,13 +858,16 @@ public partial class MainWindow : Window
         return $"{label} (*{extension})|*{extension}|All files (*.*)|*.*";
     }
 
-    private void PrefillProtectedPathFromCommandLine()
+    private bool PrefillProtectedPathFromCommandLine()
     {
         var protectedPath = TryGetProtectedPathFromCommandLine(Environment.GetCommandLineArgs());
         if (!string.IsNullOrWhiteSpace(protectedPath))
         {
             ProtectedPathBox.Text = protectedPath;
+            return true;
         }
+
+        return false;
     }
 
     private static string? TryGetProtectedPathFromCommandLine(string[] args)

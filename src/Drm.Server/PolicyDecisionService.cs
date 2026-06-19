@@ -158,58 +158,214 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
         }
 
         // v1.9: device trust enforcement
-        if (deviceId != Guid.Empty)
+        var trustConfig = await dbContext.TenantDeviceTrustConfigs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
+
+        if (trustConfig is { Enabled: true })
         {
-            var trustConfig = await dbContext.TenantDeviceTrustConfigs
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
-
-            if (trustConfig is { Enabled: true })
+            if (deviceId == Guid.Empty)
             {
-                // Materialize device — DateTimeOffset ORDER/WHERE on SQLite is unreliable
-                var device = await dbContext.AgentDevices
-                    .AsNoTracking()
-                    .Where(d => d.TenantId == tenantId && d.DeviceId == deviceId)
-                    .FirstOrDefaultAsync(cancellationToken);
+                await WriteAccessDeniedAuditAsync(
+                    tenantId,
+                    fileId,
+                    userId,
+                    decisionTime,
+                    "device_trust_required",
+                    writeAudit,
+                    cancellationToken);
 
-                var cutoff = decisionTime.AddDays(-trustConfig.RequiredCheckinDays);
-                var lastCheckin = device?.LastHeartbeatAtUtc;
+                return new ServerPolicyDecision(
+                    false,
+                    Permission.None,
+                    "device_trust_required",
+                    null,
+                    null,
+                    FileFound: true,
+                    InvalidPermission: false);
+            }
 
-                if (lastCheckin == null || lastCheckin.Value < cutoff)
+            // Materialize device — DateTimeOffset ORDER/WHERE on SQLite is unreliable
+            var device = await dbContext.AgentDevices
+                .AsNoTracking()
+                .Where(d => d.TenantId == tenantId && d.DeviceId == deviceId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (trustConfig.RequireDomainJoined)
+            {
+                if (device is null || !device.DomainJoined)
                 {
-                    if (writeAudit)
-                    {
-                        dbContext.AuditEvents.Add(new AuditEventEntity
-                        {
-                            TenantId = tenantId,
-                            FileId = fileId,
-                            UserId = userId,
-                            EventType = "access_denied",
-                            ReasonCode = "device_trust_expired",
-                            CreatedAtUtc = decisionTime
-                        });
-                        await dbContext.SaveChangesAsync(cancellationToken);
-                        await notificationService.NotifyAsync(
-                            tenantId,
-                            new AdminNotificationEvent(
-                                "access_denied",
-                                fileId,
-                                userId,
-                                null,
-                                decisionTime,
-                                ReasonCode: "device_trust_expired"),
-                            cancellationToken);
-                    }
+                    await WriteAccessDeniedAuditAsync(
+                        tenantId,
+                        fileId,
+                        userId,
+                        decisionTime,
+                        "device_not_domain_joined",
+                        writeAudit,
+                        cancellationToken);
 
                     return new ServerPolicyDecision(
                         false,
                         Permission.None,
-                        "device_trust_expired",
+                        "device_not_domain_joined",
                         null,
                         null,
                         FileFound: true,
                         InvalidPermission: false);
                 }
+
+                if (string.IsNullOrWhiteSpace(device.WindowsUser))
+                {
+                    await WriteAccessDeniedAuditAsync(
+                        tenantId,
+                        fileId,
+                        userId,
+                        decisionTime,
+                        "ad_user_not_detected",
+                        writeAudit,
+                        cancellationToken);
+
+                    return new ServerPolicyDecision(
+                        false,
+                        Permission.None,
+                        "ad_user_not_detected",
+                        null,
+                        null,
+                        FileFound: true,
+                        InvalidPermission: false);
+                }
+
+                var allowedDomains = ParseAllowedAdDomains(trustConfig.AllowedAdDomainsCsv);
+                if (allowedDomains.Count == 0)
+                {
+                    await WriteAccessDeniedAuditAsync(
+                        tenantId,
+                        fileId,
+                        userId,
+                        decisionTime,
+                        "allowed_ad_domains_required",
+                        writeAudit,
+                        cancellationToken);
+
+                    return new ServerPolicyDecision(
+                        false,
+                        Permission.None,
+                        "allowed_ad_domains_required",
+                        null,
+                        null,
+                        FileFound: true,
+                        InvalidPermission: false);
+                }
+
+                var deviceDomain = NormalizeAdDomain(device.DomainName);
+                if (!allowedDomains.Contains(deviceDomain))
+                {
+                    await WriteAccessDeniedAuditAsync(
+                        tenantId,
+                        fileId,
+                        userId,
+                        decisionTime,
+                        "ad_domain_not_allowed",
+                        writeAudit,
+                        cancellationToken);
+
+                    return new ServerPolicyDecision(
+                        false,
+                        Permission.None,
+                        "ad_domain_not_allowed",
+                        null,
+                        null,
+                        FileFound: true,
+                        InvalidPermission: false);
+                }
+
+                if (!IsWindowsUserDomainAllowed(device.WindowsUser, deviceDomain, allowedDomains))
+                {
+                    await WriteAccessDeniedAuditAsync(
+                        tenantId,
+                        fileId,
+                        userId,
+                        decisionTime,
+                        "ad_user_not_allowed",
+                        writeAudit,
+                        cancellationToken);
+
+                    return new ServerPolicyDecision(
+                        false,
+                        Permission.None,
+                        "ad_user_not_allowed",
+                        null,
+                        null,
+                        FileFound: true,
+                        InvalidPermission: false);
+                }
+
+                var tenantUser = await dbContext.TenantUsers
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(candidate =>
+                        candidate.TenantId == tenantId &&
+                        candidate.UserId == userId,
+                        cancellationToken);
+
+                if (!IsWindowsUserMappedToTenantUser(device.WindowsUser, tenantUser))
+                {
+                    await WriteAccessDeniedAuditAsync(
+                        tenantId,
+                        fileId,
+                        userId,
+                        decisionTime,
+                        "ad_user_mismatch",
+                        writeAudit,
+                        cancellationToken);
+
+                    return new ServerPolicyDecision(
+                        false,
+                        Permission.None,
+                        "ad_user_mismatch",
+                        null,
+                        null,
+                        FileFound: true,
+                        InvalidPermission: false);
+                }
+            }
+
+            var cutoff = decisionTime.AddDays(-trustConfig.RequiredCheckinDays);
+            var lastCheckin = device?.LastHeartbeatAtUtc;
+
+            if (lastCheckin == null || lastCheckin.Value < cutoff)
+            {
+                if (writeAudit)
+                {
+                    dbContext.AuditEvents.Add(new AuditEventEntity
+                    {
+                        TenantId = tenantId,
+                        FileId = fileId,
+                        UserId = userId,
+                        EventType = "access_denied",
+                        ReasonCode = "device_trust_expired",
+                        CreatedAtUtc = decisionTime
+                    });
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    await notificationService.NotifyAsync(
+                        tenantId,
+                        new AdminNotificationEvent(
+                            "access_denied",
+                            fileId,
+                            userId,
+                            null,
+                            decisionTime,
+                            ReasonCode: "device_trust_expired"),
+                        cancellationToken);
+                }
+
+                return new ServerPolicyDecision(
+                    false,
+                    Permission.None,
+                    "device_trust_expired",
+                    null,
+                    null,
+                    FileFound: true,
+                    InvalidPermission: false);
             }
         }
 
@@ -347,5 +503,125 @@ public sealed class PolicyDecisionService(AppDbContext dbContext, IAdminNotifica
             InvalidPermission: false,
             MaxOpens: file.MaxOpens,
             OpensRemaining: decision.OpensRemaining);
+    }
+
+    private async Task WriteAccessDeniedAuditAsync(
+        Guid tenantId,
+        Guid fileId,
+        Guid userId,
+        DateTimeOffset decisionTime,
+        string reasonCode,
+        bool writeAudit,
+        CancellationToken cancellationToken)
+    {
+        if (!writeAudit)
+        {
+            return;
+        }
+
+        dbContext.AuditEvents.Add(new AuditEventEntity
+        {
+            TenantId = tenantId,
+            FileId = fileId,
+            UserId = userId,
+            EventType = "access_denied",
+            ReasonCode = reasonCode,
+            CreatedAtUtc = decisionTime
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await notificationService.NotifyAsync(
+            tenantId,
+            new AdminNotificationEvent(
+                "access_denied",
+                fileId,
+                userId,
+                null,
+                decisionTime,
+                ReasonCode: reasonCode),
+            cancellationToken);
+    }
+
+    private static HashSet<string> ParseAllowedAdDomains(string? allowedAdDomainsCsv)
+    {
+        return allowedAdDomainsCsv?
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormalizeAdDomain)
+            .Where(domain => domain.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+    }
+
+    private static string NormalizeAdDomain(string? domain)
+    {
+        return domain?.Trim().ToUpperInvariant() ?? string.Empty;
+    }
+
+    private static bool IsWindowsUserDomainAllowed(
+        string windowsUser,
+        string deviceDomain,
+        HashSet<string> allowedDomains)
+    {
+        var userDomain = ExtractWindowsUserDomain(windowsUser);
+        if (string.IsNullOrWhiteSpace(userDomain))
+        {
+            return false;
+        }
+
+        return allowedDomains.Count > 0
+            ? allowedDomains.Contains(userDomain)
+            : false;
+    }
+
+    private static string ExtractWindowsUserDomain(string windowsUser)
+    {
+        var normalized = NormalizeAdDomain(windowsUser);
+        var separatorIndex = normalized.IndexOf('\\', StringComparison.Ordinal);
+        if (separatorIndex <= 0)
+        {
+            return string.Empty;
+        }
+
+        return normalized[..separatorIndex];
+    }
+
+    private static bool IsWindowsUserMappedToTenantUser(string windowsUser, TenantUserEntity? tenantUser)
+    {
+        if (tenantUser is null || !tenantUser.Active)
+        {
+            return false;
+        }
+
+        var account = ExtractWindowsUserAccount(windowsUser);
+        if (string.IsNullOrWhiteSpace(account))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(tenantUser.ExternalId))
+        {
+            var externalId = tenantUser.ExternalId.Trim();
+            if (string.Equals(externalId, windowsUser.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(externalId, account, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        var email = tenantUser.Email.Trim();
+        var at = email.IndexOf('@', StringComparison.Ordinal);
+        if (at <= 0)
+        {
+            return false;
+        }
+
+        return string.Equals(email[..at], account, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractWindowsUserAccount(string windowsUser)
+    {
+        var trimmed = windowsUser.Trim();
+        var separatorIndex = trimmed.IndexOf('\\', StringComparison.Ordinal);
+        return separatorIndex >= 0 && separatorIndex < trimmed.Length - 1
+            ? trimmed[(separatorIndex + 1)..].Trim()
+            : trimmed;
     }
 }

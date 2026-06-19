@@ -155,6 +155,20 @@ public sealed class ManagementConsoleTests : IDisposable
         js.Should().Contain("revoked");
     }
 
+    [Fact]
+    public async Task AdminConsole_includes_ad_device_trust_controls()
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/admin/");
+        var html = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        html.Should().Contain("deviceTrustRequireDomainJoined");
+        html.Should().Contain("deviceTrustAllowedDomains");
+        html.Should().Contain("Require on-prem AD domain join");
+    }
+
     public void Dispose()
     {
         factory.Dispose();

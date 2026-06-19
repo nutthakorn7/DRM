@@ -83,7 +83,7 @@
       <button type="submit" id="sendButton" class="primary big">Send protected file</button>
     </form>
 
-    <section id="result" class="result" hidden>
+    <section id="result" class="result" role="status" aria-live="polite" hidden>
       <h2>✅ Sent</h2>
       <p>Copy this link and send it to the recipient. They will need to verify their email before opening.</p>
       <div class="share-url-row">
@@ -97,7 +97,7 @@
       </p>
     </section>
 
-    <p id="errorBox" class="error-box" hidden></p>
+    <p id="errorBox" class="error-box" role="alert" hidden></p>
 
     <!-- Stage 18: My Shares — the caller's recent share-link history.
          Hidden until the session is configured (tenantId + userId).

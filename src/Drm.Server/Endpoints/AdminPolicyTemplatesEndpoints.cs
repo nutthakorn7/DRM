@@ -16,6 +16,7 @@ public static class AdminPolicyTemplatesEndpoints
         group.MapPost("/", CreatePolicyTemplateAsync);
         group.MapGet("/", ListPolicyTemplatesAsync);
         group.MapGet("/{templateId:guid}", GetPolicyTemplateAsync);
+        group.MapPut("/{templateId:guid}", UpdatePolicyTemplateAsync);
 
         return endpoints;
     }
@@ -68,6 +69,43 @@ public static class AdminPolicyTemplatesEndpoints
         return Results.Created(
             $"/api/admin/policy-templates/{template.TemplateId}?tenantId={template.TenantId}",
             PolicyTemplateResponse.From(template));
+    }
+
+    private static async Task<IResult> UpdatePolicyTemplateAsync(
+        Guid templateId,
+        UpdatePolicyTemplateRequest request,
+        HttpContext httpContext,
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        if (!AdminIdentityContext.TryRequirePermissionForTenant(httpContext, AdminPermissions.PoliciesWrite, request.TenantId, out var fail))
+            return fail!;
+        if (!httpContext.MatchesHeader(request.TenantId))
+            return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
+
+        var validationError = ValidateUpdateRequest(request);
+        if (validationError is not null) return Results.BadRequest(validationError);
+        if (!PermissionParser.TryParse(request.Permissions, out var permissions))
+            return Results.BadRequest(new ErrorResponse("invalid_permissions"));
+
+        var template = await dbContext.PolicyTemplates
+            .SingleOrDefaultAsync(
+                candidate => candidate.TenantId == request.TenantId && candidate.TemplateId == templateId,
+                cancellationToken);
+
+        if (template is null) return Results.NotFound();
+
+        template.Name = request.Name;
+        template.Permissions = permissions.ToString();
+        template.WatermarkTemplate = request.WatermarkTemplate;
+        template.OfflineLeaseMinutes = request.OfflineLeaseMinutes;
+        template.AllowPrint = request.AllowPrint;
+        template.MaxOpens = request.MaxOpens is > 0 ? request.MaxOpens : null;
+
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, null, "policy_template_updated", httpContext));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(PolicyTemplateResponse.From(template));
     }
 
     private static async Task<IResult> ListPolicyTemplatesAsync(
@@ -146,9 +184,44 @@ public static class AdminPolicyTemplatesEndpoints
         return null;
     }
 
+    private static ErrorResponse? ValidateUpdateRequest(UpdatePolicyTemplateRequest request)
+    {
+        if (request.TenantId == Guid.Empty)
+        {
+            return new ErrorResponse("invalid_tenant_id");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > MaxNameLength)
+        {
+            return new ErrorResponse("invalid_name");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.WatermarkTemplate)
+            || request.WatermarkTemplate.Length > MaxWatermarkTemplateLength)
+        {
+            return new ErrorResponse("invalid_watermark_template");
+        }
+
+        if (request.OfflineLeaseMinutes < 0 || request.OfflineLeaseMinutes > MaxOfflineLeaseMinutes)
+        {
+            return new ErrorResponse("invalid_offline_lease_minutes");
+        }
+
+        return null;
+    }
+
     private sealed record CreatePolicyTemplateRequest(
         Guid TenantId,
         Guid TemplateId,
+        string Name,
+        string Permissions,
+        string WatermarkTemplate,
+        int OfflineLeaseMinutes,
+        bool AllowPrint,
+        int? MaxOpens = null);
+
+    private sealed record UpdatePolicyTemplateRequest(
+        Guid TenantId,
         string Name,
         string Permissions,
         string WatermarkTemplate,
