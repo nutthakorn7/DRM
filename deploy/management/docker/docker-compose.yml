@@ -38,6 +38,10 @@ services:
       Drm__Security__AdminApiKey: ${DRM_ADMIN_API_KEY}
       Drm__Security__ClientApiKey: ${DRM_CLIENT_API_KEY}
       Drm__Security__TransparentTrailerSecret: ${DRM_TRAILER_SECRET}
+      # HMAC key for the tamper-evident audit chain. Empty = chain still verifies but is
+      # forgeable; set a secret hex key for real tamper-evidence. Keep stable (changing it
+      # forces a chain rebuild). Default empty so dev/local works without it.
+      Drm__Security__AuditChainKey: ${DRM_AUDIT_CHAIN_KEY:-}
       Drm__License__EnabledTiers: ${DRM_LICENSE_TIERS:-All}
       Drm__License__PaidEncrypterCount: ${DRM_PAID_ENCRYPTERS:-10}
       # Stage 12 — outbound SMTP for /share/ recipient verification.
