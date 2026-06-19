@@ -56,7 +56,10 @@ export function parseDrmxContainer(arrayBuffer) {
 // (→ UTC ms); the fractional seconds are extracted literally so no precision is
 // lost the way Date's millisecond resolution would.
 export function dotnetTicks(isoTimestamp) {
-  const ms = Date.parse(isoTimestamp);
+  // Strip fractional seconds before parsing so sub-millisecond digits can never round the
+  // whole-second value (e.g. ...:00.9999999Z); the fraction is re-applied at full 100ns precision below.
+  const whole = isoTimestamp.replace(/\.\d+/, "");
+  const ms = Date.parse(whole);
   if (Number.isNaN(ms)) throw new Error("Unparseable header timestamp: " + isoTimestamp);
   const unixSeconds = BigInt(Math.floor(ms / 1000));
   const fractionMatch = /T\d{2}:\d{2}:\d{2}\.(\d+)/.exec(isoTimestamp);

@@ -2,6 +2,7 @@
   let verificationSessionToken = "";
   let previewSessionToken = "";
   let previewWired = false;
+  let previewObjectUrl = null;
 
   const startForm = document.getElementById("verificationStartForm");
   const confirmForm = document.getElementById("verificationConfirmForm");
@@ -220,7 +221,9 @@
 
     const blob = new Blob([result.bytes], { type: "application/pdf" });
     document.getElementById("inbrowserWatermark").textContent = payload.watermarkTemplate || "zcrDRM";
-    document.getElementById("previewIframe").src = URL.createObjectURL(blob);
+    if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl); // release the prior preview blob
+    previewObjectUrl = URL.createObjectURL(blob);
+    document.getElementById("previewIframe").src = previewObjectUrl;
     document.getElementById("inbrowserFrame").hidden = false;
     setPreviewStatus("Decrypted in your browser and rendered below.", "ok");
   }
