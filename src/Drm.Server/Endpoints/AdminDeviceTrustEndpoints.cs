@@ -43,6 +43,10 @@ public static class AdminDeviceTrustEndpoints
         if (request.RequiredCheckinDays < 1 || request.RequiredCheckinDays > 365)
             return Results.BadRequest(new { reasonCode = "invalid_checkin_days" });
 
+        var allowedDomains = NormalizeDomains(request.AllowedAdDomains);
+        if (request.RequireDomainJoined && allowedDomains.Count == 0)
+            return Results.BadRequest(new { reasonCode = "allowed_ad_domains_required" });
+
         var config = await dbContext.TenantDeviceTrustConfigs
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
         if (config is null)
@@ -53,23 +57,48 @@ public static class AdminDeviceTrustEndpoints
 
         config.Enabled = request.Enabled;
         config.RequiredCheckinDays = request.RequiredCheckinDays;
+        config.RequireDomainJoined = request.RequireDomainJoined;
+        config.AllowedAdDomainsCsv = string.Join(',', allowedDomains);
         config.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
         await dbContext.SaveChangesAsync(ct);
         return Results.Ok(DeviceTrustResponse.From(config, tenantId));
     }
 
-    private sealed record UpsertDeviceTrustRequest(bool Enabled, int RequiredCheckinDays);
+    private static IReadOnlyList<string> NormalizeDomains(IReadOnlyList<string>? domains)
+        => (domains ?? [])
+            .Select(domain => domain.Trim().ToUpperInvariant())
+            .Where(domain => domain.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+    private static IReadOnlyList<string> ParseDomains(string domainsCsv)
+        => NormalizeDomains(domainsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries));
+
+    private sealed record UpsertDeviceTrustRequest(
+        bool Enabled,
+        int RequiredCheckinDays,
+        bool RequireDomainJoined,
+        IReadOnlyList<string>? AllowedAdDomains);
 
     private sealed record DeviceTrustResponse(
         Guid TenantId,
         bool Enabled,
         int RequiredCheckinDays,
+        bool RequireDomainJoined,
+        IReadOnlyList<string> AllowedAdDomains,
         DateTimeOffset? UpdatedAtUtc)
     {
         public static DeviceTrustResponse From(TenantDeviceTrustConfigEntity? c, Guid tenantId)
             => c is null
-                ? new(tenantId, false, 7, null)
-                : new(tenantId, c.Enabled, c.RequiredCheckinDays, c.UpdatedAtUtc);
+                ? new(tenantId, false, 7, false, [], null)
+                : new(
+                    tenantId,
+                    c.Enabled,
+                    c.RequiredCheckinDays,
+                    c.RequireDomainJoined,
+                    ParseDomains(c.AllowedAdDomainsCsv),
+                    c.UpdatedAtUtc);
     }
 }

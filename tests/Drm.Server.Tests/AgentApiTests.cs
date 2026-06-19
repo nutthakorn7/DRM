@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Drm.Domain;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -214,6 +215,190 @@ public sealed class AgentApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Registration_with_posture_for_unprovisioned_device_requires_device_signature()
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync("/api/agent/devices/register", new
+        {
+            tenantId = Guid.NewGuid(),
+            userId = Guid.NewGuid(),
+            deviceId = Guid.NewGuid(),
+            hostname = "WIN-001",
+            operatingSystem = "Windows 11",
+            agentVersion = "0.1.0",
+            domainJoined = true,
+            domainName = "CORP",
+            windowsUser = "CORP\\alice"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_signature_required" });
+    }
+
+    [Fact]
+    public async Task Heartbeat_with_posture_requires_matching_device_signature()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedProvisionedDeviceAsync(tenantId, userId, deviceId, deviceSecret);
+
+        using var unsigned = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.1.1",
+            domainJoined = true,
+            domainName = "CORP",
+            windowsUser = "CORP\\alice"
+        });
+
+        unsigned.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var unsignedError = await unsigned.Content.ReadFromJsonAsync<ErrorResponse>();
+        unsignedError.Should().BeEquivalentTo(new { ReasonCode = "device_signature_required" });
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.HeartbeatPayload(
+                tenantId,
+                userId,
+                deviceId,
+                "online",
+                "0.1.1",
+                true,
+                "CORP",
+                "CORP\\alice"));
+
+        using var signed = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.1.1",
+            domainJoined = true,
+            domainName = "CORP",
+            windowsUser = "CORP\\alice",
+            deviceSignature = signature
+        });
+
+        signed.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var device = await dbContext.AgentDevices.AsNoTracking().SingleAsync();
+        device.DomainJoined.Should().BeTrue();
+        device.DomainName.Should().Be("CORP");
+        device.WindowsUser.Should().Be("CORP\\alice");
+    }
+
+    [Fact]
+    public async Task Provisioned_device_rejects_replayed_signed_heartbeat()
+    {
+        // PR #50 hardening: a captured, valid signed heartbeat must not be
+        // replayable within the clock-skew window.
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedProvisionedDeviceAsync(tenantId, userId, deviceId, deviceSecret);
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.HeartbeatPayload(
+                tenantId, userId, deviceId, "online", "0.1.1", true, "CORP", "CORP\\alice"));
+
+        object Body() => new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.1.1",
+            domainJoined = true,
+            domainName = "CORP",
+            windowsUser = "CORP\\alice",
+            deviceSignature = signature
+        };
+
+        using var first = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", Body());
+        first.StatusCode.Should().Be(HttpStatusCode.OK, "the first signed heartbeat is fresh");
+
+        using var second = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", Body());
+        second.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await second.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_signature_replayed" });
+    }
+
+    [Fact]
+    public async Task Provisioned_device_rejects_unsigned_heartbeat_even_without_posture()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedProvisionedDeviceAsync(tenantId, userId, deviceId, deviceSecret);
+
+        using var response = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "0.1.1"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_signature_required" });
+    }
+
+    [Fact]
+    public async Task Provisioned_device_rejects_signed_heartbeat_for_different_user()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var provisionedUserId = Guid.NewGuid();
+        var requestUserId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedProvisionedDeviceAsync(tenantId, provisionedUserId, deviceId, deviceSecret);
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.HeartbeatPayload(
+                tenantId,
+                requestUserId,
+                deviceId,
+                "online",
+                "0.1.1",
+                null,
+                null,
+                null));
+
+        using var response = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", new
+        {
+            tenantId,
+            userId = requestUserId,
+            status = "online",
+            agentVersion = "0.1.1",
+            deviceSignature = signature
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        error.Should().BeEquivalentTo(new { ReasonCode = "device_user_mismatch" });
+    }
+
+    [Fact]
     public async Task Agent_can_upload_audit_event()
     {
         using var client = factory.CreateClient();
@@ -264,6 +449,37 @@ public sealed class AgentApiTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Admin_can_provision_device_secret_once_for_msi_deployment()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+
+        using var response = await client.PostAsJsonAsync("/api/admin/devices/provision", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            hostname = "WIN-001",
+            operatingSystem = "Windows 11",
+            agentVersion = "1.0.0"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ProvisionDeviceResponse>();
+        body!.DeviceId.Should().Be(deviceId);
+        body.DeviceSecret.Should().NotBeNullOrWhiteSpace();
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var device = await dbContext.AgentDevices.AsNoTracking().SingleAsync();
+        device.DeviceSigningKeyHashBase64.Should()
+            .Be(DeviceRequestSigning.DeriveSigningKeyHashBase64(body.DeviceSecret));
+        device.Status.Should().Be("provisioned");
+    }
+
     public void Dispose()
     {
         factory.Dispose();
@@ -300,6 +516,31 @@ public sealed class AgentApiTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    private async Task SeedProvisionedDeviceAsync(
+        Guid tenantId,
+        Guid userId,
+        Guid deviceId,
+        string deviceSecret)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        dbContext.AgentDevices.Add(new AgentDeviceEntity
+        {
+            TenantId = tenantId,
+            UserId = userId,
+            DeviceId = deviceId,
+            Hostname = "WIN-001",
+            OperatingSystem = "Windows 11",
+            AgentVersion = "0.1.0",
+            Status = "provisioned",
+            RegisteredAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+            DeviceSigningKeyHashBase64 = DeviceRequestSigning.DeriveSigningKeyHashBase64(deviceSecret),
+            DeviceSigningKeyUpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+    }
+
     private static void DeleteDatabaseFiles(string path)
     {
         foreach (var candidate in new[] { path, $"{path}-wal", $"{path}-shm" })
@@ -325,4 +566,11 @@ public sealed class AgentApiTests : IDisposable
     private sealed record HeartbeatResponse(Guid DeviceId, string Status, DateTimeOffset LastHeartbeatAtUtc);
 
     private sealed record ErrorResponse(string ReasonCode);
+
+    private sealed record ProvisionDeviceResponse(
+        Guid TenantId,
+        Guid UserId,
+        Guid DeviceId,
+        string DeviceSecret,
+        DateTimeOffset ProvisionedAtUtc);
 }

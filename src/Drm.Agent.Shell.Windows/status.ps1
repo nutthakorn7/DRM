@@ -35,7 +35,7 @@ Write-Host "============================"
 $submenu = Test-RegValue -Path "HKCU:\Software\Classes\*\shell\DrmProtect" -Name "MUIVerb"
 Report-Row "Top-level 'DRM' submenu" ($submenu ?? "MISSING") ($null -ne $submenu)
 
-foreach ($verb in "Drm.QuickSend", "Drm.Protect", "Drm.TransparentProtect") {
+foreach ($verb in "Drm.QuickSend") {
     $cmdKey = "HKCU:\Software\Classes\CommandStore\shell\$verb\command"
     $cmd = Test-RegValue -Path $cmdKey
     Report-Row "Verb $verb" ($cmd ?? "MISSING") ($null -ne $cmd)

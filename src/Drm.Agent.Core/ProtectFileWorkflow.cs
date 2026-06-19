@@ -23,6 +23,25 @@ public sealed class ProtectFileWorkflow(
             [".zip"] = "application/zip",
             [".dwg"] = "image/vnd.dwg",
             [".dxf"] = "image/vnd.dxf",
+            [".dwt"] = "image/vnd.dwg",
+            [".dws"] = "image/vnd.dwg",
+            [".step"] = "model/step",
+            [".stp"] = "model/step",
+            [".iges"] = "model/iges",
+            [".igs"] = "model/iges",
+            [".sldprt"] = "application/x-sldprt",
+            [".sldasm"] = "application/x-sldasm",
+            [".slddrw"] = "application/x-slddrw",
+            [".x_t"] = "model/vnd.parasolid.transmit.text",
+            [".x_b"] = "model/vnd.parasolid.transmit.binary",
+            [".prt"] = "application/x-cad-part",
+            [".asm"] = "application/x-cad-assembly",
+            [".catpart"] = "application/x-catia-part",
+            [".catproduct"] = "application/x-catia-product",
+            [".jt"] = "model/vnd.jt",
+            [".ifc"] = "application/x-ifc",
+            [".sat"] = "model/sat",
+            [".stl"] = "model/stl",
             [".txt"] = "text/plain",
             [".csv"] = "text/csv"
         };
@@ -70,7 +89,8 @@ public sealed class ProtectFileWorkflow(
                     fileExpiry,
                     policyOptions.Permissions,
                     policyOptions.PolicyTemplateId,
-                    policyOptions.Recipients),
+                    policyOptions.Recipients,
+                    Path.GetFileName(sourcePath)),
                 cancellationToken);
 
             await serverClient.WrapFileKeyAsync(

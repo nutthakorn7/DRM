@@ -14,6 +14,8 @@ public sealed class AgentServiceOptions
 
     public string? ClientApiKey { get; set; }
 
+    public string? DeviceSecret { get; set; }
+
     public string AuditQueuePath { get; set; } = "%ProgramData%\\DRM\\agent-audit.jsonl";
 
     public string InventoryPath { get; set; } = "%ProgramData%\\DRM\\protected-inventory.json";
@@ -30,7 +32,41 @@ public sealed class AgentServiceOptions
 
     public TimeSpan HeartbeatInterval => TimeSpan.FromSeconds(Math.Max(5, HeartbeatIntervalSeconds));
 
-    public AgentIdentity ToIdentity() => new(TenantId, UserId, DeviceId);
+    public AgentIdentity ToIdentity() => new(TenantId, UserId, DeviceId, DeviceSecret);
+
+    public void ApplyDesktopDefaults(DesktopAgentConfiguration desktopConfiguration)
+    {
+        if (desktopConfiguration.ServerUrl is not null &&
+            (string.IsNullOrWhiteSpace(ServerUrl) || string.Equals(ServerUrl, "http://localhost:5188", StringComparison.OrdinalIgnoreCase)))
+        {
+            ServerUrl = desktopConfiguration.ServerUrl.ToString();
+        }
+
+        if (TenantId == Guid.Empty && desktopConfiguration.TenantId is { } tenantId)
+        {
+            TenantId = tenantId;
+        }
+
+        if (UserId == Guid.Empty && desktopConfiguration.UserId is { } userId)
+        {
+            UserId = userId;
+        }
+
+        if (DeviceId == Guid.Empty && desktopConfiguration.DeviceId is { } deviceId)
+        {
+            DeviceId = deviceId;
+        }
+
+        if (string.IsNullOrWhiteSpace(ClientApiKey) && !string.IsNullOrWhiteSpace(desktopConfiguration.ClientApiKey))
+        {
+            ClientApiKey = desktopConfiguration.ClientApiKey;
+        }
+
+        if (string.IsNullOrWhiteSpace(DeviceSecret) && !string.IsNullOrWhiteSpace(desktopConfiguration.DeviceSecret))
+        {
+            DeviceSecret = desktopConfiguration.DeviceSecret;
+        }
+    }
 
     public string ResolveAuditQueuePath()
         => ResolveConfiguredPath(AuditQueuePath);

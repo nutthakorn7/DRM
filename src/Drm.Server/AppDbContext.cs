@@ -270,6 +270,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(device => device.OperatingSystem).HasMaxLength(256);
             entity.Property(device => device.AgentVersion).HasMaxLength(64);
             entity.Property(device => device.Status).HasMaxLength(64);
+            entity.Property(device => device.DomainName).HasMaxLength(256);
+            entity.Property(device => device.WindowsUser).HasMaxLength(256);
+            entity.Property(device => device.DeviceSigningKeyHashBase64).HasMaxLength(128);
             entity.Property(device => device.DisabledReason).HasMaxLength(128);
         });
 
@@ -500,6 +503,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<TenantDeviceTrustConfigEntity>(entity =>
         {
             entity.HasKey(c => c.TenantId);
+            entity.Property(c => c.AllowedAdDomainsCsv).HasMaxLength(1024);
         });
     }
 }

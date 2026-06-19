@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Drm.Domain;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -66,8 +67,8 @@ public sealed class V19FeatureTests : IDisposable
         {
             TenantId = tenantId,
             UserId = userId,
-            Email = $"user@v19.example",
-            DisplayName = "V19 User",
+            Email = $"alice@corp.example",
+            DisplayName = "Alice",
             Active = true,
             CreatedAtUtc = DateTimeOffset.UtcNow
         });
@@ -129,8 +130,15 @@ public sealed class V19FeatureTests : IDisposable
         return fileId;
     }
 
-    private async Task SeedDeviceAsync(Guid tenantId, Guid deviceId, Guid userId,
-        DateTimeOffset? lastHeartbeat = null)
+    private async Task SeedDeviceAsync(
+        Guid tenantId,
+        Guid deviceId,
+        Guid userId,
+        DateTimeOffset? lastHeartbeat = null,
+        bool domainJoined = false,
+        string domainName = "",
+        string windowsUser = "",
+        string? deviceSecret = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -145,7 +153,16 @@ public sealed class V19FeatureTests : IDisposable
             Status = "active",
             RegisteredAtUtc = DateTimeOffset.UtcNow.AddDays(-30),
             UpdatedAtUtc = DateTimeOffset.UtcNow,
-            LastHeartbeatAtUtc = lastHeartbeat
+            LastHeartbeatAtUtc = lastHeartbeat,
+            DomainJoined = domainJoined,
+            DomainName = domainName,
+            WindowsUser = windowsUser,
+            DeviceSigningKeyHashBase64 = string.IsNullOrWhiteSpace(deviceSecret)
+                ? string.Empty
+                : DeviceRequestSigning.DeriveSigningKeyHashBase64(deviceSecret),
+            DeviceSigningKeyUpdatedAtUtc = string.IsNullOrWhiteSpace(deviceSecret)
+                ? null
+                : DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
     }
@@ -255,6 +272,38 @@ public sealed class V19FeatureTests : IDisposable
         body.Should().Contain("ip_not_allowed");
     }
 
+    [Fact]
+    public async Task IpAllowlist_denies_policy_decide_when_client_ip_not_in_list()
+    {
+        // PR #50 hardening: /api/policy/decide must honour the IP allowlist too,
+        // so policy/permission/lease state can't be queried from a
+        // non-allowlisted IP. Surfaced as a denied decision (allowed=false).
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        using var adminClient = AdminClient();
+        adminClient.DefaultRequestHeaders.Add("X-DRM-Tenant-Id", tenantId.ToString());
+        await adminClient.PostAsJsonAsync(
+            $"/api/admin/tenants/{tenantId}/ip-allowlist",
+            new { cidr = "203.0.113.0/24", label = "Remote office" }); // not loopback
+
+        using var client = factory.CreateClient();
+        using var res = await client.PostAsJsonAsync("/api/policy/decide", new
+        {
+            tenantId,
+            fileId,
+            userId,
+            deviceId = Guid.Empty,
+            requestedPermission = "View"
+        });
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await res.Content.ReadFromJsonAsync<PolicyDecisionRow>();
+        body!.Allowed.Should().BeFalse();
+        body.ReasonCode.Should().Be("ip_not_allowed");
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // 2. Device trust enforcement
     // ─────────────────────────────────────────────────────────────────────
@@ -274,6 +323,574 @@ public sealed class V19FeatureTests : IDisposable
         var body = await res.Content.ReadFromJsonAsync<DeviceTrustRow>();
         body!.Enabled.Should().BeTrue();
         body.RequiredCheckinDays.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task PutDeviceTrust_accepts_ad_domain_requirements()
+    {
+        var (tenantId, _) = await SeedTenantUserAsync();
+        using var client = AdminClient();
+        client.DefaultRequestHeaders.Add("X-DRM-Tenant-Id", tenantId.ToString());
+
+        var res = await client.PutAsJsonAsync(
+            $"/api/admin/tenants/{tenantId}/device-trust",
+            new
+            {
+                enabled = true,
+                requiredCheckinDays = 3,
+                requireDomainJoined = true,
+                allowedAdDomains = new[] { "CORP", "ENGINEERING" }
+            });
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await res.Content.ReadFromJsonAsync<DeviceTrustRow>();
+        body!.Enabled.Should().BeTrue();
+        body.RequireDomainJoined.Should().BeTrue();
+        body.AllowedAdDomains.Should().BeEquivalentTo("CORP", "ENGINEERING");
+    }
+
+    [Fact]
+    public async Task PutDeviceTrust_rejects_domain_join_requirement_without_allowed_domains()
+    {
+        var (tenantId, _) = await SeedTenantUserAsync();
+        using var client = AdminClient();
+        client.DefaultRequestHeaders.Add("X-DRM-Tenant-Id", tenantId.ToString());
+
+        var res = await client.PutAsJsonAsync(
+            $"/api/admin/tenants/{tenantId}/device-trust",
+            new
+            {
+                enabled = true,
+                requiredCheckinDays = 3,
+                requireDomainJoined = true,
+                allowedAdDomains = Array.Empty<string>()
+            });
+
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await res.Content.ReadAsStringAsync();
+        body.Should().Contain("allowed_ad_domains_required");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_access_when_device_is_not_domain_joined()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: false,
+            domainName: "",
+            windowsUser: "WORKGROUP\\alice");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeFalse();
+        result.ReasonCode.Should().Be("device_not_domain_joined");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_policy_decision_when_device_id_is_empty()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        using var client = factory.CreateClient();
+        using var response = await client.PostAsJsonAsync("/api/policy/decide", new
+        {
+            tenantId,
+            fileId,
+            userId,
+            deviceId = Guid.Empty,
+            requestedPermission = "View"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<PolicyDecisionRow>();
+        body!.Allowed.Should().BeFalse();
+        body.ReasonCode.Should().Be("device_trust_required");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_unwrap_when_device_id_is_empty()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        using var client = factory.CreateClient();
+        using var response = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId,
+            deviceId = Guid.Empty,
+            requestedPermission = "View"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("device_trust_required");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_requires_signed_unwrap_for_provisioned_device()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "CORP\\alice",
+            deviceSecret: deviceSecret);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+            {
+                TenantId = tenantId,
+                Enabled = true,
+                RequiredCheckinDays = 7,
+                RequireDomainJoined = true,
+                AllowedAdDomainsCsv = "CORP",
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var client = factory.CreateClient();
+        using var unsigned = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            requestedPermission = "View"
+        });
+
+        unsigned.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var unsignedBody = await unsigned.Content.ReadAsStringAsync();
+        unsignedBody.Should().Contain("device_signature_required");
+
+        var wrongSignature = DeviceRequestSigning.Sign(
+            "wrong-secret",
+            DeviceRequestSigning.UnwrapPayload(
+                tenantId,
+                fileId,
+                userId,
+                deviceId,
+                "View"));
+
+        using var forged = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            requestedPermission = "View",
+            deviceSignature = wrongSignature
+        });
+
+        forged.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var forgedBody = await forged.Content.ReadAsStringAsync();
+        forgedBody.Should().Contain("device_signature_invalid");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_access_when_domain_is_not_allowed()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "VENDOR",
+            windowsUser: "VENDOR\\alice");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeFalse();
+        result.ReasonCode.Should().Be("ad_domain_not_allowed");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_access_when_windows_user_domain_is_not_allowed()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "WORKSTATION\\alice");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeFalse();
+        result.ReasonCode.Should().Be("ad_user_not_allowed");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_access_when_windows_user_does_not_match_requested_user()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "CORP\\bob");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeFalse();
+        result.ReasonCode.Should().Be("ad_user_mismatch");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_unwrap_when_signed_device_user_differs_from_request_user()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var otherUserId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            otherUserId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "CORP\\alice",
+            deviceSecret: deviceSecret);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+            {
+                TenantId = tenantId,
+                Enabled = true,
+                RequiredCheckinDays = 7,
+                RequireDomainJoined = true,
+                AllowedAdDomainsCsv = "CORP",
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.UnwrapPayload(
+                tenantId,
+                fileId,
+                userId,
+                deviceId,
+                "View"));
+
+        using var client = factory.CreateClient();
+        using var response = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            requestedPermission = "View",
+            deviceSignature = signature
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("device_user_mismatch");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_rejects_replayed_signed_unwrap()
+    {
+        // PR #50 hardening: a captured, valid signed unwrap must not be usable
+        // a second time. The first request passes the signature + replay gate;
+        // the identical second request is rejected as a replay.
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+        var deviceSecret = DeviceRequestSigning.GenerateDeviceSecret();
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            deviceSecret: deviceSecret);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+            {
+                TenantId = tenantId,
+                Enabled = true,
+                RequiredCheckinDays = 7,
+                RequireDomainJoined = false,
+                AllowedAdDomainsCsv = "",
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var signature = DeviceRequestSigning.Sign(
+            deviceSecret,
+            DeviceRequestSigning.UnwrapPayload(tenantId, fileId, userId, deviceId, "View"));
+
+        object UnwrapBody() => new
+        {
+            tenantId,
+            userId,
+            deviceId,
+            requestedPermission = "View",
+            deviceSignature = signature
+        };
+
+        using var client = factory.CreateClient();
+
+        // First presentation: the signature is fresh, so it passes the device
+        // signature + replay gate. (It then fails to decrypt the placeholder
+        // wrapped key the seed installs — a fixture artifact, the same reason
+        // the other real-unwrap tests only assert deny paths — so we only
+        // assert here that it is NOT rejected as a replay.)
+        using var first = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", UnwrapBody());
+        var firstBody = await first.Content.ReadAsStringAsync();
+        firstBody.Should().NotContain("device_signature_replayed",
+            "the first presentation of a fresh signature must pass the replay gate");
+
+        // Second presentation of the byte-identical signed request: replay.
+        using var second = await client.PostAsJsonAsync($"/api/files/{fileId}/keys/unwrap", UnwrapBody());
+        second.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var secondBody = await second.Content.ReadAsStringAsync();
+        secondBody.Should().Contain("device_signature_replayed",
+            "a captured signed unwrap must not be replayable within the clock-skew window");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_denies_access_when_domain_join_required_without_allowed_domains()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "CORP\\alice");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeFalse();
+        result.ReasonCode.Should().Be("allowed_ad_domains_required");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_legacy_heartbeat_without_posture_clears_domain_trust()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "CORP\\alice");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+            {
+                TenantId = tenantId,
+                Enabled = true,
+                RequiredCheckinDays = 7,
+                RequireDomainJoined = true,
+                AllowedAdDomainsCsv = "CORP",
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var client = factory.CreateClient();
+        using var heartbeat = await client.PostAsJsonAsync($"/api/agent/devices/{deviceId}/heartbeat", new
+        {
+            tenantId,
+            userId,
+            status = "online",
+            agentVersion = "legacy"
+        });
+        heartbeat.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeFalse();
+        result.ReasonCode.Should().Be("device_not_domain_joined");
+    }
+
+    [Fact]
+    public async Task DeviceTrust_allows_access_when_domain_joined_and_domain_allowed()
+    {
+        var (tenantId, userId) = await SeedTenantUserAsync();
+        var deviceId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var fileId = await SeedFileWithGrantAsync(tenantId, ownerId, userId);
+
+        await SeedDeviceAsync(
+            tenantId,
+            deviceId,
+            userId,
+            lastHeartbeat: DateTimeOffset.UtcNow,
+            domainJoined: true,
+            domainName: "CORP",
+            windowsUser: "CORP\\alice");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.TenantDeviceTrustConfigs.Add(new TenantDeviceTrustConfigEntity
+        {
+            TenantId = tenantId,
+            Enabled = true,
+            RequiredCheckinDays = 7,
+            RequireDomainJoined = true,
+            AllowedAdDomainsCsv = "CORP,ENGINEERING",
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var result = await SimulateAsync(tenantId, fileId, userId, deviceId);
+        result!.Allowed.Should().BeTrue();
     }
 
     [Fact]
@@ -427,7 +1044,12 @@ public sealed class V19FeatureTests : IDisposable
         Guid RuleId, Guid TenantId, string Cidr, string Label, DateTimeOffset CreatedAtUtc);
 
     private sealed record DeviceTrustRow(
-        Guid TenantId, bool Enabled, int RequiredCheckinDays, DateTimeOffset? UpdatedAtUtc);
+        Guid TenantId,
+        bool Enabled,
+        int RequiredCheckinDays,
+        bool RequireDomainJoined,
+        IReadOnlyList<string> AllowedAdDomains,
+        DateTimeOffset? UpdatedAtUtc);
 
     private sealed record GrantRow(
         Guid TenantId, Guid FileId, string SubjectType, Guid SubjectId,
@@ -436,4 +1058,11 @@ public sealed class V19FeatureTests : IDisposable
     private sealed record SimulatorResult(
         Guid TenantId, Guid FileId, Guid UserId, bool Allowed,
         string ReasonCode, bool Simulated);
+
+    private sealed record PolicyDecisionRow(
+        bool Allowed,
+        string AllowedPermissions,
+        string ReasonCode,
+        string? WatermarkTemplate,
+        DateTimeOffset? OfflineLeaseExpiresAtUtc);
 }

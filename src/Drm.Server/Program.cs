@@ -30,6 +30,9 @@ builder.Services
 builder.Services.AddScoped<ISiemDispatcher, SiemDispatcher>();
 builder.Services.AddScoped<PolicyDecisionService>();
 builder.Services.AddScoped<BruteForceProtectionService>();
+// PR #50 hardening: replay protection for signed device requests. Singleton
+// because it holds the in-memory nonce ledger across requests.
+builder.Services.AddSingleton<IDeviceReplayGuard, InMemoryDeviceReplayGuard>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
 builder.Services.AddHttpClient("EntraGraph");
 builder.Services.AddScoped<IDirectorySyncService, EntraIdDirectorySyncService>();
@@ -773,6 +776,60 @@ using (var scope = app.Services.CreateScope())
                 "UpdatedAtUtc" TEXT NOT NULL
             );
             """);
+        bool SqliteColumnExists(string tableName, string columnName)
+        {
+            var connection = dbContext.Database.GetDbConnection();
+            if (connection.State != System.Data.ConnectionState.Open) connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = $"""PRAGMA table_info("{tableName}");""";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool SqliteTableExists(string tableName)
+        {
+            var connection = dbContext.Database.GetDbConnection();
+            if (connection.State != System.Data.ConnectionState.Open) connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table' AND name = $tableName
+                LIMIT 1;
+                """;
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "$tableName";
+            parameter.Value = tableName;
+            command.Parameters.Add(parameter);
+
+            return command.ExecuteScalar() is not null;
+        }
+
+        if (!SqliteColumnExists("TenantDeviceTrustConfigs", "RequireDomainJoined"))
+            dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN "RequireDomainJoined" INTEGER NOT NULL DEFAULT 0;""");
+        if (!SqliteColumnExists("TenantDeviceTrustConfigs", "AllowedAdDomainsCsv"))
+            dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN "AllowedAdDomainsCsv" TEXT NOT NULL DEFAULT '';""");
+        if (SqliteTableExists("AgentDevices"))
+        {
+            if (!SqliteColumnExists("AgentDevices", "DomainJoined"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "AgentDevices" ADD COLUMN "DomainJoined" INTEGER NOT NULL DEFAULT 0;""");
+            if (!SqliteColumnExists("AgentDevices", "DomainName"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "AgentDevices" ADD COLUMN "DomainName" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("AgentDevices", "WindowsUser"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "AgentDevices" ADD COLUMN "WindowsUser" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("AgentDevices", "DeviceSigningKeyHashBase64"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "AgentDevices" ADD COLUMN "DeviceSigningKeyHashBase64" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("AgentDevices", "DeviceSigningKeyUpdatedAtUtc"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "AgentDevices" ADD COLUMN "DeviceSigningKeyUpdatedAtUtc" TEXT NULL;""");
+        }
 
         // v1.9: time-windowed grants — add columns to existing FileGrants table
         var hasFileGrantsValidFromUtc = false;
@@ -1080,6 +1137,28 @@ using (var scope = app.Services.CreateScope())
                 "RequiredCheckinDays" integer NOT NULL DEFAULT 7,
                 "UpdatedAtUtc" timestamptz NOT NULL
             );
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN IF NOT EXISTS "RequireDomainJoined" boolean NOT NULL DEFAULT FALSE;
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN IF NOT EXISTS "AllowedAdDomainsCsv" text NOT NULL DEFAULT '';
+            """);
+        dbContext.Database.ExecuteSqlRaw("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'AgentDevices'
+                ) THEN
+                    ALTER TABLE "AgentDevices" ADD COLUMN IF NOT EXISTS "DomainJoined" boolean NOT NULL DEFAULT FALSE;
+                    ALTER TABLE "AgentDevices" ADD COLUMN IF NOT EXISTS "DomainName" text NOT NULL DEFAULT '';
+                    ALTER TABLE "AgentDevices" ADD COLUMN IF NOT EXISTS "WindowsUser" text NOT NULL DEFAULT '';
+                    ALTER TABLE "AgentDevices" ADD COLUMN IF NOT EXISTS "DeviceSigningKeyHashBase64" text NOT NULL DEFAULT '';
+                    ALTER TABLE "AgentDevices" ADD COLUMN IF NOT EXISTS "DeviceSigningKeyUpdatedAtUtc" timestamp with time zone NULL;
+                END IF;
+            END $$;
             """);
 
         // v1.9: time-windowed grants — add columns to existing FileGrants table (Postgres)

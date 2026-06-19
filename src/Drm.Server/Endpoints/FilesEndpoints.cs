@@ -8,6 +8,53 @@ public static class FilesEndpoints
 {
     private const string DefaultWatermarkTemplate = "{user} {time} {file}";
     private const int DefaultOfflineLeaseMinutes = 15;
+    private static readonly HashSet<string> CadContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/vnd.dwg",
+        "image/vnd.dxf",
+        "model/step",
+        "application/step",
+        "model/iges",
+        "application/iges",
+        "application/x-sldprt",
+        "application/x-sldasm",
+        "application/x-slddrw",
+        "application/x-parasolid",
+        "model/vnd.parasolid.transmit.text",
+        "model/vnd.parasolid.transmit.binary",
+        "application/x-cad-part",
+        "application/x-cad-assembly",
+        "application/x-catia-part",
+        "application/x-catia-product",
+        "model/vnd.jt",
+        "application/x-ifc",
+        "model/sat",
+        "model/stl"
+    };
+    private static readonly HashSet<string> CadExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".dwg",
+        ".dxf",
+        ".dwt",
+        ".dws",
+        ".step",
+        ".stp",
+        ".iges",
+        ".igs",
+        ".sldprt",
+        ".sldasm",
+        ".slddrw",
+        ".x_t",
+        ".x_b",
+        ".prt",
+        ".asm",
+        ".catpart",
+        ".catproduct",
+        ".jt",
+        ".ifc",
+        ".sat",
+        ".stl"
+    };
 
     public static IEndpointRouteBuilder MapFilesEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -24,8 +71,15 @@ public static class FilesEndpoints
         RegisterFileRequest request,
         AppDbContext dbContext,
         ISiemDispatcher siemDispatcher,
+        IConfiguration configuration,
         CancellationToken cancellationToken)
     {
+        if (configuration.GetValue<bool>("Drm:Files:CadOnly:Enabled") &&
+            (!CadContentTypes.Contains(request.ContentType.Trim()) || !HasCadFileName(request.OriginalFileName)))
+        {
+            return TypedResults.BadRequest(new ErrorResponse("unsupported_file_type"));
+        }
+
         if (!PermissionParser.TryParse(request.Permissions, out var permissions))
         {
             return TypedResults.BadRequest(new ErrorResponse("invalid_permissions"));
@@ -313,6 +367,17 @@ public static class FilesEndpoints
             .AnyAsync(candidate => candidate.TenantId == tenantId && candidate.Id == fileId, cancellationToken);
     }
 
+    private static bool HasCadFileName(string? originalFileName)
+    {
+        if (string.IsNullOrWhiteSpace(originalFileName))
+        {
+            return false;
+        }
+
+        var extension = Path.GetExtension(originalFileName.Trim());
+        return extension.Length > 0 && CadExtensions.Contains(extension);
+    }
+
     private static Task<bool> GroupExistsAsync(
         AppDbContext dbContext,
         Guid tenantId,
@@ -334,7 +399,8 @@ public static class FilesEndpoints
         string? WatermarkTemplate,
         Guid? PolicyTemplateId = null,
         IReadOnlyList<RegisterFileRecipientRequest?>? Recipients = null,
-        int? MaxOpens = null);
+        int? MaxOpens = null,
+        string? OriginalFileName = null);
 
     private sealed record RegisterFileRecipientRequest(string SubjectType, Guid SubjectId);
 

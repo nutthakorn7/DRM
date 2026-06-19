@@ -33,6 +33,13 @@ public sealed class ManagementInstallAssetsTests
             .GetString()
             .Should()
             .Be("REPLACE_WITH_CLIENT_API_KEY");
+        root.GetProperty("Drm")
+            .GetProperty("Files")
+            .GetProperty("CadOnly")
+            .GetProperty("Enabled")
+            .GetBoolean()
+            .Should()
+            .BeTrue();
         root.GetProperty("ConnectionStrings")
             .GetProperty("DrmDb")
             .GetString()
@@ -79,10 +86,14 @@ public sealed class ManagementInstallAssetsTests
         var script = File.ReadAllText(scriptPath);
 
         script.Should().Contain("HKCU:\\Software\\Classes");
+        script.Should().Contain("HKCU:\\Software\\zcrDRM");
         script.Should().Contain(".drmx");
         script.Should().Contain("EnterpriseDRM.ProtectedFile");
-        script.Should().Contain("Protect with DRM");
-        script.Should().Contain("--protect");
+        script.Should().Contain("Protect CAD file (internal)");
+        script.Should().Contain("--quick-protect");
+        script.Should().Contain("ClientApiKey");
+        script.Should().Contain("DeviceId");
+        script.Should().Contain("DeviceSecret");
         script.Should().Contain("--open");
         script.Should().Contain("\"%1\"");
         script.Should().Contain("Remove-Item");

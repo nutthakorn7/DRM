@@ -405,6 +405,16 @@ public sealed class AgentDeviceEntity
 
     public DateTimeOffset? LastHeartbeatAtUtc { get; set; }
 
+    public bool DomainJoined { get; set; }
+
+    public string DomainName { get; set; } = string.Empty;
+
+    public string WindowsUser { get; set; } = string.Empty;
+
+    public string DeviceSigningKeyHashBase64 { get; set; } = string.Empty;
+
+    public DateTimeOffset? DeviceSigningKeyUpdatedAtUtc { get; set; }
+
     public DateTimeOffset? DisabledAtUtc { get; set; }
 
     public string? DisabledReason { get; set; }
@@ -865,5 +875,7 @@ public sealed class TenantDeviceTrustConfigEntity
     public bool Enabled { get; set; }
     /// <summary>Maximum number of days since last heartbeat before access is denied.</summary>
     public int RequiredCheckinDays { get; set; } = 7;
+    public bool RequireDomainJoined { get; set; }
+    public string AllowedAdDomainsCsv { get; set; } = string.Empty;
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }

@@ -4,21 +4,21 @@
 
     What this MSI does (the "easy to use ที่สุด" promise):
       1. Drops the self-contained .NET 10 win-x64 publish output of
-         Drm.Agent.Tray.Windows + Drm.Viewer.Windows into
+         Drm.Agent.Tray.Windows + Drm.Viewer.Windows +
+         Drm.Agent.Service.Windows into
          C:\Program Files\zcrDRM\.  No prerequisite runtime install
          required on the end-user machine.
       2. Bakes the production server URL (https://drm.zcr.ai) into
          HKLM\SOFTWARE\zcrDRM\ServerUrl so the agent does not require
-         the end user to paste or even know the server URL.
+         the end user to paste or even know the server URL. Optional MSI
+         properties also provision ClientApiKey/TenantId/UserId/DeviceId
+         and DeviceSecret.
       3. Registers the .drmx file association so double-clicking a
          protected file opens it in the zcrDRM viewer.
-      4. Registers a "Protect with zcrDRM" right-click context menu on
-         every file, with three sub-actions:
-             - Quick send (recommended)
-             - Protect (advanced)
-             - Transparent protect (preserve extension)
-      5. Adds the tray to the system-wide Windows startup so every user
-         on the machine gets the tray icon on login.
+      4. Registers a "Protect CAD file (internal)" right-click context menu
+         that launches the internal CAD encryption flow.
+      5. Installs and starts the Windows service that reports AD posture
+         heartbeats for device trust.
       6. Adds a Start Menu shortcut.
 
     On uninstall every registry key declared below comes out too — the
@@ -35,7 +35,8 @@
     this and then runs msiexec /i and asserts the registry/files.
 -->
 
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <!--
       UpgradeCode MUST remain stable across versions — it's how
@@ -64,6 +65,13 @@
         Schedule="afterInstallInitialize" />
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="SERVERURL" Value="https://drm.zcr.ai" />
+    <Property Id="CLIENTAPIKEY" Secure="yes" Hidden="yes" />
+    <Property Id="TENANTID" Secure="yes" />
+    <Property Id="USERID" Secure="yes" />
+    <Property Id="DEVICEID" Secure="yes" />
+    <Property Id="DEVICESECRET" Secure="yes" Hidden="yes" />
 
     <!--
         Install layout. ProgramFiles64Folder is the 64-bit
@@ -98,9 +106,37 @@
     -->
     <Component Id="ServerConfigRegistry" Directory="INSTALLFOLDER" Guid="*">
       <RegistryKey Root="HKLM" Key="SOFTWARE\zcrDRM">
-        <RegistryValue Name="ServerUrl" Type="string" Value="https://drm.zcr.ai" KeyPath="yes" />
+        <RegistryValue Name="ServerUrl" Type="string" Value="[SERVERURL]" KeyPath="yes" />
+        <RegistryValue Name="ClientApiKey" Type="string" Value="[CLIENTAPIKEY]" />
+        <RegistryValue Name="TenantId" Type="string" Value="[TENANTID]" />
+        <RegistryValue Name="UserId" Type="string" Value="[USERID]" />
+        <RegistryValue Name="DeviceId" Type="string" Value="[DEVICEID]" />
+        <!-- DeviceSecret moved to the ACL'd HKLM\SOFTWARE\zcrDRM\Secure key
+             below (PR #51 hardening) so non-admin Users cannot read it.
+             The rest of this key stays Users-readable because the tray app
+             reads ServerUrl from it in the logged-on user's context. -->
         <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" />
         <RegistryValue Name="Version" Type="string" Value="1.6.1.0" />
+      </RegistryKey>
+    </Component>
+
+    <!--
+        PR #51 hardening: the per-device signing secret lives in its own
+        ACL'd key so a non-admin local user cannot read it (the default
+        HKLM\SOFTWARE ACL grants Users:Read, which would otherwise let any
+        local user run `reg query` and forge device signatures offline).
+
+        util:PermissionEx sets a protected DACL of exactly LocalSystem +
+        Administrators (full control) — inheritance is broken, so the
+        inherited Users:Read ACE no longer applies. LocalSystem is the
+        account the zcrDRMAgent service runs as (it reads + signs);
+        Administrators covers the elevated installer doing install/uninstall.
+    -->
+    <Component Id="DeviceSecretRegistry" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\zcrDRM\Secure" ForceCreateOnInstall="yes">
+        <RegistryValue Name="DeviceSecret" Type="string" Value="[DEVICESECRET]" KeyPath="yes" />
+        <util:PermissionEx User="SYSTEM" GenericAll="yes" />
+        <util:PermissionEx User="Administrators" GenericAll="yes" />
       </RegistryKey>
     </Component>
 
@@ -150,104 +186,39 @@
     </Component>
 
     <!--
-        Right-click "Protect with zcrDRM" submenu on every file.
-
-        Implementation uses ExtendedSubCommandsKey (Windows 7+) so the
-        verb expands into a flyout with three sub-actions when the
-        user hovers it.  Sub-verbs live under
-        HKCR\zcrDRM.ProtectSubmenu\shell\<sortable-id> and are ordered
-        by the alphabetic sort of those IDs — hence the "01", "02",
-        "03" prefixes.
-
-        Icon imageres.dll,-78 is the Windows padlock glyph shipped
-        with Windows 10/11 — gives the entry visual identity without
-        bundling our own .ico into the MSI.
+        Right-click "Protect CAD file (internal)" on files. The tray enforces
+        the CAD extension allowlist and no longer exposes external share-link
+        or folder/passphrase flows for the customer demo.
     -->
     <Component Id="ProtectShellMenu" Directory="INSTALLFOLDER" Guid="*">
       <RegistryKey Root="HKCR" Key="*\shell\zcrDRMProtect">
-        <RegistryValue Name="MUIVerb" Type="string" Value="Protect with zcrDRM" KeyPath="yes" />
+        <RegistryValue Name="MUIVerb" Type="string" Value="Protect CAD file (internal)" KeyPath="yes" />
         <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-78" />
-        <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="zcrDRM.ProtectSubmenu" />
       </RegistryKey>
-    </Component>
-
-    <!-- Sub-verb 1: Quick send (recommended) -->
-    <Component Id="ProtectShellSubQuickSend" Directory="INSTALLFOLDER" Guid="*">
-      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\01quicksend">
-        <RegistryValue Type="string" Value="Quick send (recommended)" KeyPath="yes" />
-        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-1024" />
-      </RegistryKey>
-      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\01quicksend\command">
+      <RegistryKey Root="HKCR" Key="*\shell\zcrDRMProtect\command">
         <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --quick-protect &quot;%1&quot;" />
       </RegistryKey>
     </Component>
 
-    <!-- Sub-verb 2: Protect (advanced) -->
-    <Component Id="ProtectShellSubProtect" Directory="INSTALLFOLDER" Guid="*">
-      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\02protect">
-        <RegistryValue Type="string" Value="Protect (advanced)" KeyPath="yes" />
-        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-78" />
-      </RegistryKey>
-      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\02protect\command">
-        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --protect &quot;%1&quot;" />
-      </RegistryKey>
+    <Component Id="AgentPostureService" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="AgentPostureServiceExe"
+            Source="publish\service\Drm.Agent.Service.Windows.exe"
+            KeyPath="yes" />
+      <ServiceInstall Id="AgentPostureServiceInstall"
+                      Name="zcrDRMAgent"
+                      DisplayName="zcrDRM Agent"
+                      Description="Reports zcrDRM device posture and processes remote commands."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal"
+                      Account="LocalSystem" />
+      <ServiceControl Id="AgentPostureServiceControl"
+                      Name="zcrDRMAgent"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
     </Component>
-
-    <!-- Sub-verb 3: Transparent protect (preserve extension) -->
-    <Component Id="ProtectShellSubTransparent" Directory="INSTALLFOLDER" Guid="*">
-      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\03transparent">
-        <RegistryValue Type="string" Value="Transparent protect (preserve extension)" KeyPath="yes" />
-        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-5366" />
-      </RegistryKey>
-      <RegistryKey Root="HKCR" Key="zcrDRM.ProtectSubmenu\shell\03transparent\command">
-        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --transparent-protect &quot;%1&quot;" />
-      </RegistryKey>
-    </Component>
-
-    <!--
-        Phase 5AS-folder-rclick (Stage 8): folder right-click → seal into
-        .drmcontainer.
-
-        Files use HKCR\*\shell (the universal file verb root). Folders
-        live under HKCR\Directory\shell — a separate verb namespace, so
-        the file submenu above DOES NOT show up for folders. We add a
-        single top-level verb here (no submenu) because folders only
-        have one DRM operation: pack the tree into a single
-        .drmcontainer with the existing Drm.Crypto.SecureContainer
-        format. The .drmcontainer file association (lines ~141-149) is
-        already wired to open with the viewer, so end-to-end works as
-        soon as this verb shells the tray with the protect-folder switch.
-
-        %V (the "verb path" token) is the Windows-canonical placeholder
-        for the selected directory when invoking a Directory\shell verb,
-        whereas %1 is the canonical token for file verbs. We use %V
-        here to be unambiguous about the substitution semantics.
-    -->
-    <Component Id="ProtectFolderShellMenu" Directory="INSTALLFOLDER" Guid="*">
-      <RegistryKey Root="HKCR" Key="Directory\shell\zcrDRMProtectFolder">
-        <RegistryValue Type="string" Value="Protect folder with zcrDRM" KeyPath="yes" />
-        <RegistryValue Name="Icon" Type="string" Value="imageres.dll,-78" />
-      </RegistryKey>
-      <RegistryKey Root="HKCR" Key="Directory\shell\zcrDRMProtectFolder\command">
-        <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]Drm.Agent.Tray.Windows.exe&quot; --protect-folder &quot;%V&quot;" />
-      </RegistryKey>
-    </Component>
-
-    <!--
-        Tray auto-start at login is INTENTIONALLY NOT in Stage 2.
-
-        The tray today (Drm.Agent.Tray.Windows/MainWindow.xaml.cs) only
-        accepts the protect / quick-protect / transparent-protect
-        switches. It has no background-start switch, so wiring it
-        into HKLM\...\Run now would either crash on every login or
-        pop the main window in every user's face at every login.
-
-        Stage 3 is already editing this tray to add the first-run
-        email dialog. We add a background-start switch there at the
-        same time and add a TrayAutoStart component (HKLM Run key
-        with the tray exe path and the background switch) in the
-        same change.
-    -->
 
     <!--
         Start Menu shortcut.  The HKCU RegistryValue is required by
@@ -274,21 +245,17 @@
 
     <!--
         Single feature, no install-time picker.  The end user clicks
-        Next-Next-Finish and gets everything — Quick send, advanced
-        protect, transparent protect, .drmx viewer, auto-start, Start
-        Menu.  Power users can still uninstall via Add/Remove Programs.
+        Next-Next-Finish and gets internal CAD protection, .drmx viewer,
+        auto-start, Start Menu. Power users can still uninstall via Add/Remove Programs.
     -->
     <Feature Id="Main" Title="zcrDRM Agent" Level="1">
       <ComponentGroupRef Id="AgentBinaries" />
       <ComponentRef Id="ServerConfigRegistry" />
+      <ComponentRef Id="DeviceSecretRegistry" />
       <ComponentRef Id="DrmxFileAssociation" />
       <ComponentRef Id="DrmContainerFileAssociation" />
       <ComponentRef Id="ProtectShellMenu" />
-      <ComponentRef Id="ProtectShellSubQuickSend" />
-      <ComponentRef Id="ProtectShellSubProtect" />
-      <ComponentRef Id="ProtectShellSubTransparent" />
-      <ComponentRef Id="ProtectFolderShellMenu" />
-      <!-- TrayAutoStart deferred to Stage 3 (needs background-start switch in the tray first). -->
+      <ComponentRef Id="AgentPostureService" />
       <ComponentRef Id="TrayStartMenuShortcut" />
     </Feature>
 
@@ -305,7 +272,9 @@
       producing one Component per file with WiX-generated stable IDs.
       Directory subtree (e.g. runtimes\win-x64\native\) is preserved
       into INSTALLFOLDER, so WebView2 native deps land where the
-      viewer expects them.
+      viewer expects them. build-msi.ps1 moves the service EXE to
+      publish\service\ first so its File element can own the Windows
+      service install without duplicating that file in AgentBinaries.
   -->
   <Fragment>
     <ComponentGroup Id="AgentBinaries" Directory="INSTALLFOLDER" Source="publish\agent">

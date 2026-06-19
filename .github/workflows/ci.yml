@@ -230,7 +230,7 @@ jobs:
           }
           Write-Host "  OK open command points at the viewer"
 
-      - name: Verify registry — Protect-with-zcrDRM shell menu
+      - name: Verify registry — internal CAD shell menu
         shell: pwsh
         # `HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect` contains a literal
         # `*` (the all-files registration key). PowerShell's -Path
@@ -239,18 +239,20 @@ jobs:
         run: |
           $menuKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect" -ErrorAction Stop
           $muiVerb = $menuKey.GetValue("MUIVerb")
-          if ($muiVerb -ne "Protect with zcrDRM") {
-            throw "Expected MUIVerb = 'Protect with zcrDRM', got '$muiVerb'"
+          if ($muiVerb -ne "Protect CAD file (internal)") {
+            throw "Expected MUIVerb = 'Protect CAD file (internal)', got '$muiVerb'"
           }
           Write-Host "  OK *\\shell\\zcrDRMProtect MUIVerb = $muiVerb"
-          foreach ($sub in @("01quicksend","02protect","03transparent")) {
-            $subKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectSubmenu\shell\$sub\command" -ErrorAction Stop
-            $cmd = $subKey.GetValue("")
-            if ($cmd -notlike "*Drm.Agent.Tray.Windows.exe*") {
-              throw "Sub-verb $sub command does not point at the tray exe: $cmd"
-            }
-            Write-Host "  OK submenu $sub -> tray exe"
+          $commandKey = Get-Item -LiteralPath "Registry::HKEY_CLASSES_ROOT\*\shell\zcrDRMProtect\command" -ErrorAction Stop
+          $cmd = $commandKey.GetValue("")
+          if ($cmd -notlike "*Drm.Agent.Tray.Windows.exe*--quick-protect*") {
+            throw "Expected internal CAD command to point at tray --quick-protect, got '$cmd'"
           }
+          Write-Host "  OK internal CAD command -> tray --quick-protect"
+          if (Test-Path -LiteralPath "Registry::HKEY_CLASSES_ROOT\zcrDRM.ProtectSubmenu") {
+            throw "Legacy external-share submenu should not be installed for internal CAD mode."
+          }
+          Write-Host "  OK legacy external-share submenu absent"
 
       # NOTE: tray auto-start (HKLM\...\Run\zcrDRM Agent) is intentionally
       # NOT in Stage 2 — the tray exe has no --background flag yet (see
