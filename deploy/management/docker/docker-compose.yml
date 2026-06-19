@@ -42,6 +42,10 @@ services:
       # forgeable; set a secret hex key for real tamper-evidence. Keep stable (changing it
       # forces a chain rebuild). Default empty so dev/local works without it.
       Drm__Security__AuditChainKey: ${DRM_AUDIT_CHAIN_KEY:-}
+      # Days before audit events are depersonalized (personal fields nulled; row + chain kept).
+      # 0 = keep forever (the worker no-ops). Default 0 here so existing deploys are unchanged
+      # unless the var is set; .env.example ships 365 so new installs minimize by default.
+      Drm__Audit__RetentionDays: ${DRM_AUDIT_RETENTION_DAYS:-0}
       Drm__License__EnabledTiers: ${DRM_LICENSE_TIERS:-All}
       Drm__License__PaidEncrypterCount: ${DRM_PAID_ENCRYPTERS:-10}
       # Stage 12 — outbound SMTP for /share/ recipient verification.
