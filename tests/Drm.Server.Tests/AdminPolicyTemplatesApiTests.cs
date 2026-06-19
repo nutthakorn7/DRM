@@ -123,6 +123,38 @@ public sealed class AdminPolicyTemplatesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Admin_can_create_and_update_template_with_macros_and_transfer_ownership()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+        var templateId = Guid.NewGuid();
+
+        // Regression: RunMacros / TransferOwnership are real flags (the Windows viewer reads them at
+        // MainWindow.xaml.cs:738), but PermissionParser's mask omitted them — so ticking either of the
+        // two checkboxes returned 400 on create AND on the new PUT. Both must now accept them.
+        using (var create = await CreatePolicyTemplateAsync(
+            client, tenantId, templateId, "Power", "View, RunMacros, TransferOwnership"))
+        {
+            create.StatusCode.Should().Be(HttpStatusCode.Created);
+            var created = await create.Content.ReadFromJsonAsync<PolicyTemplateResponse>();
+            created!.Permissions.Should().Be("View, RunMacros, TransferOwnership");
+        }
+
+        using var update = await client.PutAsJsonAsync($"/api/admin/policy-templates/{templateId}", new
+        {
+            tenantId,
+            name = "Power",
+            permissions = "View, RunMacros",
+            watermarkTemplate = "user:{userId}",
+            offlineLeaseMinutes = 60,
+            allowPrint = false,
+        });
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await update.Content.ReadFromJsonAsync<PolicyTemplateResponse>();
+        updated!.Permissions.Should().Be("View, RunMacros");
+    }
+
+    [Fact]
     public async Task Admin_create_policy_template_rejects_invalid_admin_state()
     {
         using var client = factory.CreateClient();

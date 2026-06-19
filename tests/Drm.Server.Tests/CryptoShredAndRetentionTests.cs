@@ -18,6 +18,7 @@ namespace Drm.Server.Tests;
 /// </summary>
 public sealed class CryptoShredAndRetentionTests : IDisposable
 {
+    private const string ChainKeyHex = "abcdef0123456789";
     private readonly string databasePath = Path.Combine(Path.GetTempPath(), $"drm-cryptoshred-{Guid.NewGuid():N}.db");
     private readonly WebApplicationFactory<Program> factory;
 
@@ -28,6 +29,8 @@ public sealed class CryptoShredAndRetentionTests : IDisposable
             {
                 builder.UseSetting("ConnectionStrings:DrmDb", $"Data Source={databasePath}");
                 builder.UseSetting("Drm:Mode", "OnPrem");
+                // Same key the AuditChainInterceptor uses to build the chain, so verify can re-check it.
+                builder.UseSetting("Drm:Security:AuditChainKey", ChainKeyHex);
                 builder.UseSetting("Drm:KeyWrapping:MasterKeyBase64",
                     Convert.ToBase64String(Enumerable.Range(0, 32).Select(v => (byte)v).ToArray()));
             });
@@ -146,20 +149,20 @@ public sealed class CryptoShredAndRetentionTests : IDisposable
     }
 
     [Fact]
-    public async Task Audit_chain_still_verifies_after_depersonalization()
+    public async Task Audit_chain_built_by_interceptor_still_verifies_after_depersonalization()
     {
         var tenantId = Guid.NewGuid();
-        const string keyHex = "abcdef0123456789";
         var past = DateTimeOffset.UtcNow.AddDays(-30);
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            // Three events carrying personal data, chained in Id order.
+            // Three events carrying personal data. The interceptor chains each on save — no manual
+            // AppendAsync, so this proves the chain is actually wired on the real write path.
             for (var i = 0; i < 3; i++)
             {
-                var evt = new AuditEventEntity
+                db.AuditEvents.Add(new AuditEventEntity
                 {
                     TenantId = tenantId,
                     FileId = Guid.NewGuid(),
@@ -168,15 +171,12 @@ public sealed class CryptoShredAndRetentionTests : IDisposable
                     EventType = "file_revoked",
                     ReasonCode = "revoked",
                     CreatedAtUtc = past.AddMinutes(i),
-                };
-                db.AuditEvents.Add(evt);
-                await db.SaveChangesAsync(); // assign Id
-                await AuditChainService.AppendAsync(db, evt, keyHex);
+                });
                 await db.SaveChangesAsync();
             }
 
-            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, keyHex)).Valid
-                .Should().BeTrue("chain is intact before retention");
+            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, ChainKeyHex)).Valid
+                .Should().BeTrue("the interceptor builds a verifiable chain on every save");
 
             var scrubbed = await AuditRetentionService.DepersonalizeAsync(
                 db, DateTimeOffset.UtcNow, CancellationToken.None);
@@ -192,8 +192,83 @@ public sealed class CryptoShredAndRetentionTests : IDisposable
             events.Should().OnlyContain(e => e.UserId == null && e.FileId == null
                 && e.ActorAdminId == null && e.ReasonCode == "");
 
-            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, keyHex)).Valid
+            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, ChainKeyHex)).Valid
                 .Should().BeTrue("depersonalization nulls only non-hashed fields, so the chain stays valid");
+        }
+    }
+
+    [Fact]
+    public async Task Audit_chain_verify_survives_microsecond_timestamp_truncation()
+    {
+        // Postgres truncates timestamptz to microseconds and EF does not refresh after insert.
+        // The chain hash folds the timestamp in as Unix-ms, which is invariant under that truncation.
+        // Emulate the round-trip on SQLite: chain an event, drop its sub-microsecond digit, re-verify.
+        var tenantId = Guid.NewGuid();
+        var stamp = new DateTimeOffset(2026, 6, 19, 12, 0, 0, TimeSpan.Zero).AddTicks(9_999_999); // .9999999s
+
+        long eventId;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var evt = new AuditEventEntity
+            {
+                TenantId = tenantId, EventType = "file_revoked", ReasonCode = "revoked", CreatedAtUtc = stamp,
+            };
+            db.AuditEvents.Add(evt);
+            await db.SaveChangesAsync(); // interceptor chains it from the in-memory 100ns-precision stamp
+            eventId = evt.Id;
+
+            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, ChainKeyHex)).Valid.Should().BeTrue();
+        }
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var evt = await db.AuditEvents.SingleAsync(e => e.Id == eventId);
+            var truncatedTicks = evt.CreatedAtUtc.Ticks - (evt.CreatedAtUtc.Ticks % 10); // 100ns → 1µs
+            evt.CreatedAtUtc = new DateTimeOffset(truncatedTicks, TimeSpan.Zero);
+            await db.SaveChangesAsync();
+
+            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, ChainKeyHex)).Valid
+                .Should().BeTrue("the hash uses Unix-ms, which microsecond truncation cannot change");
+        }
+    }
+
+    [Fact]
+    public async Task Backfill_builds_chain_rows_for_events_written_before_the_interceptor()
+    {
+        var tenantId = Guid.NewGuid();
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (var i = 0; i < 3; i++)
+            {
+                db.AuditEvents.Add(new AuditEventEntity
+                {
+                    TenantId = tenantId, EventType = "system_changed", ReasonCode = "x",
+                    CreatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(i),
+                });
+                await db.SaveChangesAsync();
+            }
+        }
+
+        // Fresh scope = the startup scenario. Simulate the pre-fix prod state: events exist, but
+        // their chain rows were never written.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.AuditChain.ExecuteDeleteAsync();
+            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, ChainKeyHex)).FailureReason
+                .Should().Be("missing_chain_entry", "without chain rows the tamper-evident verify must fail");
+
+            var created = await AuditChainService.BackfillAsync(db, ChainKeyHex);
+            created.Should().Be(3);
+
+            (await AuditChainService.VerifyTenantChainAsync(db, tenantId, ChainKeyHex)).Valid
+                .Should().BeTrue("backfill reconstructs the chain so verify passes end-to-end");
+
+            (await AuditChainService.BackfillAsync(db, ChainKeyHex)).Should().Be(0, "backfill is idempotent");
         }
     }
 
