@@ -29,9 +29,15 @@ done
 
 ## Step 2 — สร้าง Demo Tenant ใหม่ (5 นาที)
 
-ใช้ tenant แยกสำหรับ demo ไม่ปนกับ test/dev ของคุณ:
+> ⛔ **ห้ามทำ Step 2 นี้บน prod สำหรับ demo จริง.** สำหรับ demo ให้ใช้ tenant ที่ seed ไว้แล้ว — ดู [09-prod-seeded-credentials.md](09-prod-seeded-credentials.md) (Tenant ID `dddddddd-1111-2222-3333-dddddddddddd` "ABC Co." + admin key จาก `.env`). **ข้ามไป Step 4 / 08 ได้เลย**
+>
+> **ทำไมห้าม:** ปุ่ม **"Create test tenant"** จะ generate Tenant ID + admin key แบบ**สุ่ม**ให้ในเบราว์เซอร์. บน prod ที่ตั้ง `DRM_ADMIN_API_KEY` ไว้แล้ว key สุ่มนั้น **auth ไม่ผ่าน** → tenant ไม่ถูกสร้างจริง และทุกคำสั่ง (สร้าง user ฯลฯ) จะได้ **403** กลางเดโม. นี่คือสาเหตุที่เดโม 2026-06-25 ล่ม.
+>
+> หลัง deploy 2026-06-25: ถ้าเผลอใช้ key สุ่ม พอกด **"Save session"** จอจะขึ้น **"Admin credential is invalid"** ทันที — ถ้าเห็นข้อความนี้ แปลว่า key ผิด ให้กลับไปใช้ค่าจาก 09
 
-1. เปิด **incognito window** → <https://drm.zcr.ai/admin/>
+Step 2/3 ข้างล่างนี้ใช้**เฉพาะตอนตั้ง tenant ใหม่บน server ที่ยังไม่ตั้ง admin key** (เช่น เครื่อง dev/local ที่คุณซ้อมเอง) — ไม่ใช่ prod:
+
+1. เปิด **incognito window** → server **dev/local ของคุณ** (ไม่ใช่ prod)
 2. Welcome modal ขึ้น → กด **"Create test tenant"** (ปุ่มที่ใหญ่ที่สุด)
 3. ฟอร์มจะ auto-fill 3 ค่า — **คัดลอกเก็บไว้:**
 
