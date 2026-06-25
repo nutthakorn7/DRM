@@ -49,7 +49,7 @@ if (!state.tenantId || !state.adminKey) {
   connectionState.className = "status-line disconnected";
 }
 
-document.querySelector("#saveSession").addEventListener("click", () => {
+document.querySelector("#saveSession").addEventListener("click", async () => {
   state.tenantId = tenantIdInput.value.trim();
   state.adminKey = adminKeyInput.value.trim();
   state.adminUserId = adminUserIdInput.value.trim();
@@ -58,7 +58,30 @@ document.querySelector("#saveSession").addEventListener("click", () => {
   localStorage.setItem("drm:adminUserId", state.adminUserId);
   // Remove disconnected styling when a session is saved
   connectionState.className = "status-line";
-  setStatus("Session saved (persists across browser sessions)", "ok");
+
+  if (!state.adminKey) {
+    setStatus("Session saved — enter an admin credential to connect", "ok");
+    return;
+  }
+
+  // Verify the credential NOW, so a wrong key surfaces here (not mid-demo), and
+  // warm up the roles list that the create-admin form depends on.
+  setStatus("Session saved — verifying credential…", "ok");
+  try {
+    const me = await apiFetch("/api/admin/identity/whoami");
+    const who = me?.displayName || me?.email || "admin";
+    connectionState.textContent = `Connected as ${who}${me?.isSharedKeyFallback ? " (shared key)" : ""}`;
+    connectionState.className = "status-line";
+    setStatus("Credential verified", "ok");
+    // Best-effort warm-up: a role without roles:read can't list them, but the
+    // connection is still valid, so don't let that flip the state to failed.
+    try { await refreshRoles(); } catch { /* describeFailure already reported it */ }
+  } catch {
+    // apiFetch → describeFailure already showed the specific reason
+    // (e.g. "Admin credential is invalid — check the key").
+    connectionState.textContent = "Not connected";
+    connectionState.className = "status-line disconnected";
+  }
 });
 
 // Forget-session helper: clear local credentials without nuking other admin
@@ -757,7 +780,8 @@ document.querySelector("#createUserForm").addEventListener("submit", async (even
   event.preventDefault();
   const body = {
     tenantId: requireTenantId(),
-    userId: document.querySelector("#newUserId").value.trim(),
+    // User ID is optional — auto-generate so an operator never hand-types a GUID.
+    userId: document.querySelector("#newUserId").value.trim() || crypto.randomUUID(),
     email: document.querySelector("#newUserEmail").value.trim(),
     displayName: document.querySelector("#newUserDisplayName").value.trim()
   };
@@ -1845,6 +1869,32 @@ function adminAuthHeader(credential) {
     : { "X-DRM-Admin-Key": credential };
 }
 
+// Plain-language messages for known server reasonCodes, so a failed request
+// explains itself instead of showing a bare "Request failed: 403" — which gave
+// no clue, during a live demo, that the admin credential was simply wrong.
+const REASON_MESSAGES = {
+  admin_api_key_invalid: "Admin credential is invalid — check the key in the field above.",
+  admin_token_invalid: "Admin token is invalid, revoked, or expired — re-issue it.",
+  admin_credential_required: "Enter an admin credential above first.",
+  shared_key_disabled: "Shared-key admin access is disabled — use a per-admin token.",
+  admin_api_key_unconfigured: "Server has no admin key configured (Drm:Security:AdminApiKey).",
+  tenant_mismatch: "Tenant ID mismatch — the header and the request body disagree.",
+  invalid_tenant_id: "Tenant ID is missing or invalid.",
+  forbidden: "Not permitted for this tenant with this credential.",
+};
+
+async function describeFailure(response) {
+  let reason = "";
+  try {
+    const body = await response.clone().json();
+    reason = body?.reasonCode || body?.reason || "";
+  } catch { /* non-JSON / empty body */ }
+  const friendly = REASON_MESSAGES[reason];
+  if (friendly) return `${friendly} (HTTP ${response.status})`;
+  if (reason) return `Request failed: ${response.status} — ${reason}`;
+  return `Request failed: ${response.status}`;
+}
+
 async function apiFetch(url, options = {}) {
   const adminKey = requireAdminKey();
   // Pass tenant ID via X-DRM-Tenant-Id so the server can cross-check it
@@ -1862,8 +1912,9 @@ async function apiFetch(url, options = {}) {
   });
 
   if (!response.ok) {
-    setStatus(`Request failed: ${response.status}`, "error");
-    throw new Error(`Request failed with HTTP ${response.status}`);
+    const failMessage = await describeFailure(response);
+    setStatus(failMessage, "error");
+    throw new Error(failMessage);
   }
 
   if (response.status === 204) {
@@ -1886,8 +1937,9 @@ async function apiFetchBlob(url, options = {}) {
   });
 
   if (!response.ok) {
-    setStatus(`Request failed: ${response.status}`, "error");
-    throw new Error(`Request failed with HTTP ${response.status}`);
+    const failMessage = await describeFailure(response);
+    setStatus(failMessage, "error");
+    throw new Error(failMessage);
   }
 
   return response.blob();
@@ -2531,8 +2583,9 @@ async function apiFetchGlobal(url, options = {}) {
     }
   });
   if (!response.ok) {
-    setStatus(`Request failed: ${response.status}`, "error");
-    throw new Error(`Request failed with HTTP ${response.status}`);
+    const failMessage = await describeFailure(response);
+    setStatus(failMessage, "error");
+    throw new Error(failMessage);
   }
   return response.status === 204 ? null : response.json();
 }

@@ -48,6 +48,38 @@ public sealed class AdminUsersApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_user_without_user_id_generates_one()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var create = await client.PostAsJsonAsync("/api/admin/users", new
+        {
+            tenantId, email = "noid@example.com", displayName = "No Id"
+        });
+
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await create.Content.ReadFromJsonAsync<UserResponse>();
+        created!.UserId.Should().NotBe(Guid.Empty, "the server generates a user id when the admin omits one");
+    }
+
+    [Fact]
+    public async Task Two_users_created_without_user_id_do_not_collide()
+    {
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var a = await client.PostAsJsonAsync("/api/admin/users", new { tenantId, email = "a@example.com", displayName = "A" });
+        using var b = await client.PostAsJsonAsync("/api/admin/users", new { tenantId, email = "b@example.com", displayName = "B" });
+        a.StatusCode.Should().Be(HttpStatusCode.Created);
+        b.StatusCode.Should().Be(HttpStatusCode.Created, "a second id-less user must not collide on Guid.Empty");
+
+        var users = await client.GetFromJsonAsync<List<UserResponse>>($"/api/admin/users?tenantId={tenantId}");
+        users!.Should().HaveCount(2);
+        users.Select(u => u.UserId).Should().OnlyHaveUniqueItems().And.NotContain(Guid.Empty);
+    }
+
+    [Fact]
     public async Task Admin_create_user_returns_conflict_for_duplicate_user_id_in_same_tenant()
     {
         using var client = factory.CreateClient();
