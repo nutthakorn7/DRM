@@ -497,6 +497,13 @@ public sealed class TenantDirectorySyncConfigEntity
 
     public int? LastSyncGroupCount { get; set; }
 
+    /// <summary>
+    /// When true, a completed sync deactivates directory-sourced users / prunes memberships that
+    /// vanished from the source (offboarding). Default false so it is rolled out deliberately;
+    /// reconciliation is additionally guarded against partial fetches + mass-deactivation.
+    /// </summary>
+    public bool ReconcileRemovals { get; set; }
+
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
 
