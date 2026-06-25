@@ -27,6 +27,10 @@ public static class AdminUsersEndpoints
         if (!httpContext.MatchesHeader(request.TenantId))
             return Results.BadRequest(new ErrorResponse("tenant_mismatch"));
 
+        // Generate the user id when the caller didn't supply one — admins shouldn't have to
+        // hand-type a GUID, and storing Guid.Empty would collide the next user on (TenantId, UserId).
+        var userId = request.UserId == Guid.Empty ? Guid.NewGuid() : request.UserId;
+
         // Seat quota: reject if tenant has a MaxEncrypters limit and it is already reached
         var maxEncrypters = await dbContext.Tenants
             .AsNoTracking()
@@ -45,20 +49,20 @@ public static class AdminUsersEndpoints
                 return Results.Conflict(new ErrorResponse("seat_limit_exceeded"));
         }
 
-        if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
+        if (await ConflictingUserExistsAsync(dbContext, request.TenantId, userId, request.Email, cancellationToken))
             return Results.Conflict();
 
         var user = new TenantUserEntity
         {
             TenantId = request.TenantId,
-            UserId = request.UserId,
+            UserId = userId,
             Email = request.Email,
             DisplayName = request.DisplayName,
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
 
         dbContext.TenantUsers.Add(user);
-        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, request.UserId, "user_created", httpContext));
+        dbContext.AuditEvents.Add(AdminAudit.SystemEvent(request.TenantId, userId, "user_created", httpContext));
 
         try
         {
@@ -66,7 +70,7 @@ public static class AdminUsersEndpoints
         }
         catch (DbUpdateException)
         {
-            if (await ConflictingUserExistsAsync(dbContext, request.TenantId, request.UserId, request.Email, cancellationToken))
+            if (await ConflictingUserExistsAsync(dbContext, request.TenantId, userId, request.Email, cancellationToken))
                 return Results.Conflict();
             throw;
         }
