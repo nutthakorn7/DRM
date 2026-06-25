@@ -34,8 +34,11 @@ builder.Services.AddScoped<BruteForceProtectionService>();
 // because it holds the in-memory nonce ledger across requests.
 builder.Services.AddSingleton<IDeviceReplayGuard, InMemoryDeviceReplayGuard>();
 builder.Services.AddSingleton<IFileKeyProtector, FileKeyProtector>();
+builder.Services.AddSingleton<IDirectorySecretProtector, DirectorySecretProtector>();
 builder.Services.AddHttpClient("EntraGraph");
-builder.Services.AddScoped<IDirectorySyncService, EntraIdDirectorySyncService>();
+builder.Services.AddScoped<EntraIdDirectorySyncService>();
+builder.Services.AddScoped<IDirectorySyncService>(sp => sp.GetRequiredService<EntraIdDirectorySyncService>());
+builder.Services.AddScoped<IDirectorySyncProviderFactory, DirectorySyncProviderFactory>();
 builder.Services.AddHttpClient("BoxApi");
 builder.Services.AddScoped<IBoxIntegrationService, BoxIntegrationService>();
 

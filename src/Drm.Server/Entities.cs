@@ -489,6 +489,20 @@ public sealed class TenantDirectorySyncConfigEntity
 
     public string ClientSecret { get; set; } = string.Empty;
 
+    /// <summary>"entra" (cloud, default) or "ldap" (on-prem AD). Selects the sync provider.</summary>
+    public string Provider { get; set; } = "entra";
+
+    // On-prem LDAP/AD config (used when Provider == "ldap").
+    public string LdapHost { get; set; } = string.Empty;
+    public int LdapPort { get; set; } = 636;
+    public bool LdapUseLdaps { get; set; } = true;
+    public string LdapBindDn { get; set; } = string.Empty;
+    /// <summary>Bind password, encrypted at rest via <see cref="IDirectorySecretProtector"/>. Never echoed.</summary>
+    public string LdapBindPasswordEncrypted { get; set; } = string.Empty;
+    public string LdapBaseDn { get; set; } = string.Empty;
+    public string LdapUserFilter { get; set; } = string.Empty;
+    public string LdapGroupFilter { get; set; } = string.Empty;
+
     public string? LastSyncStatus { get; set; }
 
     public DateTimeOffset? LastSyncAtUtc { get; set; }
