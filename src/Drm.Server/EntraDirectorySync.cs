@@ -24,149 +24,63 @@ public sealed class EntraIdDirectorySyncService(
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken)
             ?? throw new InvalidOperationException("Directory sync not configured for this tenant.");
 
-        using var http = httpClientFactory.CreateClient("EntraGraph");
-        var token = await AcquireTokenAsync(http, config.EntraTenantId, config.ClientId, config.ClientSecret, cancellationToken);
-
-        var entraUsers = await FetchAllPagesAsync<EntraUser>(
-            http, "https://graph.microsoft.com/v1.0/users?$select=id,mail,displayName,userPrincipalName",
-            token, cancellationToken);
-
-        var entraGroups = await FetchAllPagesAsync<EntraGroup>(
-            http, "https://graph.microsoft.com/v1.0/groups?$select=id,displayName",
-            token, cancellationToken);
-
-        int usersUpserted = 0;
-
-        foreach (var u in entraUsers)
-        {
-            var externalId = u.Id;
-            if (string.IsNullOrWhiteSpace(externalId)) continue;
-
-            var email = u.Mail ?? u.UserPrincipalName ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(email)) continue;
-
-            var displayName = u.DisplayName ?? email;
-
-            var existing = await dbContext.TenantUsers
-                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ExternalId == externalId, cancellationToken);
-
-            if (existing == null)
-            {
-                dbContext.TenantUsers.Add(new TenantUserEntity
-                {
-                    TenantId = tenantId,
-                    UserId = Guid.NewGuid(),
-                    Email = email,
-                    DisplayName = displayName,
-                    ExternalId = externalId,
-                    CreatedAtUtc = DateTimeOffset.UtcNow
-                });
-                usersUpserted++;
-            }
-            else
-            {
-                existing.Email = email;
-                existing.DisplayName = displayName;
-            }
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        int groupsUpserted = 0;
-        int membershipsUpserted = 0;
-
-        var groupsToSync = new List<(string ExternalId, Guid GroupId, string Name)>();
-
-        foreach (var g in entraGroups)
-        {
-            var externalId = g.Id;
-            if (string.IsNullOrWhiteSpace(externalId)) continue;
-
-            var name = g.DisplayName ?? externalId;
-
-            var existingGroup = await dbContext.TenantGroups
-                .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ExternalId == externalId, cancellationToken);
-
-            Guid groupId;
-            if (existingGroup == null)
-            {
-                var newGroup = new TenantGroupEntity
-                {
-                    TenantId = tenantId,
-                    GroupId = Guid.NewGuid(),
-                    Name = name,
-                    ExternalId = externalId,
-                    CreatedAtUtc = DateTimeOffset.UtcNow
-                };
-                dbContext.TenantGroups.Add(newGroup);
-                groupId = newGroup.GroupId;
-                groupsUpserted++;
-            }
-            else
-            {
-                existingGroup.Name = name;
-                groupId = existingGroup.GroupId;
-            }
-
-            groupsToSync.Add((externalId, groupId, name));
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        foreach (var (externalId, groupId, _) in groupsToSync)
-        {
-            var members = await FetchAllPagesAsync<EntraDirectoryObject>(
-                http, $"https://graph.microsoft.com/v1.0/groups/{externalId}/members?$select=id",
-                token, cancellationToken);
-
-            foreach (var m in members)
-            {
-                var memberExternalId = m.Id;
-                if (string.IsNullOrWhiteSpace(memberExternalId)) continue;
-
-                var memberUser = await dbContext.TenantUsers
-                    .FirstOrDefaultAsync(u => u.TenantId == tenantId && u.ExternalId == memberExternalId, cancellationToken);
-
-                if (memberUser == null) continue;
-
-                var memberExists = await dbContext.GroupMembers.AnyAsync(
-                    x => x.TenantId == tenantId && x.GroupId == groupId && x.UserId == memberUser.UserId,
-                    cancellationToken);
-
-                if (!memberExists)
-                {
-                    dbContext.GroupMembers.Add(new GroupMemberEntity
-                    {
-                        TenantId = tenantId,
-                        GroupId = groupId,
-                        UserId = memberUser.UserId,
-                        CreatedAtUtc = DateTimeOffset.UtcNow
-                    });
-                    membershipsUpserted++;
-                }
-            }
-        }
-
         try
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            using var http = httpClientFactory.CreateClient("EntraGraph");
+            var token = await AcquireTokenAsync(http, config.EntraTenantId, config.ClientId, config.ClientSecret, cancellationToken);
+
+            var entraUsers = await FetchAllPagesAsync<EntraUser>(
+                http, "https://graph.microsoft.com/v1.0/users?$select=id,mail,displayName,userPrincipalName",
+                token, cancellationToken);
+            var entraGroups = await FetchAllPagesAsync<EntraGroup>(
+                http, "https://graph.microsoft.com/v1.0/groups?$select=id,displayName",
+                token, cancellationToken);
+
+            var users = entraUsers
+                .Where(u => !string.IsNullOrWhiteSpace(u.Id) && !string.IsNullOrWhiteSpace(u.Mail ?? u.UserPrincipalName))
+                .Select(u => new DirectoryUser(u.Id, (u.Mail ?? u.UserPrincipalName)!, u.DisplayName ?? (u.Mail ?? u.UserPrincipalName)!))
+                .ToList();
+            var groups = entraGroups
+                .Where(g => !string.IsNullOrWhiteSpace(g.Id))
+                .Select(g => new DirectoryGroup(g.Id, g.DisplayName ?? g.Id))
+                .ToList();
+
+            var memberships = new List<DirectoryMembership>();
+            foreach (var g in groups)
+            {
+                var members = await FetchAllPagesAsync<EntraDirectoryObject>(
+                    http, $"https://graph.microsoft.com/v1.0/groups/{g.ExternalId}/members?$select=id",
+                    token, cancellationToken);
+                foreach (var m in members)
+                    if (!string.IsNullOrWhiteSpace(m.Id))
+                        memberships.Add(new DirectoryMembership(g.ExternalId, m.Id));
+            }
+
+            // Reaching here means every page of every fetch succeeded → a complete sync, so it is
+            // safe to reconcile removals (gated per-tenant by config). A failed/partial fetch throws
+            // above and lands in catch, where nothing is deactivated.
+            var result = await DirectoryUpsert.ApplyAsync(
+                dbContext, tenantId, users, groups, memberships,
+                reconcileRemovals: config.ReconcileRemovals, cancellationToken);
 
             var syncConfig = await dbContext.TenantDirectorySyncConfigs
                 .FirstOrDefaultAsync(c => c.TenantId == tenantId, cancellationToken);
-
             if (syncConfig != null)
             {
                 syncConfig.LastSyncAtUtc = DateTimeOffset.UtcNow;
                 syncConfig.LastSyncStatus = "ok";
-                syncConfig.LastSyncUserCount = usersUpserted;
-                syncConfig.LastSyncGroupCount = groupsUpserted;
+                syncConfig.LastSyncUserCount = result.UsersUpserted;
+                syncConfig.LastSyncGroupCount = result.GroupsUpserted;
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            logger.LogInformation("Entra sync complete: {Users} users, {Groups} groups, {Memberships} memberships upserted.",
-                usersUpserted, groupsUpserted, membershipsUpserted);
+            logger.LogInformation(
+                "Entra sync complete: {Users} users, {Groups} groups, {Memberships} memberships upserted; {Deact} deactivated, {Pruned} memberships pruned.{Warn}",
+                result.UsersUpserted, result.GroupsUpserted, result.MembershipsUpserted,
+                result.UsersDeactivated, result.MembershipsRemoved,
+                result.Warnings.Count > 0 ? " " + string.Join("; ", result.Warnings) : "");
 
-            return new DirectorySyncResult(usersUpserted, groupsUpserted, membershipsUpserted);
+            return new DirectorySyncResult(result.UsersUpserted, result.GroupsUpserted, result.MembershipsUpserted);
         }
         catch (Exception ex)
         {

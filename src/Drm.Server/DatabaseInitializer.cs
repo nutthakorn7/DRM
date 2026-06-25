@@ -757,6 +757,8 @@ internal static class DatabaseInitializer
                 dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN "RequireDomainJoined" INTEGER NOT NULL DEFAULT 0;""");
             if (!SqliteColumnExists("TenantDeviceTrustConfigs", "AllowedAdDomainsCsv"))
                 dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN "AllowedAdDomainsCsv" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "ReconcileRemovals"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "ReconcileRemovals" INTEGER NOT NULL DEFAULT 0;""");
             if (SqliteTableExists("AgentDevices"))
             {
                 if (!SqliteColumnExists("AgentDevices", "DomainJoined"))
@@ -1083,6 +1085,9 @@ internal static class DatabaseInitializer
                 """);
             dbContext.Database.ExecuteSqlRaw("""
                 ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN IF NOT EXISTS "AllowedAdDomainsCsv" text NOT NULL DEFAULT '';
+                """);
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "ReconcileRemovals" boolean NOT NULL DEFAULT FALSE;
                 """);
             dbContext.Database.ExecuteSqlRaw("""
                 DO $$
