@@ -49,7 +49,7 @@ if (!state.tenantId || !state.adminKey) {
   connectionState.className = "status-line disconnected";
 }
 
-document.querySelector("#saveSession").addEventListener("click", () => {
+document.querySelector("#saveSession").addEventListener("click", async () => {
   state.tenantId = tenantIdInput.value.trim();
   state.adminKey = adminKeyInput.value.trim();
   state.adminUserId = adminUserIdInput.value.trim();
@@ -58,7 +58,30 @@ document.querySelector("#saveSession").addEventListener("click", () => {
   localStorage.setItem("drm:adminUserId", state.adminUserId);
   // Remove disconnected styling when a session is saved
   connectionState.className = "status-line";
-  setStatus("Session saved (persists across browser sessions)", "ok");
+
+  if (!state.adminKey) {
+    setStatus("Session saved — enter an admin credential to connect", "ok");
+    return;
+  }
+
+  // Verify the credential NOW, so a wrong key surfaces here (not mid-demo), and
+  // warm up the roles list that the create-admin form depends on.
+  setStatus("Session saved — verifying credential…", "ok");
+  try {
+    const me = await apiFetch("/api/admin/identity/whoami");
+    const who = me?.displayName || me?.email || "admin";
+    connectionState.textContent = `Connected as ${who}${me?.isSharedKeyFallback ? " (shared key)" : ""}`;
+    connectionState.className = "status-line";
+    setStatus("Credential verified", "ok");
+    // Best-effort warm-up: a role without roles:read can't list them, but the
+    // connection is still valid, so don't let that flip the state to failed.
+    try { await refreshRoles(); } catch { /* describeFailure already reported it */ }
+  } catch {
+    // apiFetch → describeFailure already showed the specific reason
+    // (e.g. "Admin credential is invalid — check the key").
+    connectionState.textContent = "Not connected";
+    connectionState.className = "status-line disconnected";
+  }
 });
 
 // Forget-session helper: clear local credentials without nuking other admin
