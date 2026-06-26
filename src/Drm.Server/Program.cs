@@ -1,5 +1,6 @@
 using Drm.Server;
 using Drm.Server.Endpoints;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -75,6 +76,15 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     DatabaseInitializer.Initialize(dbContext, auditChainKey, app.Logger);
 }
+
+// Behind Caddy (TLS terminator) the app sees plain http on the internal network,
+// so generated absolute URLs (share links, verification emails) came out http://.
+// Honor Caddy's X-Forwarded-Proto so Request.Scheme reflects the real https edge.
+// The proxy is the only ingress (app isn't exposed directly), so trust forwarders.
+var forwardedOptions = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedProto };
+forwardedOptions.KnownIPNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 
 app.UseAdminIdentityAuthentication();
 app.UseScimBearerAuthentication();
