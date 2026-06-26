@@ -34,6 +34,7 @@ const ROLE_DETAILS = [
 
 const tenantIdInput = document.querySelector("#tenantId");
 const userIdInput = document.querySelector("#userId");
+const clientKeyInput = document.querySelector("#clientKey");
 const sessionLabel = document.querySelector("#sessionLabel");
 const personaBadge = document.querySelector("#personaBadge");
 const adminLink = document.querySelector("#adminLink");
@@ -55,6 +56,19 @@ const copyBtn = document.querySelector("#copyBtn");
 
 let pickedFile = null;
 
+// Inject the client API key on same-origin /api/me/* requests so the web sender
+// works when the server enforces a client key (parity with the agent + admin
+// console). Scoped to /api/me/ so it never alters any other request.
+const _meOriginalFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const url = typeof input === "string" ? input : (input && input.url) || "";
+  const key = clientKeyInput && clientKeyInput.value.trim();
+  if (key && url.includes("/api/me/")) {
+    init = { ...init, headers: { ...(init.headers || {}), "X-DRM-Client-Key": key } };
+  }
+  return _meOriginalFetch(input, init);
+};
+
 function loadSession() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null"); }
   catch { return null; }
@@ -63,7 +77,8 @@ function loadSession() {
 function saveSession() {
   localStorage.setItem(SESSION_KEY, JSON.stringify({
     tenantId: tenantIdInput.value.trim(),
-    userId: userIdInput.value.trim()
+    userId: userIdInput.value.trim(),
+    clientKey: clientKeyInput.value.trim()
   }));
   updateSessionLabel();
 }
@@ -249,7 +264,7 @@ anotherFileLink.addEventListener("click", (e) => {
   recipientInput.focus();
 });
 
-[tenantIdInput, userIdInput].forEach((el) => {
+[tenantIdInput, userIdInput, clientKeyInput].forEach((el) => {
   el.addEventListener("change", () => { saveSession(); loadPersona(); loadRecentRecipients(); });
 });
 
@@ -259,6 +274,7 @@ anotherFileLink.addEventListener("click", (e) => {
   if (s) {
     tenantIdInput.value = s.tenantId ?? "";
     userIdInput.value = s.userId ?? "";
+    clientKeyInput.value = s.clientKey ?? "";
   }
   updateSessionLabel();
   loadPersona();
