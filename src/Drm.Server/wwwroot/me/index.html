@@ -50,7 +50,10 @@
         <label>User ID
           <input id="userId" type="text" placeholder="00000000-0000-0000-0000-000000000000" required>
         </label>
-        <p class="hint">These IDs are remembered on this browser only. Get them from your IT admin if you do not have them.</p>
+        <label>Client key
+          <input id="clientKey" type="password" autocomplete="off" placeholder="needed if your server enforces a client key">
+        </label>
+        <p class="hint">These are remembered on this browser only. Get them from your IT admin if you do not have them. Leave Client key blank unless your server requires one.</p>
       </details>
 
       <div id="dropZone" class="drop-zone" tabindex="0">
