@@ -57,6 +57,32 @@ public sealed class QuickShareEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Quick_share_url_uses_https_when_forwarded_proto_is_https()
+    {
+        // Behind Caddy (TLS terminator) the app sees internal http; the real
+        // edge scheme rides in X-Forwarded-Proto. UseForwardedHeaders must make
+        // the generated share URL https so recipients never get an http:// link.
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/me/share")
+        {
+            Content = JsonContent.Create(new
+            {
+                tenantId = Guid.NewGuid(), userId = Guid.NewGuid(),
+                recipientEmail = "proto@example.com",
+                fileName = "doc.pdf", contentType = "application/pdf",
+                fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("hi")),
+                expiresInHours = 24, allowPrint = false,
+            }),
+        };
+        request.Headers.Add("X-Forwarded-Proto", "https");
+
+        using var resp = await client.SendAsync(request);
+        resp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var result = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
+        result!.ShareUrl.Should().StartWith("https://", "X-Forwarded-Proto: https must drive the generated scheme");
+    }
+
+    [Fact]
     public async Task Quick_share_with_allow_print_grants_view_and_print_permissions()
     {
         using var client = factory.CreateClient();
