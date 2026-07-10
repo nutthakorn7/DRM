@@ -24,7 +24,7 @@ public static class QuickShareEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Created<QuickShareResponse>, BadRequest<ErrorResponse>, ForbidHttpResult>> QuickShareAsync(
+    private static async Task<Results<Created<QuickShareResponse>, BadRequest<ErrorResponse>, ForbidHttpResult, ProblemHttpResult>> QuickShareAsync(
         QuickShareRequest request,
         AppDbContext dbContext,
         IFileKeyProtector fileKeyProtector,
@@ -139,7 +139,22 @@ public static class QuickShareEndpoints
         // exactly — this fileId is fresh, so it's always an insert, never an update.
         if (fileKey is not null)
         {
-            var wrapped = fileKeyProtector.Wrap(request.TenantId, fileId, fileKey);
+            WrappedFileKey wrapped;
+            try
+            {
+                wrapped = fileKeyProtector.Wrap(request.TenantId, fileId, fileKey);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or FormatException)
+            {
+                // Drm:KeyWrapping:MasterKeyBase64 is missing/malformed on this
+                // server. That's an operator config problem, not something the
+                // sender did wrong — surface it as a clean 500 with a specific
+                // reason instead of an unhandled exception/stack trace.
+                return TypedResults.Problem(
+                    "Server encryption key is not configured correctly — contact your administrator.",
+                    statusCode: StatusCodes.Status500InternalServerError,
+                    extensions: new Dictionary<string, object?> { ["reasonCode"] = "server_key_wrapping_misconfigured" });
+            }
             dbContext.FileKeys.Add(new FileKeyEntity
             {
                 TenantId = request.TenantId,
