@@ -143,6 +143,7 @@ public static class FilesEndpoints
             TenantId = request.TenantId,
             OwnerUserId = request.OwnerUserId,
             ContentType = request.ContentType,
+            FileName = request.OriginalFileName?.Trim() ?? string.Empty,
             ExpiresAtUtc = request.ExpiresAtUtc,
             Revoked = false,
             Permissions = permissions,

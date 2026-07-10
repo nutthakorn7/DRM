@@ -39,7 +39,7 @@ public static class AdminFilesEndpoints
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            query = query.Where(file => file.ContentType.Contains(q));
+            query = query.Where(file => file.ContentType.Contains(q) || file.FileName.Contains(q));
         }
 
         var files = await query
@@ -820,6 +820,7 @@ public static class AdminFilesEndpoints
         Guid FileId,
         Guid OwnerUserId,
         string ContentType,
+        string FileName,
         DateTimeOffset ExpiresAtUtc,
         string Permissions,
         string WatermarkTemplate,
@@ -831,6 +832,7 @@ public static class AdminFilesEndpoints
                 file.Id,
                 file.OwnerUserId,
                 file.ContentType,
+                file.FileName,
                 file.ExpiresAtUtc,
                 file.Permissions.ToString(),
                 file.WatermarkTemplate,

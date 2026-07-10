@@ -164,7 +164,11 @@
   --warning-bg: var(--color-warning-50);
   --warning-ink: var(--color-warning-700);
 
-  --focus-ring: 0 0 0 3px rgba(39, 93, 114, 0.35);
+  /* WCAG 1.4.11 (Non-text Contrast) needs >=3:1 for a focus indicator against
+     its adjacent background. The 0.35 alpha this used to be computed to
+     ~1.77:1 against white — invisible enough to fail a VPAT/axe procurement
+     check. 0.7 alpha of the same color computes to ~3.55:1. */
+  --focus-ring: 0 0 0 3px rgba(39, 93, 114, 0.7);
 
   /* ───────────────────────────────────────────────────────────
    * 3. COMPONENT TOKENS — component-scoped. Tweak these to retheme

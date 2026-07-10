@@ -56,8 +56,8 @@
         <p class="hint">These are remembered on this browser only. Get them from your IT admin if you do not have them. Leave Client key blank unless your server requires one.</p>
       </details>
 
-      <div id="dropZone" class="drop-zone" tabindex="0">
-        <div class="drop-icon">📄</div>
+      <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Drop a file here, or press Enter to browse for one">
+        <div class="drop-icon" aria-hidden="true">📄</div>
         <p><strong>Drop a file here</strong> or click to browse</p>
         <input type="file" id="fileInput" hidden>
         <p id="fileSummary" class="file-summary"></p>
@@ -88,7 +88,8 @@
 
     <section id="result" class="result" role="status" aria-live="polite" hidden>
       <h2>✅ Sent</h2>
-      <p>Copy this link and send it to the recipient. They will need to verify their email before opening.</p>
+      <p id="resultInstructions">Copy this link and send it to the recipient. They will need to verify their email before opening.</p>
+      <p id="downloadInstructions" class="hint" hidden></p>
       <div class="share-url-row">
         <input id="shareUrl" type="text" readonly>
         <button id="copyBtn" type="button">Copy link</button>
@@ -115,6 +116,7 @@
       <table id="mySharesTable" class="my-shares-table" hidden>
         <thead>
           <tr>
+            <th>File</th>
             <th>Recipient</th>
             <th>Sent</th>
             <th>Expires</th>
@@ -131,6 +133,10 @@
     </section>
   </main>
 
+  <!-- Exposes window.DrmxPreview.associatedData so the sender can encrypt with
+       the exact same AAD format the recipient's /share/ page decrypts with —
+       one source of truth for the .drmx crypto interop, not a duplicated copy. -->
+  <script type="module" src="/share/drmx-preview.js"></script>
   <script src="/me/app.js" defer></script>
 </body>
 </html>

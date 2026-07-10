@@ -614,6 +614,73 @@ public sealed class ExternalShareApiTests : IDisposable
     // ─────────────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task Quick_share_client_encrypted_file_key_releases_through_the_full_recipient_flow()
+    {
+        // Regression guard for the "/me/ web send is a dead end" finding
+        // (2026-07-01 UX audit): QuickShareEndpoints used to discard the
+        // uploaded bytes and never register a FileKeys row, so a recipient
+        // could verify their email but the content-key endpoint 404'd for
+        // every single /me/-created share — there was nothing to release.
+        // This drives /api/me/share exactly the way the browser's in-browser
+        // .drmx builder now does (client-generated fileId + fileKeyBase64),
+        // then proves the SAME key comes back out through the real
+        // verify -> confirm -> open -> content-key sequence a recipient uses.
+        var setupClient = factory.CreateClient();
+        setupClient.DefaultRequestHeaders.Add("X-DRM-Client-Key", ClientApiKey);
+        var guestClient = factory.CreateClient();
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var fileKey = RandomNumberGenerator.GetBytes(32);
+        var fileKeyBase64 = Convert.ToBase64String(fileKey);
+
+        using var shareResp = await setupClient.PostAsJsonAsync("/api/me/share", new
+        {
+            tenantId,
+            userId,
+            fileId,
+            recipientEmail = "guest@example.com",
+            fileName = "contract.pdf",
+            contentType = "application/pdf",
+            fileBytesBase64 = Convert.ToBase64String("pretend-drmx-container-bytes"u8.ToArray()),
+            expiresInHours = 24,
+            allowPrint = false, // must stay exactly View — content-key refuses richer permissions
+            fileKeyBase64,
+        });
+        shareResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var share = await shareResp.Content.ReadFromJsonAsync<QuickShareCreatedResponse>();
+        share!.FileId.Should().Be(fileId, "the server must use the client-supplied fileId so it matches the .drmx header the browser already encrypted");
+
+        var accessToken = System.Web.HttpUtility.ParseQueryString(new Uri(share.ShareUrl).Query)["accessToken"];
+        accessToken.Should().NotBeNullOrWhiteSpace();
+
+        var previousMessageCount = verificationSender.Messages.Count;
+        using var start = await StartVerificationAsync(guestClient, tenantId, accessToken!, "guest@example.com");
+        start.StatusCode.Should().Be(HttpStatusCode.OK);
+        var started = await start.Content.ReadFromJsonAsync<ExternalShareVerificationStartResponse>();
+        verificationSender.Messages.Count.Should().Be(previousMessageCount + 1);
+        var code = verificationSender.Messages[^1].Code;
+
+        using var confirm = await ConfirmVerificationAsync(guestClient, tenantId, started!.VerificationId, code);
+        confirm.StatusCode.Should().Be(HttpStatusCode.OK);
+        var confirmed = await confirm.Content.ReadFromJsonAsync<ExternalShareVerificationConfirmResponse>();
+
+        using var open = await OpenViewerSessionAsync(guestClient, tenantId, confirmed!.VerificationSessionToken);
+        open.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var keyResp = await ReleaseContentKeyAsync(guestClient, tenantId, confirmed.VerificationSessionToken);
+        keyResp.StatusCode.Should().Be(HttpStatusCode.OK,
+            "before this fix, no FileKeys row existed for a QuickShare-created file, so this 404'd for every /me/ share");
+        var body = await keyResp.Content.ReadFromJsonAsync<ContentKeyRow>();
+        Convert.FromBase64String(body!.FileKeyBase64).Should().Equal(fileKey,
+            "the recipient's browser must get back the exact key the sender's browser generated, to decrypt the .drmx client-side");
+        body.ContentType.Should().Be("application/pdf");
+    }
+
+    private sealed record QuickShareCreatedResponse(Guid FileId, string ShareUrl);
+
+    [Fact]
     public async Task Content_key_released_for_viewonly_share_roundtrips_the_file_key()
     {
         var started = await CreateStartedVerificationAsync(); // registers a View-only file
