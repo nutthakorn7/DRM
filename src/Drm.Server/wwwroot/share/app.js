@@ -115,6 +115,32 @@
     }
   }
 
+  // Recipient-facing copy for server reason codes. External counterparties must
+  // never see raw snake_case like "share_link_expired" — each maps to plain
+  // language plus the recovery action they can actually take.
+  const REASON_COPY = {
+    network_error: "Couldn't reach the server. Check your connection and try again.",
+    invalid_tenant_id: "This share link is invalid. Ask the sender to send a fresh link.",
+    invalid_access_token: "This share link is invalid or has changed. Ask the sender to reshare.",
+    invalid_guest_email: "That doesn't look like a valid email address.",
+    invalid_verification_id: "Your verification session expired. Request a new code above.",
+    invalid_verification_code: "That code doesn't match. Check your email and enter it again.",
+    verification_already_confirmed: "This code was already used. Open the viewer, or request a new code.",
+    verification_expired: "That code has expired. Request a new one above.",
+    verification_attempts_exceeded: "Too many incorrect codes — this link is locked for security. Ask the sender to reshare.",
+    share_link_auto_revoked: "This link was locked after too many failed attempts. Ask the sender to send a new one.",
+    invalid_verification_session_token: "Your session expired. Confirm your code again.",
+    verification_session_expired: "Your session expired. Confirm your code again to reopen the document.",
+    share_link_revoked: "The sender has revoked access to this file.",
+    share_link_expired: "This share link has expired. Ask the sender to send a new one.",
+    share_link_max_uses_exceeded: "This link has reached its open limit. Ask the sender to send a new one.",
+    file_revoked: "The sender has revoked this file.",
+    file_expired: "This file has expired and can no longer be opened.",
+  };
+  function humanizeReason(code, fallback) {
+    return REASON_COPY[code] || fallback || "Something went wrong. Please try again.";
+  }
+
   async function renderError(response, fallbackMessage) {
     if (response.status === 404) {
       setStatus("Share not found or no longer available.", "error");
@@ -122,7 +148,7 @@
     }
 
     const body = await response.json();
-    setStatus(body.reasonCode || fallbackMessage, "error");
+    setStatus(humanizeReason(body.reasonCode, fallbackMessage), "error");
   }
 
   function renderViewerSession(payload) {
@@ -234,7 +260,7 @@
       return;
     }
     const body = await response.json().catch(() => ({}));
-    setPreviewStatus(body.reasonCode || "Could not fetch the preview key.", "error");
+    setPreviewStatus(humanizeReason(body.reasonCode, "Could not load the preview. The desktop viewer can open this file."), "error");
   }
 
   function setPreviewStatus(message, tone) {
