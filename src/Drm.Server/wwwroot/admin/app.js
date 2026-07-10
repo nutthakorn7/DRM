@@ -43,6 +43,28 @@ tenantIdInput.value = state.tenantId;
 adminKeyInput.value = state.adminKey;
 adminUserIdInput.value = state.adminUserId;
 
+// The Policy/Files/Tenants compliance panels resolve the active tenant through
+// this helper. It was referenced 17x but never defined, so every one of those
+// handlers threw ReferenceError on its first line and silently did nothing —
+// GDPR erasure, compliance export, retention, IP allowlist, device trust, key
+// rotation, collections, and batch ops all looked clickable but were inert.
+// Resolve it against the tenant field, the same source every other panel reads.
+function currentTenantId() {
+  return tenantIdInput.value.trim();
+}
+
+// Never let a handler fail silently again: surface any uncaught error/rejection
+// as a visible status instead of a dead button. setStatus is defined below and
+// resolved at event time, so referencing it here is safe.
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("Unhandled promise rejection:", event.reason);
+  try { setStatus(`Unexpected error: ${event.reason?.message || event.reason}`, "error"); } catch { /* pre-init */ }
+});
+window.addEventListener("error", (event) => {
+  console.error("Uncaught error:", event.error || event.message);
+  try { setStatus(`Unexpected error: ${event.message}`, "error"); } catch { /* pre-init */ }
+});
+
 // Show disconnected badge when no session is loaded
 if (!state.tenantId || !state.adminKey) {
   connectionState.textContent = "Not connected";
@@ -1656,6 +1678,7 @@ async function downloadAuditCsv() {
 }
 
 async function revokeFile(fileId) {
+  if (!confirm("Revoke this file? Everyone it was shared with loses access immediately. This cannot be undone.")) return;
   const body = {
     tenantId: requireTenantId(),
     adminUserId: requireAdminUserId()
@@ -1818,6 +1841,7 @@ async function createShareLink() {
 }
 
 async function revokeShareLink(fileId, shareLinkId) {
+  if (!confirm("Revoke this share link? The recipient loses access immediately.")) return;
   const body = {
     tenantId: requireTenantId(),
     adminUserId: requireAdminUserId()
@@ -1833,6 +1857,7 @@ async function revokeShareLink(fileId, shareLinkId) {
 }
 
 async function disableDevice(deviceId) {
+  if (!confirm("Disable this device? The user can no longer open protected files on it until it is re-enabled.")) return;
   const body = {
     tenantId: requireTenantId(),
     adminUserId: requireAdminUserId(),
@@ -2636,6 +2661,7 @@ async function refreshTenants() {
 }
 
 async function toggleTenantStatus(tenantId, newStatus) {
+  if (newStatus === 1 && !confirm("Suspend this tenant? Everyone in it is locked out of protected files until you reactivate it.")) return;
   try {
     await apiFetchGlobal(`/api/admin/tenants/${encodeURIComponent(tenantId)}`, {
       method: "PATCH",
@@ -3353,6 +3379,7 @@ document.getElementById("batchRevokeBtn")?.addEventListener("click", async () =>
   const raw = document.getElementById("batchRevokeIds").value.trim();
   const fileIds = raw.split(/\s+/).filter(Boolean);
   if (!fileIds.length) return;
+  if (!confirm(`Revoke ${fileIds.length} file(s)? Everyone they were shared with loses access immediately. This cannot be undone.`)) return;
   const data = await apiFetch("/api/admin/files/batch-revoke", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
