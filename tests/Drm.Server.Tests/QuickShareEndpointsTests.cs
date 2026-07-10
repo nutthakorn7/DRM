@@ -92,6 +92,51 @@ public sealed class QuickShareEndpointsTests : IDisposable
     private sealed record AdminFileRow(Guid FileId, string FileName);
 
     [Fact]
+    public async Task Quick_share_with_misconfigured_master_key_returns_clean_500_not_unhandled_exception()
+    {
+        // Regression guard: a malformed/missing Drm:KeyWrapping:MasterKeyBase64
+        // is an operator config error, not something the sender did wrong. It
+        // must never leak as a raw unhandled exception/stack trace to the
+        // client — this is exactly what prod hit the first time this wrap
+        // path was ever exercised there (its configured key decoded to the
+        // wrong byte length).
+        var badKeyDatabasePath = Path.Combine(Path.GetTempPath(), $"drm-quickshare-badkey-{Guid.NewGuid():N}.db");
+        using var badKeyFactory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b =>
+            {
+                b.UseSetting("ConnectionStrings:DrmDb", $"Data Source={badKeyDatabasePath}");
+                b.UseSetting("Drm:Mode", "OnPrem");
+                // 43 chars: one short of the 44 a valid base64 32-byte key needs.
+                b.UseSetting("Drm:KeyWrapping:MasterKeyBase64", new string('A', 43));
+            });
+        try
+        {
+            using var client = badKeyFactory.CreateClient();
+            using var resp = await client.PostAsJsonAsync("/api/me/share", new
+            {
+                tenantId = Guid.NewGuid(),
+                userId = Guid.NewGuid(),
+                recipientEmail = "keyerror@example.com",
+                fileName = "doc.pdf",
+                contentType = "application/pdf",
+                fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("hi")),
+                expiresInHours = 24,
+                allowPrint = false,
+                fileId = Guid.NewGuid(),
+                fileKeyBase64 = Convert.ToBase64String(new byte[32]),
+            });
+            resp.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+            var body = await resp.Content.ReadAsStringAsync();
+            body.Should().Contain("server_key_wrapping_misconfigured");
+        }
+        finally
+        {
+            foreach (var c in new[] { badKeyDatabasePath, $"{badKeyDatabasePath}-wal", $"{badKeyDatabasePath}-shm" })
+                if (File.Exists(c)) File.Delete(c);
+        }
+    }
+
+    [Fact]
     public async Task Quick_share_url_uses_https_when_forwarded_proto_is_https()
     {
         // Behind Caddy (TLS terminator) the app sees internal http; the real
