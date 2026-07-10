@@ -14,8 +14,31 @@ public static class AdminIdentityEndpoints
         endpoints.MapPost("/api/admin/identity/admins/{adminId:guid}/disable", DisableAdmin);
         endpoints.MapPost("/api/admin/identity/admins/{adminId:guid}/enable", EnableAdmin);
         endpoints.MapPost("/api/admin/identity/admins/{adminId:guid}/rotate-token", RotateToken);
+        endpoints.MapGet("/api/admin/identity/admins/{adminId:guid}/tokens", ListTokens);
         endpoints.MapPost("/api/admin/identity/tokens/{tokenId:guid}/revoke", RevokeToken);
         return endpoints;
+    }
+
+    // Per-token inventory so a compromised credential can actually be found
+    // and killed from the console — previously the UI only showed an active
+    // *count*, and /tokens/{tokenId}/revoke had no caller anywhere in it.
+    private static async Task<Results<Ok<IReadOnlyList<TokenResponse>>, JsonHttpResult<object>>> ListTokens(
+        Guid adminId, HttpContext httpContext, AppDbContext db, CancellationToken ct)
+    {
+        if (!AdminIdentityContext.TryRequirePermission(httpContext, AdminPermissions.AdminsRead, out var fail))
+            return Forbidden(fail!);
+
+        // SQLite can't translate ORDER BY on a DateTimeOffset column — sort
+        // client-side (a token count of dozens at most, so no scale concern).
+        var tokens = await db.AdminApiTokens.AsNoTracking()
+            .Where(t => t.AdminUserId == adminId)
+            .ToListAsync(ct);
+
+        IReadOnlyList<TokenResponse> response = tokens
+            .OrderByDescending(t => t.CreatedAtUtc)
+            .Select(t => new TokenResponse(t.Id, t.Label, t.CreatedAtUtc, t.ExpiresAtUtc, t.LastUsedAtUtc, t.Revoked))
+            .ToArray();
+        return TypedResults.Ok(response);
     }
 
     private static Results<Ok<WhoAmIResponse>, JsonHttpResult<object>> WhoAmI(HttpContext httpContext)
@@ -174,6 +197,18 @@ public static class AdminIdentityEndpoints
         var admin = await db.AdminUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == adminId, ct);
         if (admin is null) return BadRequest("admin_not_found");
 
+        // The Okta/Stripe roll-key contract: rotating mints a new token AND
+        // kills every predecessor immediately. Previously this only ever
+        // added a new row — every prior token an admin had ever been issued
+        // stayed valid forever, so "rotate" didn't actually roll anything.
+        var priorActiveTokens = await db.AdminApiTokens
+            .Where(t => t.AdminUserId == adminId && !t.Revoked)
+            .ToListAsync(ct);
+        foreach (var prior in priorActiveTokens)
+        {
+            prior.Revoked = true;
+        }
+
         var plaintext = AdminTokenCrypto.GenerateToken();
         var now = DateTimeOffset.UtcNow;
         var token = new AdminApiTokenEntity
@@ -255,6 +290,14 @@ public static class AdminIdentityEndpoints
         DateTimeOffset? LastUsedAtUtc,
         int ActiveTokenCount,
         Guid? TenantScope);
+
+    private sealed record TokenResponse(
+        Guid Id,
+        string Label,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? ExpiresAtUtc,
+        DateTimeOffset? LastUsedAtUtc,
+        bool Revoked);
 
     public sealed record CreateAdminRequest(string Email, string? DisplayName, Guid RoleId, string? TokenLabel, DateTimeOffset? TokenExpiresAtUtc, Guid? TenantScope = null);
 

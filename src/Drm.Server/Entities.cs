@@ -98,6 +98,11 @@ public sealed class ProtectedFileEntity
 
     public string ContentType { get; set; } = string.Empty;
 
+    // The original filename, so the console can show "Q4-Contract.pdf"
+    // instead of only ever showing this row's GUID. Empty for files
+    // registered before this column existed.
+    public string FileName { get; set; } = string.Empty;
+
     public DateTimeOffset ExpiresAtUtc { get; set; }
 
     public bool Revoked { get; set; }

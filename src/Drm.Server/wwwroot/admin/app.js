@@ -2250,7 +2250,9 @@ function renderFiles(files) {
   const tenantId = tenantIdInput.value.trim();
   filesBody.innerHTML = files.map((file) => `
     <tr>
-      <td><code>${escapeHtml(file.fileId)}</code></td>
+      <td>${file.fileName
+        ? `${escapeHtml(file.fileName)}<br><code class="hint">${escapeHtml(file.fileId)}</code>`
+        : `<code>${escapeHtml(file.fileId)}</code>`}</td>
       <td><code>${escapeHtml(file.ownerUserId)}</code></td>
       <td>${escapeHtml(file.contentType)}</td>
       <td>${escapeHtml(file.permissions)}</td>
@@ -2540,6 +2542,7 @@ async function refreshAdmins() {
           ? `<button type="button" data-enable-admin="${escapeHtml(a.id)}">Enable</button>`
           : `<button type="button" class="danger" data-disable-admin="${escapeHtml(a.id)}">Disable</button>`}
         <button type="button" data-rotate-token-admin="${escapeHtml(a.id)}">Rotate token</button>
+        <button type="button" data-list-tokens-admin="${escapeHtml(a.id)}">Tokens</button>
       </td>
     </tr>
   `).join("");
@@ -2552,6 +2555,9 @@ async function refreshAdmins() {
   });
   adminsBody.querySelectorAll("[data-rotate-token-admin]").forEach((btn) => {
     btn.addEventListener("click", () => rotateAdminToken(btn.dataset.rotateTokenAdmin));
+  });
+  adminsBody.querySelectorAll("[data-list-tokens-admin]").forEach((btn) => {
+    btn.addEventListener("click", () => openAdminTokensDialog(btn.dataset.listTokensAdmin));
   });
 
   setStatus(`${admins.length} admin${admins.length === 1 ? "" : "s"} loaded`, "ok");
@@ -2594,6 +2600,59 @@ async function rotateAdminToken(adminId) {
   await refreshAdmins();
   setStatus("Token rotated — copy the new token above", "ok");
 }
+
+// ── Per-token inventory + one-click revoke (UX audit finding #9) ──────────
+// Rotating used to only ever ADD a token, so a leaked credential stayed
+// valid forever; the console also had no way to see individual tokens, only
+// an opaque active count. This dialog lists every token an admin has ever
+// been issued and lets any single one be killed on the spot.
+let _adminTokensDialogAdminId = null;
+
+async function openAdminTokensDialog(adminId) {
+  _adminTokensDialogAdminId = adminId;
+  document.getElementById("adminTokensDialog")?.showModal();
+  await refreshAdminTokensDialog();
+}
+
+async function refreshAdminTokensDialog() {
+  const tbody = document.getElementById("adminTokensBody");
+  if (!_adminTokensDialogAdminId || !tbody) return;
+  try {
+    const tokens = await apiFetch(`/api/admin/identity/admins/${encodeURIComponent(_adminTokensDialogAdminId)}/tokens`);
+    if (!tokens.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No tokens issued yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = tokens.map((t) => `
+      <tr>
+        <td>${escapeHtml(t.label || "(untitled)")}</td>
+        <td>${escapeHtml(formatDate(t.createdAtUtc) || "—")}</td>
+        <td>${t.expiresAtUtc ? escapeHtml(formatDate(t.expiresAtUtc)) : "Never"}</td>
+        <td>${escapeHtml(formatDate(t.lastUsedAtUtc) || "Never")}</td>
+        <td>${t.revoked ? '<span class="badge badge-error">Revoked</span>' : '<span class="badge badge-ok">Active</span>'}</td>
+        <td>${t.revoked ? "" : `<button type="button" class="danger" data-revoke-token-id="${escapeHtml(t.id)}">Revoke</button>`}</td>
+      </tr>
+    `).join("");
+    tbody.querySelectorAll("[data-revoke-token-id]").forEach((btn) => {
+      btn.addEventListener("click", () => revokeAdminToken(btn.dataset.revokeTokenId));
+    });
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Failed to load tokens.</td></tr>';
+  }
+}
+
+async function revokeAdminToken(tokenId) {
+  if (!confirm("Revoke this token? Anything still using it loses access immediately.")) return;
+  await apiFetch(`/api/admin/identity/tokens/${encodeURIComponent(tokenId)}/revoke`, { method: "POST" });
+  setStatus("Token revoked", "ok");
+  await refreshAdminTokensDialog();
+  await refreshAdmins();
+}
+
+document.getElementById("closeAdminTokensDialog")?.addEventListener("click", () => {
+  document.getElementById("adminTokensDialog")?.close();
+  _adminTokensDialogAdminId = null;
+});
 
 // ── Tenants (operator-level) ────────────────────────────────────────────────
 

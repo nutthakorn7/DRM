@@ -145,6 +145,73 @@ public sealed class AdminIdentityApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Rotate_token_revokes_the_predecessor()
+    {
+        // Regression guard (UX audit finding #9): rotate used to only ADD a
+        // new token, never touching the old one — a leaked admin credential
+        // stayed valid forever even after "rotating" it. This is the
+        // Okta/Stripe roll-key contract: rotating must kill the old token.
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(AdminIdentityAuthentication.SharedKeyHeaderName, AdminApiKey);
+
+        using var createResponse = await client.PostAsJsonAsync("/api/admin/identity/admins", new
+        {
+            email = $"carol-{Guid.NewGuid():N}@example.com",
+            displayName = "Carol",
+            roleId = AdminSystemRoles.TenantAdminId,
+            tokenLabel = "original"
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateAdminBody>();
+
+        using var rotateResponse = await client.PostAsJsonAsync(
+            $"/api/admin/identity/admins/{created!.AdminUserId}/rotate-token", new { label = "rotated" });
+        rotateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rotated = await rotateResponse.Content.ReadFromJsonAsync<RotateTokenBody>();
+
+        using var oldTokenClient = factory.CreateClient();
+        oldTokenClient.DefaultRequestHeaders.Add(AdminIdentityAuthentication.TokenHeaderName, created.Token);
+        using var oldWhoami = await oldTokenClient.GetAsync("/api/admin/identity/whoami");
+        oldWhoami.StatusCode.Should().Be(HttpStatusCode.Forbidden, "rotating must revoke the predecessor immediately");
+
+        using var newTokenClient = factory.CreateClient();
+        newTokenClient.DefaultRequestHeaders.Add(AdminIdentityAuthentication.TokenHeaderName, rotated!.Token);
+        using var newWhoami = await newTokenClient.GetAsync("/api/admin/identity/whoami");
+        newWhoami.StatusCode.Should().Be(HttpStatusCode.OK, "the freshly rotated token must authenticate");
+    }
+
+    [Fact]
+    public async Task List_tokens_shows_full_inventory_including_revoked_state()
+    {
+        // Regression guard (UX audit finding #9): the console had no way to
+        // see or individually revoke a specific token — only an opaque
+        // active-count. This is the endpoint that inventory view calls.
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(AdminIdentityAuthentication.SharedKeyHeaderName, AdminApiKey);
+
+        using var createResponse = await client.PostAsJsonAsync("/api/admin/identity/admins", new
+        {
+            email = $"dave-{Guid.NewGuid():N}@example.com",
+            displayName = "Dave",
+            roleId = AdminSystemRoles.TenantAdminId,
+            tokenLabel = "first"
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateAdminBody>();
+
+        using var rotateResponse = await client.PostAsJsonAsync(
+            $"/api/admin/identity/admins/{created!.AdminUserId}/rotate-token", new { label = "second" });
+        var rotated = await rotateResponse.Content.ReadFromJsonAsync<RotateTokenBody>();
+
+        using var listResponse = await client.GetAsync($"/api/admin/identity/admins/{created.AdminUserId}/tokens");
+        listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var tokens = await listResponse.Content.ReadFromJsonAsync<List<TokenBody>>();
+
+        tokens.Should().HaveCount(2);
+        tokens.Should().ContainSingle(t => t.Id == created.TokenId && t.Label == "first" && t.Revoked,
+            "rotate-token must have revoked the original");
+        tokens.Should().ContainSingle(t => t.Id == rotated!.TokenId && t.Label == "second" && !t.Revoked);
+    }
+
+    [Fact]
     public async Task Readonly_role_cannot_create_admins()
     {
         using var bootstrap = factory.CreateClient();
@@ -202,4 +269,6 @@ public sealed class AdminIdentityApiTests : IDisposable
     private sealed record WhoamiBody(Guid AdminUserId, Guid RoleId, string DisplayName, string Email, List<string> Permissions, bool SharedKeyFallback);
     private sealed record RoleBody(Guid Id, string Name, List<string> Permissions, bool IsSystem);
     private sealed record CreateAdminBody(Guid AdminUserId, string Email, string DisplayName, Guid RoleId, string RoleName, Guid TokenId, string Token, DateTimeOffset? TokenExpiresAtUtc);
+    private sealed record RotateTokenBody(Guid TokenId, string Token, DateTimeOffset? ExpiresAtUtc);
+    private sealed record TokenBody(Guid Id, string Label, DateTimeOffset CreatedAtUtc, DateTimeOffset? ExpiresAtUtc, DateTimeOffset? LastUsedAtUtc, bool Revoked);
 }

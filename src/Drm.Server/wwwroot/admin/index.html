@@ -272,7 +272,7 @@
 
         <form id="notificationConfigForm">
           <div class="create-row">
-            <input id="notifyAdminEmails" autocomplete="off" placeholder="Admin emails (comma-separated)">
+            <input id="notifyAdminEmails" autocomplete="off" placeholder="Admin emails (comma-separated)" aria-label="Admin emails (comma-separated)">
             <button type="submit">Save</button>
           </div>
           <div class="check-row">
@@ -293,9 +293,9 @@
         </div>
 
         <form class="create-row" id="directorySyncConfigForm">
-          <input id="dirEntraTenantId" autocomplete="off" placeholder="Entra tenant ID">
-          <input id="dirClientId" autocomplete="off" placeholder="Client ID">
-          <input id="dirClientSecret" type="password" autocomplete="off" placeholder="Client secret">
+          <input id="dirEntraTenantId" autocomplete="off" placeholder="Entra tenant ID" aria-label="Entra tenant ID">
+          <input id="dirClientId" autocomplete="off" placeholder="Client ID" aria-label="Client ID">
+          <input id="dirClientSecret" type="password" autocomplete="off" placeholder="Client secret" aria-label="Client secret">
           <button type="submit">Save config</button>
         </form>
 
@@ -325,9 +325,9 @@
           <label class="inline-check">
             <input id="outlookAutoEncrypt" type="checkbox" checked> Auto-encrypt outgoing
           </label>
-          <input id="outlookMinSize" type="number" min="0" max="100000" value="0" placeholder="Min size (KB, 0 = always)">
-          <input id="outlookSkipDomains" autocomplete="off" placeholder="Skip domains (comma sep)">
-          <input id="outlookDefaultTemplate" autocomplete="off" placeholder="Default policy template ID">
+          <input id="outlookMinSize" type="number" min="0" max="100000" value="0" placeholder="Min size (KB, 0 = always)" aria-label="Min size (KB, 0 = always)">
+          <input id="outlookSkipDomains" autocomplete="off" placeholder="Skip domains (comma sep)" aria-label="Skip domains (comma sep)">
+          <input id="outlookDefaultTemplate" autocomplete="off" placeholder="Default policy template ID" aria-label="Default policy template ID">
           <button type="submit">Save config</button>
         </form>
 
@@ -369,10 +369,10 @@
         </div>
 
         <form class="create-row" id="boxConfigForm">
-          <input id="boxClientId" autocomplete="off" placeholder="Box Client ID">
-          <input id="boxClientSecret" type="password" autocomplete="off" placeholder="Box Client Secret">
-          <input id="boxEnterpriseId" autocomplete="off" placeholder="Enterprise ID">
-          <input id="boxWebhookSecret" type="password" autocomplete="off" placeholder="Webhook signing secret">
+          <input id="boxClientId" autocomplete="off" placeholder="Box Client ID" aria-label="Box Client ID">
+          <input id="boxClientSecret" type="password" autocomplete="off" placeholder="Box Client Secret" aria-label="Box Client Secret">
+          <input id="boxEnterpriseId" autocomplete="off" placeholder="Enterprise ID" aria-label="Enterprise ID">
+          <input id="boxWebhookSecret" type="password" autocomplete="off" placeholder="Webhook signing secret" aria-label="Webhook signing secret">
           <label class="inline-check">
             <input id="boxEnabled" type="checkbox"> Enabled
           </label>
@@ -416,9 +416,9 @@
         </div>
 
         <form class="create-row" id="createUserForm">
-          <input id="newUserId" autocomplete="off" placeholder="User ID (optional — auto)">
-          <input id="newUserEmail" type="email" autocomplete="off" placeholder="Email">
-          <input id="newUserDisplayName" autocomplete="off" placeholder="Display name">
+          <input id="newUserId" autocomplete="off" placeholder="User ID (optional — auto)" aria-label="User ID (optional — auto)">
+          <input id="newUserEmail" type="email" autocomplete="off" placeholder="Email" aria-label="Email">
+          <input id="newUserDisplayName" autocomplete="off" placeholder="Display name" aria-label="Display name">
           <button type="submit">Create</button>
         </form>
 
@@ -456,14 +456,14 @@
         </div>
 
         <form class="create-row" id="createGroupForm">
-          <input id="newGroupId" autocomplete="off" placeholder="Group ID">
-          <input id="newGroupName" autocomplete="off" placeholder="Group name">
+          <input id="newGroupId" autocomplete="off" placeholder="Group ID" aria-label="Group ID">
+          <input id="newGroupName" autocomplete="off" placeholder="Group name" aria-label="Group name">
           <button type="submit">Create group</button>
         </form>
 
         <form class="create-row" id="addGroupMemberForm">
-          <input id="memberGroupId" autocomplete="off" placeholder="Group ID">
-          <input id="memberUserId" autocomplete="off" placeholder="User ID">
+          <input id="memberGroupId" autocomplete="off" placeholder="Group ID" aria-label="Group ID">
+          <input id="memberUserId" autocomplete="off" placeholder="User ID" aria-label="User ID">
           <button type="submit">Add member</button>
         </form>
 
@@ -527,8 +527,8 @@
         </div>
 
         <div class="device-filter-row">
-          <input id="deviceStatusFilter" autocomplete="off" placeholder="Filter by status">
-          <input id="deviceUserFilter" autocomplete="off" placeholder="Filter by user ID">
+          <input id="deviceStatusFilter" autocomplete="off" placeholder="Filter by status" aria-label="Filter by status">
+          <input id="deviceUserFilter" autocomplete="off" placeholder="Filter by user ID" aria-label="Filter by user ID">
         </div>
 
         <div class="table-wrap">
@@ -602,13 +602,13 @@
         <details class="anti-capture-block">
           <summary>Create admin user</summary>
           <form id="createAdminForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
-            <input id="newAdminEmail" type="email" autocomplete="off" placeholder="Email" required>
-            <input id="newAdminDisplayName" autocomplete="off" placeholder="Display name (optional)">
+            <input id="newAdminEmail" type="email" autocomplete="off" placeholder="Email" required aria-label="Email">
+            <input id="newAdminDisplayName" autocomplete="off" placeholder="Display name (optional)" aria-label="Display name (optional)">
             <select id="newAdminRoleId" aria-label="Role">
               <option value="">Select role…</option>
             </select>
-            <input id="newAdminTokenLabel" autocomplete="off" placeholder="Token label (optional)">
-            <input id="newAdminTenantScope" autocomplete="off" placeholder="Tenant scope (UUID, blank = global)">
+            <input id="newAdminTokenLabel" autocomplete="off" placeholder="Token label (optional)" aria-label="Token label (optional)">
+            <input id="newAdminTenantScope" autocomplete="off" placeholder="Tenant scope (UUID, blank = global)" aria-label="Tenant scope (UUID, blank = global)">
             <button type="submit">Create admin</button>
           </form>
           <pre id="createAdminOutput" class="output-block" hidden></pre>
@@ -635,6 +635,33 @@
             </tbody>
           </table>
         </div>
+
+        <dialog id="adminTokensDialog" aria-modal="true" aria-labelledby="adminTokensDialogTitle">
+          <div class="dialog-head">
+            <p class="eyebrow" id="adminTokensDialogTitle">Tokens</p>
+            <button type="button" class="dialog-close" aria-label="Close" id="closeAdminTokensDialog">×</button>
+          </div>
+          <div class="dialog-body">
+            <p class="hint">A leaked or unused token can be killed here without waiting for it to expire. Rotating always revokes whatever token it replaces.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Label</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>Last used</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminTokensBody">
+                  <tr><td colspan="6" class="empty">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </dialog>
       </section>
 
       <section class="panel" id="templates" data-tab="policy">
@@ -647,12 +674,12 @@
         </div>
 
         <form class="template-row" id="createPolicyTemplateForm">
-          <input id="templateId" autocomplete="off" placeholder="Template ID">
-          <input id="templateName" autocomplete="off" placeholder="Name">
-          <input id="templatePermissions" autocomplete="off" placeholder="Permissions, e.g. View, Print">
-          <input id="templateWatermark" autocomplete="off" placeholder="Watermark template">
-          <input id="templateOfflineLease" type="number" min="0" max="527040" autocomplete="off" placeholder="Offline lease minutes">
-          <input id="templateMaxOpens" type="number" min="1" max="100000" autocomplete="off" placeholder="Max opens per user (blank = unlimited)">
+          <input id="templateId" autocomplete="off" placeholder="Template ID" aria-label="Template ID">
+          <input id="templateName" autocomplete="off" placeholder="Name" aria-label="Name">
+          <input id="templatePermissions" autocomplete="off" placeholder="Permissions, e.g. View, Print" aria-label="Permissions, e.g. View, Print">
+          <input id="templateWatermark" autocomplete="off" placeholder="Watermark template" aria-label="Watermark template">
+          <input id="templateOfflineLease" type="number" min="0" max="527040" autocomplete="off" placeholder="Offline lease minutes" aria-label="Offline lease minutes">
+          <input id="templateMaxOpens" type="number" min="1" max="100000" autocomplete="off" placeholder="Max opens per user (blank = unlimited)" aria-label="Max opens per user (blank = unlimited)">
           <label class="check-row">
             <input id="templateAllowPrint" type="checkbox">
             <span>Allow print</span>
@@ -707,9 +734,9 @@
         </div>
 
         <form class="watermark-row" id="createWatermarkTemplateForm">
-          <input id="watermarkTemplateId" autocomplete="off" placeholder="Watermark template ID">
-          <input id="watermarkTemplateName" autocomplete="off" placeholder="Name">
-          <input id="watermarkTemplatePattern" autocomplete="off" placeholder="Watermark pattern (e.g. {user} • {time})">
+          <input id="watermarkTemplateId" autocomplete="off" placeholder="Watermark template ID" aria-label="Watermark template ID">
+          <input id="watermarkTemplateName" autocomplete="off" placeholder="Name" aria-label="Name">
+          <input id="watermarkTemplatePattern" autocomplete="off" placeholder="Watermark pattern (e.g. {user} • {time})" aria-label="Watermark pattern (e.g. {user} • {time})">
           <button type="submit">Create watermark</button>
         </form>
 
@@ -790,10 +817,10 @@
         </div>
 
         <form class="simulator-row" id="simulatePolicyForm">
-          <input id="simulateFileId" autocomplete="off" placeholder="File ID">
-          <input id="simulateUserId" autocomplete="off" placeholder="User ID">
-          <input id="simulateDeviceId" autocomplete="off" placeholder="Device ID">
-          <input id="simulatePermission" autocomplete="off" placeholder="Permission, e.g. View">
+          <input id="simulateFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
+          <input id="simulateUserId" autocomplete="off" placeholder="User ID" aria-label="User ID">
+          <input id="simulateDeviceId" autocomplete="off" placeholder="Device ID" aria-label="Device ID">
+          <input id="simulatePermission" autocomplete="off" placeholder="Permission, e.g. View" aria-label="Permission, e.g. View">
           <button type="submit">Simulate access</button>
         </form>
 
@@ -810,23 +837,23 @@
         </div>
 
         <div class="filter-row">
-          <input id="fileQuery" autocomplete="off" placeholder="Filter by content type">
+          <input id="fileQuery" autocomplete="off" placeholder="Filter by content type" aria-label="Filter by content type">
         </div>
 
         <form class="grant-row" id="grantForm">
-          <input id="grantFileId" autocomplete="off" placeholder="File ID">
+          <input id="grantFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
           <select id="grantSubjectType" aria-label="Subject type">
             <option value="User">User</option>
             <option value="Group">Group</option>
           </select>
-          <input id="grantSubjectId" autocomplete="off" placeholder="Subject ID">
-          <input id="grantPermissions" autocomplete="off" placeholder="Permissions, e.g. View, Print">
+          <input id="grantSubjectId" autocomplete="off" placeholder="Subject ID" aria-label="Subject ID">
+          <input id="grantPermissions" autocomplete="off" placeholder="Permissions, e.g. View, Print" aria-label="Permissions, e.g. View, Print">
           <button type="submit">Set grant</button>
         </form>
 
         <form class="apply-template-row" id="applyPolicyTemplateForm">
-          <input id="applyTemplateFileId" autocomplete="off" placeholder="File ID">
-          <input id="applyPolicyTemplateId" autocomplete="off" placeholder="Policy template ID">
+          <input id="applyTemplateFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
+          <input id="applyPolicyTemplateId" autocomplete="off" placeholder="Policy template ID" aria-label="Policy template ID">
           <button type="submit">Apply policy template</button>
         </form>
 
@@ -867,14 +894,14 @@
         </details>
 
         <form class="delete-copy-row" id="deleteCopyForm">
-          <input id="deleteCopyFileId" autocomplete="off" placeholder="File ID">
-          <input id="deleteCopyDeviceId" autocomplete="off" placeholder="Target device ID">
+          <input id="deleteCopyFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
+          <input id="deleteCopyDeviceId" autocomplete="off" placeholder="Target device ID" aria-label="Target device ID">
           <button class="danger" type="submit">Delete protected copy</button>
         </form>
 
         <form class="apply-template-row" id="addTagForm">
-          <input id="tagFileId" autocomplete="off" placeholder="File ID">
-          <input id="tagValue" autocomplete="off" placeholder="Tag (e.g. confidential, hr, q4-2026)" maxlength="64">
+          <input id="tagFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
+          <input id="tagValue" autocomplete="off" placeholder="Tag (e.g. confidential, hr, q4-2026)" maxlength="64" aria-label="Tag (e.g. confidential, hr, q4-2026)">
           <button type="submit">Add tag</button>
           <button id="removeTagBtn" type="button">Remove tag</button>
         </form>
@@ -889,7 +916,7 @@
           <table>
             <thead>
               <tr>
-                <th>File ID</th>
+                <th>File</th>
                 <th>Owner</th>
                 <th>Type</th>
                 <th>Permissions</th>
@@ -917,15 +944,15 @@
         </div>
 
         <form class="share-link-row" id="createShareLinkForm">
-          <input id="shareLinkFileId" autocomplete="off" placeholder="File ID">
-          <input id="shareLinkGuestEmail" type="email" autocomplete="off" placeholder="Guest email">
-          <input id="shareLinkExpiresAt" type="datetime-local" autocomplete="off">
-          <input id="shareLinkMaxUses" type="number" min="1" max="1000" value="1" autocomplete="off" placeholder="Max uses">
+          <input id="shareLinkFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
+          <input id="shareLinkGuestEmail" type="email" autocomplete="off" placeholder="Guest email" aria-label="Guest email">
+          <input id="shareLinkExpiresAt" type="datetime-local" autocomplete="off" aria-label="Share link expiry">
+          <input id="shareLinkMaxUses" type="number" min="1" max="1000" value="1" autocomplete="off" placeholder="Max uses" aria-label="Max uses">
           <button type="submit">Create share link</button>
         </form>
 
         <div class="share-link-filter-row">
-          <input id="shareLinksFileId" autocomplete="off" placeholder="File ID">
+          <input id="shareLinksFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
         </div>
 
         <pre class="token-output" id="shareLinkCreatedOutput">Created share tokens appear once.</pre>
@@ -962,8 +989,8 @@
         </div>
 
         <div class="command-filter-row">
-          <input id="commandFileId" autocomplete="off" placeholder="File ID">
-          <input id="commandDeviceId" autocomplete="off" placeholder="Device ID filter">
+          <input id="commandFileId" autocomplete="off" placeholder="File ID" aria-label="File ID">
+          <input id="commandDeviceId" autocomplete="off" placeholder="Device ID filter" aria-label="Device ID filter">
         </div>
 
         <div class="table-wrap">
@@ -998,8 +1025,8 @@
         </div>
 
         <form class="webhook-row" id="createSiemWebhookForm">
-          <input id="siemWebhookId" autocomplete="off" placeholder="Webhook ID">
-          <input id="siemWebhookUrl" autocomplete="off" placeholder="Webhook URL">
+          <input id="siemWebhookId" autocomplete="off" placeholder="Webhook ID" aria-label="Webhook ID">
+          <input id="siemWebhookUrl" autocomplete="off" placeholder="Webhook URL" aria-label="Webhook URL">
           <label class="check-row">
             <input id="siemWebhookEnabled" type="checkbox" checked>
             <span>Enabled</span>
@@ -1040,7 +1067,7 @@
         </div>
 
         <div class="audit-filter-row">
-          <input id="auditEventType" autocomplete="off" placeholder="Event type filter">
+          <input id="auditEventType" autocomplete="off" placeholder="Event type filter" aria-label="Event type filter">
         </div>
 
         <div class="table-wrap">
@@ -1145,7 +1172,7 @@
             <h3>Analytics</h3>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <select id="metricsPeriod" style="min-width:100px">
+            <select id="metricsPeriod" style="min-width:100px" aria-label="Metrics time period">
               <option value="7">7 days</option>
               <option value="30">30 days</option>
               <option value="90">90 days</option>
@@ -1341,10 +1368,10 @@
         <p class="hint">Transparent files keep their original extension (<code>.xlsx</code> stays <code>.xlsx</code>) by appending a tamper-evident DRM trailer. They open in their native application; DRM-aware tools surface tenant + policy metadata.</p>
 
         <form class="grant-row" id="registerTransparentForm">
-          <input id="transparentFileId" autocomplete="off" placeholder="File ID (GUID)">
-          <input id="transparentOwner" autocomplete="off" placeholder="Owner user ID">
-          <input id="transparentFileName" autocomplete="off" placeholder="Original file name (foo.xlsx)">
-          <input id="transparentContentType" autocomplete="off" placeholder="MIME type (optional)">
+          <input id="transparentFileId" autocomplete="off" placeholder="File ID (GUID)" aria-label="File ID (GUID)">
+          <input id="transparentOwner" autocomplete="off" placeholder="Owner user ID" aria-label="Owner user ID">
+          <input id="transparentFileName" autocomplete="off" placeholder="Original file name (foo.xlsx)" aria-label="Original file name (foo.xlsx)">
+          <input id="transparentContentType" autocomplete="off" placeholder="MIME type (optional)" aria-label="MIME type (optional)">
           <button type="submit">Register</button>
         </form>
 
@@ -1419,7 +1446,7 @@
           <label class="inline-check">
             <input id="folderWatcherEnabled" type="checkbox"> Enabled
           </label>
-          <input id="folderWatcherPaths" autocomplete="off" placeholder="Watched folders (one path per line)">
+          <input id="folderWatcherPaths" autocomplete="off" placeholder="Watched folders (one path per line)" aria-label="Watched folders (one path per line)">
           <button type="submit">Save config</button>
         </form>
 
@@ -1464,10 +1491,10 @@
         <details id="createTenantDetails">
           <summary>Create tenant</summary>
           <form id="createTenantForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
-            <input id="newTenantName" autocomplete="off" placeholder="Unique name (slug)" required>
-            <input id="newTenantDisplayName" autocomplete="off" placeholder="Display name (optional)">
-            <input id="newTenantId" autocomplete="off" placeholder="Tenant ID (UUID, blank = auto)">
-            <input id="newTenantMaxEncrypters" type="number" min="1" autocomplete="off" placeholder="Seat limit (blank = unlimited)">
+            <input id="newTenantName" autocomplete="off" placeholder="Unique name (slug)" required aria-label="Unique name (slug)">
+            <input id="newTenantDisplayName" autocomplete="off" placeholder="Display name (optional)" aria-label="Display name (optional)">
+            <input id="newTenantId" autocomplete="off" placeholder="Tenant ID (UUID, blank = auto)" aria-label="Tenant ID (UUID, blank = auto)">
+            <input id="newTenantMaxEncrypters" type="number" min="1" autocomplete="off" placeholder="Seat limit (blank = unlimited)" aria-label="Seat limit (blank = unlimited)">
             <button type="submit">Create tenant</button>
           </form>
           <pre id="createTenantOutput" class="output-block" hidden></pre>
@@ -1513,7 +1540,7 @@
           <details id="createKeyDetails">
             <summary>Issue new key</summary>
             <form id="createKeyForm" class="create-row" style="gap:6px;margin-top:8px">
-              <input id="newKeyLabel" autocomplete="off" placeholder="Label (e.g. production)">
+              <input id="newKeyLabel" autocomplete="off" placeholder="Label (e.g. production)" aria-label="Label (e.g. production)">
               <button type="submit">Issue key</button>
             </form>
             <pre id="createKeyOutput" class="output-block anti-capture-block" hidden></pre>
@@ -1549,8 +1576,8 @@
           <details id="createWebhookDetails">
             <summary>Add webhook</summary>
             <form id="createWebhookForm" class="create-row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
-              <input id="newWebhookUrl" autocomplete="off" placeholder="https://hooks.example.com/drm" required style="flex:2;min-width:240px">
-              <select id="newWebhookEvents" style="flex:1;min-width:160px">
+              <input id="newWebhookUrl" autocomplete="off" placeholder="https://hooks.example.com/drm" required style="flex:2;min-width:240px" aria-label="https://hooks.example.com/drm">
+              <select id="newWebhookEvents" style="flex:1;min-width:160px" aria-label="Webhook events to send">
                 <option value="*">All events</option>
                 <option value="seat_limit_approach">seat_limit_approach only</option>
                 <option value="tenant_suspended">tenant_suspended only</option>
@@ -1585,7 +1612,7 @@
             <h3>Tenant registrations</h3>
           </div>
           <div style="display:flex;gap:8px">
-            <select id="registrationStatusFilter" style="min-width:140px">
+            <select id="registrationStatusFilter" style="min-width:140px" aria-label="Filter by registration status">
               <option value="">All statuses</option>
               <option value="Pending">Pending</option>
               <option value="Verified">Verified</option>
@@ -1621,7 +1648,7 @@
           </div>
           <div class="dialog-body">
             <form id="rejectForm" class="create-row" style="flex-wrap:wrap;gap:6px">
-              <input id="rejectNotes" autocomplete="off" placeholder="Reason / notes (optional)" style="flex:1;min-width:240px">
+              <input id="rejectNotes" autocomplete="off" placeholder="Reason / notes (optional)" style="flex:1;min-width:240px" aria-label="Reason / notes (optional)">
               <button type="submit" class="danger">Reject</button>
             </form>
           </div>
@@ -1636,7 +1663,7 @@
             <h3>Access requests</h3>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <select id="arStatusFilter" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--line)">
+            <select id="arStatusFilter" style="height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--line)" aria-label="Filter by access request status">
               <option value="">All statuses</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
@@ -1792,7 +1819,7 @@
           <div class="card">
             <h4>Batch revoke</h4>
             <p class="hint">Revoke multiple files at once. Enter one File ID per line.</p>
-            <textarea id="batchRevokeIds" rows="4" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <textarea id="batchRevokeIds" rows="4" placeholder="UUID&#10;UUID&#10;UUID" aria-label="UUID&amp;#10;UUID&amp;#10;UUID"></textarea>
             <div class="btn-row">
               <button id="batchRevokeBtn" type="button" class="danger">Revoke all</button>
             </div>
@@ -1801,7 +1828,7 @@
           <div class="card">
             <h4>Batch update expiry</h4>
             <p class="hint">Set a new expiry date for multiple files. Enter one File ID per line.</p>
-            <textarea id="batchExpiryIds" rows="4" placeholder="UUID&#10;UUID&#10;UUID"></textarea>
+            <textarea id="batchExpiryIds" rows="4" placeholder="UUID&#10;UUID&#10;UUID" aria-label="UUID&amp;#10;UUID&amp;#10;UUID"></textarea>
             <label>New expiry<input id="batchExpiryDate" type="datetime-local"></label>
             <div class="btn-row">
               <button id="batchExpiryBtn" type="button">Update expiry</button>
@@ -1877,8 +1904,8 @@
         </div>
         <p class="hint">When rules are configured, only requests from matching CIDR ranges can decrypt files. Leave empty to allow all IPs.</p>
         <div class="field-row">
-          <input id="ipRuleCidr" type="text" placeholder="e.g. 10.0.0.0/8 or 203.0.113.5/32" style="flex:1;min-width:200px">
-          <input id="ipRuleLabel" type="text" placeholder="Label (optional)" style="flex:1;min-width:160px">
+          <input id="ipRuleCidr" type="text" placeholder="e.g. 10.0.0.0/8 or 203.0.113.5/32" style="flex:1;min-width:200px" aria-label="e.g. 10.0.0.0/8 or 203.0.113.5/32">
+          <input id="ipRuleLabel" type="text" placeholder="Label (optional)" style="flex:1;min-width:160px" aria-label="Label (optional)">
           <button id="addIpRuleBtn" type="button">Add rule</button>
         </div>
         <table>

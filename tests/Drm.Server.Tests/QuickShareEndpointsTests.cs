@@ -57,6 +57,41 @@ public sealed class QuickShareEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Quick_share_persists_the_original_filename_and_admin_console_shows_it()
+    {
+        // Regression guard for the "GUID-paste operational model" finding
+        // (2026-07-01 UX audit): every protected file used to be addressed
+        // only by its GUID everywhere in the product, including the admin
+        // console's file list — the original filename was already sent on
+        // this exact request and simply discarded. This proves it now
+        // survives end-to-end: QuickShare -> stored -> shown by the same
+        // list endpoint the admin console's Files panel calls.
+        using var client = factory.CreateClient();
+        var tenantId = Guid.NewGuid();
+
+        using var resp = await client.PostAsJsonAsync("/api/me/share", new
+        {
+            tenantId,
+            userId = Guid.NewGuid(),
+            recipientEmail = "grace@example.com",
+            fileName = "Q4-Sales-Contract.pdf",
+            contentType = "application/pdf",
+            fileBytesBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("contract bytes")),
+            expiresInHours = 24,
+            allowPrint = false,
+        });
+        resp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await resp.Content.ReadFromJsonAsync<QuickShareResponse>();
+
+        using var listResp = await client.GetAsync($"/api/admin/files?tenantId={tenantId}");
+        listResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var files = await listResp.Content.ReadFromJsonAsync<List<AdminFileRow>>();
+        files.Should().ContainSingle(f => f.FileId == created!.FileId && f.FileName == "Q4-Sales-Contract.pdf");
+    }
+
+    private sealed record AdminFileRow(Guid FileId, string FileName);
+
+    [Fact]
     public async Task Quick_share_url_uses_https_when_forwarded_proto_is_https()
     {
         // Behind Caddy (TLS terminator) the app sees internal http; the real

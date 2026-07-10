@@ -793,6 +793,13 @@ internal static class DatabaseInitializer
                 dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "FileGrants" ADD COLUMN "ValidFromUtc" TEXT NULL;""");
             if (!hasFileGrantsValidUntilUtc)
                 dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "FileGrants" ADD COLUMN "ValidUntilUtc" TEXT NULL;""");
+
+            // UX audit fix: every protected file was addressed only by GUID
+            // in the admin console — no human-readable name anywhere. The
+            // original filename was already being sent (QuickShare, agent
+            // registration) but discarded; this just keeps it.
+            if (!SqliteColumnExists("ProtectedFiles", "FileName"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "ProtectedFiles" ADD COLUMN "FileName" TEXT NOT NULL DEFAULT '';""");
         }
         else
         {
@@ -1112,6 +1119,11 @@ internal static class DatabaseInitializer
                 """);
             dbContext.Database.ExecuteSqlRaw("""
                 ALTER TABLE "FileGrants" ADD COLUMN IF NOT EXISTS "ValidUntilUtc" timestamptz NULL;
+                """);
+
+            // UX audit fix: see the matching SQLite comment above.
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "ProtectedFiles" ADD COLUMN IF NOT EXISTS "FileName" text NOT NULL DEFAULT '';
                 """);
         }
 
