@@ -759,6 +759,25 @@ internal static class DatabaseInitializer
                 dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDeviceTrustConfigs" ADD COLUMN "AllowedAdDomainsCsv" TEXT NOT NULL DEFAULT '';""");
             if (!SqliteColumnExists("TenantDirectorySyncConfigs", "ReconcileRemovals"))
                 dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "ReconcileRemovals" INTEGER NOT NULL DEFAULT 0;""");
+            // On-prem LDAP provider config (SQLite)
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "Provider"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "Provider" TEXT NOT NULL DEFAULT 'entra';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapHost"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapHost" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapPort"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapPort" INTEGER NOT NULL DEFAULT 636;""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapUseLdaps"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapUseLdaps" INTEGER NOT NULL DEFAULT 1;""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapBindDn"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapBindDn" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapBindPasswordEncrypted"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapBindPasswordEncrypted" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapBaseDn"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapBaseDn" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapUserFilter"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapUserFilter" TEXT NOT NULL DEFAULT '';""");
+            if (!SqliteColumnExists("TenantDirectorySyncConfigs", "LdapGroupFilter"))
+                dbContext.Database.ExecuteSqlRaw("""ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN "LdapGroupFilter" TEXT NOT NULL DEFAULT '';""");
             if (SqliteTableExists("AgentDevices"))
             {
                 if (!SqliteColumnExists("AgentDevices", "DomainJoined"))
@@ -1095,6 +1114,18 @@ internal static class DatabaseInitializer
                 """);
             dbContext.Database.ExecuteSqlRaw("""
                 ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "ReconcileRemovals" boolean NOT NULL DEFAULT FALSE;
+                """);
+            // On-prem LDAP provider config (Postgres)
+            dbContext.Database.ExecuteSqlRaw("""
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "Provider" text NOT NULL DEFAULT 'entra';
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapHost" text NOT NULL DEFAULT '';
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapPort" integer NOT NULL DEFAULT 636;
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapUseLdaps" boolean NOT NULL DEFAULT TRUE;
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapBindDn" text NOT NULL DEFAULT '';
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapBindPasswordEncrypted" text NOT NULL DEFAULT '';
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapBaseDn" text NOT NULL DEFAULT '';
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapUserFilter" text NOT NULL DEFAULT '';
+                ALTER TABLE "TenantDirectorySyncConfigs" ADD COLUMN IF NOT EXISTS "LdapGroupFilter" text NOT NULL DEFAULT '';
                 """);
             dbContext.Database.ExecuteSqlRaw("""
                 DO $$
